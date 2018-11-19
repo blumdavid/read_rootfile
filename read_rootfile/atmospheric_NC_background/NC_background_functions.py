@@ -33,6 +33,7 @@
 """
 
 import ROOT
+from array import array
 import glob
 import numpy as np
 from matplotlib import pyplot as plt
@@ -68,10 +69,1731 @@ class NCData:
 """
 
 
+def convert_genie_file_for_generator(rootfile_input, path_output):
+    """
+    function to convert the 'original' GENIE root-file from Julia to a root-file, which can be used as input for the
+    DSNB-NC.exe generator of JUNO offline.
+
+    INFO:
+    The variable isopdg can only be set for the following isotopes: C11, B11, C10, B10, Be10, C9, B9, Be9, Li9,
+    B8, Li8, Be7 and Li7.
+    For all other isotopes (e.g. C8, Be8, He8, B7, He7, H7 and lighter isotopes), NO isopdg should be set, because there
+    are no TALYS files for the de-excitation of these isotopes and therefore you get an error in DSNB-NC.exe.
+
+    :param rootfile_input: path to the original GENIE ROOT-file (for example: gntp.101.gst.root (string)
+    :param path_output: path, where the output ROOT file is saved (string)
+    :return:
+    """
+    # load the ROOT file:
+    rfile_input = ROOT.TFile(rootfile_input)
+    # get the TTree from the TFile:
+    rtree_input = rfile_input.Get("gst")
+
+    # Info-me: "gst;13" is a copy of meta data of "gst;14", "gst;14" contains correct data and is read
+
+    # set new ROOT file:
+    rfile_output = ROOT.TFile(path_output + "genie_data.root", "recreate")
+    # set new ROOT Tree:
+    rtree_output = ROOT.TTree("particleT", "particle Tree")
+
+    # get the number of entries in the ROOT-file:
+    number_entries = rtree_input.GetEntries()
+    # number_entries = 100
+
+    # set the maximal number of final particles for one event:
+    max_n_par = 20
+
+    """ preallocate all arrays: """
+    # INFO-me: type code 'd' is float-type in python and double-type in C and ROOT
+    # event number (integer):
+    event_number = array('i', [0])
+    # neutrino PDG code (integer):
+    p_pdg = array('i', [0])
+    # Nuclear target PDG code (integer):
+    t_pdg = array('i', [0])
+    # channel id of the NC interaction (integer):
+    channel_id = array('i', [0])
+    # incoming neutrino energy in GeV (double):
+    p_en = array('d', [0.])
+    # incoming neutrino x-momentum in GeV (double):
+    p_px = array('d', [0.])
+    # incoming neutrino y-momentum in GeV (double):
+    p_py = array('d', [0.])
+    # incoming neutrino z-momentum in GeV (double):
+    p_pz = array('d', [0.])
+    # PDG code of produced isotope (integer):
+    m_isopdg = array('i', [0])
+    # momentum of produced isotope in GeV (double):
+    m_isopx = array('d', [0.])
+    # momentum of produced isotope in GeV (double):
+    m_isopy = array('d', [0.])
+    # momentum of produced isotope in GeV (double):
+    m_isopz = array('d', [0.])
+    # mass of produced isotope in GeV (double):
+    m_isomass = array('d', [0.])
+    # number of final state particles in hadronic system (integer):
+    n_pars = array('i', [0])
+    # PDG code of i-th final state particle in hadronic system (array of integer):
+    pdg = array('i', max_n_par*[0])
+    # energy of i-th final state particle in hadronic system in GeV (array of double):
+    energy = array('d', max_n_par*[0.])
+    # Px of i-th final state particle in hadronic system in GeV (array of double):
+    px = array('d', max_n_par*[0.])
+    # Py of i-th final state particle in hadronic system in GeV (array of double):
+    py = array('d', max_n_par*[0.])
+    # Pz of i-th final state particle in hadronic system in GeV (array of double):
+    pz = array('d', max_n_par*[0.])
+    # mass of the i-th final particle in GeV (array of double):
+    mass = array('d', max_n_par*[0.])
+
+    # Add the arrays to the TBranch:
+    # INFO-me: D indicates that values are 'double'-type like required from the DSNB-NC.exe generator
+    rtree_output.Branch('pPdg', p_pdg, 'pPdg/I')
+    rtree_output.Branch('tPdg', t_pdg, 'tPdg/I')
+    rtree_output.Branch('channelID', channel_id, "channelID/I")
+    rtree_output.Branch('pEn', p_en, "pEn/D")
+    rtree_output.Branch('pPx', p_px, "pPx/D")
+    rtree_output.Branch('pPy', p_py, "pPy/D")
+    rtree_output.Branch('pPz', p_pz, "pPz/D")
+    rtree_output.Branch('m_isoPdg', m_isopdg, 'm_isoPdg/I')
+    rtree_output.Branch('m_isoPx', m_isopx, 'm_isoPx/D')
+    rtree_output.Branch('m_isoPy', m_isopy, 'm_isoPy/D')
+    rtree_output.Branch('m_isoPz', m_isopz, 'm_isoPz/D')
+    rtree_output.Branch('m_isoMass', m_isomass, 'm_isoMass/D')
+    rtree_output.Branch('Npars', n_pars, 'Npars/I')
+    rtree_output.Branch('pdg', pdg, 'pdg[Npars]/I')
+    rtree_output.Branch('px', px, 'px[Npars]/D')
+    rtree_output.Branch('py', py, 'py[Npars]/D')
+    rtree_output.Branch('pz', pz, 'pz[Npars]/D')
+    rtree_output.Branch('energy', energy, 'energy[Npars]/D')
+    rtree_output.Branch('mass', mass, 'mass[Npars]/D')
+
+
+    """ Read the data from the TTree: """
+    # loop over every entry, i.e. every event, in the TTree:
+    for event in range(number_entries):
+
+        # get the current event in the TTree:
+        rtree_input.GetEntry(event)
+
+        # is it a quasi-elastic scattering event? (0 = no QEL event, 1 = QEL event):
+        qel = rtree_input.GetBranch('qel').GetLeaf('qel').GetValue()
+        qel = int(qel)
+
+        # is it a NC event? (0 = no NC event, 1 = NC event):
+        nc = rtree_input.GetBranch('nc').GetLeaf('nc').GetValue()
+        nc = int(nc)
+
+        # read only NC and QEL events:
+        # if qel == 1 and nc == 1:
+        if nc == 1:
+
+            # set the event number:
+            event_number[0] = event
+
+            # get the value of neutrino PDG:
+            neu = rtree_input.GetBranch('neu').GetLeaf('neu').GetValue()
+            neu = int(neu)
+            p_pdg[0] = neu
+
+            # get the value of target PDG:
+            tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+            tgt = int(tgt)
+            t_pdg[0] = tgt
+
+            # get the value of number of final p:
+            nfp = rtree_input.GetBranch('nfp').GetLeaf('nfp').GetValue()
+            nfp = int(nfp)
+
+            # get the value of number of final n:
+            nfn = rtree_input.GetBranch('nfn').GetLeaf('nfn').GetValue()
+            nfn = int(nfn)
+
+            # get the value of number of final pi_minus:
+            nfpim = rtree_input.GetBranch('nfpim').GetLeaf('nfpim').GetValue()
+            nfpim = int(nfpim)
+
+            # get the value of number of final pi_plus:
+            nfpip = rtree_input.GetBranch('nfpip').GetLeaf('nfpip').GetValue()
+            nfpip = int(nfpip)
+
+            # get the value of number of final Kaon_minus:
+            nfkm = rtree_input.GetBranch('nfkm').GetLeaf('nfkm').GetValue()
+            nfkm = int(nfkm)
+
+            # get the value of number of final Kaon_plus:
+            nfkp = rtree_input.GetBranch('nfkp').GetLeaf('nfkp').GetValue()
+            nfkp = int(nfkp)
+
+            # preallocate the channel ID (integer):
+            ch_id = int(0)
+            # calculate the channel ID (n_nu, n_p, n_n, n_piminus, n_piplus, n_Kminus, n_Kplus)
+            if tgt == 1000060120:
+                # target C12:
+                if nfkm == 0 and nfkp == 0:
+                    # no Kaons:
+                    ch_id = int(str(1) + str(nfp) + str(nfn) + str(nfpim) + str(nfpip))
+                else:
+                    # with Kaons:
+                    ch_id = int(str(1) + str(nfp) + str(nfn) + str(nfpim) + str(nfpip) + str(nfkm) + str(nfkp))
+
+            elif tgt == 2212:
+                # target proton:
+                if nfp == 1 and nfn == 0 and nfpim == 0 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                    # interaction channel: nu + p -> nu + p (elastic scattering):
+                    ch_id = int(2)
+
+                elif nfkm == 0 and nfkp == 0:
+                    # no Kaons:
+                    ch_id = int(str(1) + str(nfp) + str(nfn) + str(nfpim) + str(nfpip))
+
+                else:
+                    # with Kaons:
+                    ch_id = int(str(1) + str(nfp) + str(nfn) + str(nfpim) + str(nfpip) + str(nfkm) + str(nfkp))
+
+            elif tgt == 11 or tgt == 1000080160 or tgt == 1000070140 or tgt == 1000160320:
+                # target either electron, N14, O16 or S32 (interaction: nu + tgt -> nu + tgt (elastic scattering)):
+                ch_id = int(3)
+
+            else:
+                print("other target PDG as expected (no C12, p, e, N14, O16, S32)")
+                print(tgt)
+
+            # add ch_id to the tree (integer):
+            channel_id[0] = ch_id
+
+            # preallocate the PDG code and the mass of the isotope:
+            isopdg = int(0)
+            isomass = float(0.0)
+            # calculate the PDG of the isotope:
+            if tgt == 1000060120:
+                # target C12
+                if (nfp + nfn) == 1:
+                    # possible isotopes: B11, C11
+                    if nfp == 1 and nfn == 0 and (nfpim - nfpip) == 0:
+                        # interaction: nu + C12 -> nu + B11 + p + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000050110)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 1 and (nfpim - nfpip) == -1:
+                        # interaction: nu + C12 -> nu + B11 + n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000050110)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 1 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + C11 + n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000060110)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 0 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + C11 + p + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000060110)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    else:
+                        print("other possible channels with B11 and C11: nfp={0:d}, nfn={1:d}, nfpim={2:d}, nfpip={3:d}"
+                              .format(nfp, nfn, nfpim, nfpip))
+                        ## other possible channel with B11 and C11 (interactions with Be11 and Li11 are not possible):
+                        ## dummy isopdg for this case:
+                        ## isopdg = int(110000000)
+
+                elif (nfp + nfn) == 2:
+                    # possible isotopes: B10, C10, Be10
+                    if nfp == 1 and nfn == 1 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + B10 + p + n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000050100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 0 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + B10 + 2p + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000050100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 2 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + B10 + 2n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000050100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 2 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + C10 + 2n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000060100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 1 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + C10 + p + n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000060100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 0 and (nfpim - nfpip) == 2:
+                        # channel: nu + C12 -> nu + C10 + 2p + ((N+2)*pi_minus + N*pi_plus):
+                        isopdg = int(1000060100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 0 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Be10 + 2p + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000040100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 1 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Be10 + p + n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000040100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 2 and (nfpim - nfpip) == -2:
+                        # channel: nu + C12 -> nu + Be10 + 2n + (N*pi_minus + (N+2)*pi_plus):
+                        isopdg = int(1000040100)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    else:
+                        print("other possible channels with C10, B10, Be10: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                        ## other possible channel with B10, C10, Be10 (interaction with N10, Li10, He10 are not possible)
+                        ## dummy isopdg for this case:
+                        ##isopdg = int(100000000)
+
+                elif (nfp + nfn) == 3:
+                    # possible isotopes: B9, C9, Be9, Li9
+                    if nfp == 1 and nfn == 2 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + B9 + p + 2n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000050090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 1 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + B9 + 2p + n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000050090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 3 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + B9 + 3n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000050090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 0 and (nfpim - nfpip) == 2:
+                        # channel: nu + C12 -> nu + B9 + 3p + ((N+2)*pi_minus + N*pi_plus):
+                        isopdg = int(1000050090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 3 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + C9 + 3n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000060090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 2 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + C9 + p + 2n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000060090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 1 and (nfpim - nfpip) == 2:
+                        # channel: nu + C12 -> nu + C9 + 2p + n + ((N+2)*pi_minus + N*pi_plus):
+                        isopdg = int(1000060090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 1 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Be9 + 2p + n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000040090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 2 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Be9 + p + 2n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000040090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 0 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + Be9 + 3p + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000040090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 3 and (nfpim - nfpip) == -2:
+                        # channel: nu + C12 -> nu + Be9 + 3n + (N*pi_minus + (N+2)*pi_plus):
+                        isopdg = int(1000040090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 0 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Li9 + 3p + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000030090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 1 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Li9 + 2p + n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000030090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 2 and (nfpim - nfpip) == -2:
+                        # channel: nu + C12 -> nu + Li9 + p + 2n + (N*pi_minus + (N+2)*pi_plus):
+                        isopdg = int(1000030090)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    else:
+                        print("other possible channels with B9, C9, Be9, Li9: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                        ## other possible channel with B9, C9, Be9, Li9 (interactions with He9 are not possible):
+                        ## dummy isopdg for this case:
+                        ## isopdg = int(90000000)
+
+                elif (nfp + nfn) == 4:
+                    # possible isotopes: C8, B8, Be8, Li8, He8
+                    if nfp == 1 and nfn == 3 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + B8 + p + 3n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000050080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 2 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + B8 + 2p + 2n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000050080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + B8 + 4n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000050080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 2 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Be8 + 2p + 2n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000040080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 1 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + Be8 + 3p + n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000040080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 3 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Be8 + p + 3n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000040080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == -2:
+                        # channel: nu + C12 -> nu + Be8 + 4n + (N*pi_minus + (N+2)*pi_plus):
+                        isopdg = int(1000040080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 2:
+                        # channel: nu + C12 -> nu + Be8 + 4p + ((N+2)*pi_minus + N*pi_plus):
+                        isopdg = int(1000040080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 1 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Li8 + 3p + n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000030080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + Li8 + 4p + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000030080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 2 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Li8 + 2p + 2n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000030080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 3 and (nfpim - nfpip) == -2:
+                        # channel: nu + C12 -> nu + Li8 + p + 3n + (N*pi_minus + (N+2)*pi_plus):
+                        isopdg = int(1000030080)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    ## elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == 0:
+                    ##     # channel: nu + C12 -> nu + C8 + 4n + (N*pi_minus + N*pi_plus):
+                    ##     isopdg = int(1000060080)
+                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    ## elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 0:
+                    ##     # channel: nu + C12 -> nu + He8 + 4p + (N*pi_minus + N*pi_plus):
+                    ##     isopdg = int(1000020080)
+                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    else:
+                        print("other possible channels with B8, Be8, Li8, C8, He8: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                        ## other possible channel with B8, Be8, Li8, C8, He8 are produced:
+                        ## dummy isopdg for this case:
+                        ## isopdg = int(80000000)
+
+                elif (nfn + nfp) == 5:
+                    # possible isotopes: Be7, Li7, B7, He7, H7
+                    if nfp == 2 and nfn == 3 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Be7 + 2p + 3n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000040070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 4 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Be7 + p + 4n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000040070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 2 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + Be7 + 3p + 2n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000040070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 1 and (nfpim - nfpip) == 2:
+                        # channel: nun + C12 -> nu + Be7 + 4p + n + ((N+2)*pi_minus + N*pi_plus):
+                        isopdg = int(1000040070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 3 and nfn == 2 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + Li7 + 3p + 2n + (N*pi_minus + N*pi_plus):
+                        isopdg = int(1000030070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 2 and nfn == 3 and (nfpim - nfpip) == -1:
+                        # channel: nu + C12 -> nu + Li7 + 2p + 3n + (N*pi_minus + (N+1)*pi_plus):
+                        isopdg = int(1000030070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 1 and (nfpim - nfpip) == 1:
+                        # channel: nu + C12 -> nu + Li7 + 4p + n + ((N+1)*pi_minus + N*pi_plus):
+                        isopdg = int(1000030070)
+                        isomass = float(get_mass_from_pdg(isopdg))
+                    ## elif nfp == 1 and nfn == 4 and (nfpim - nfpip) == 0:
+                    ##     # channel: nu + C12 -> nu + B7 + p + 4n + (N*pi_minus + N*pi_plus):
+                    ##     isopdg = int(1000050070)
+                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    ## elif nfp == 4 and nfn == 1 and (nfpim - nfpip) == 0:
+                    ##     # channel: nu + C12 -> nu + He7 + 4p + n + (N*pi_minus + N*pi_plus):
+                    ##     isopdg = int(1000020070)
+                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    ## elif nfp == 5 and nfn == 0 and (nfpim - nfpip) == 0:
+                    ##     # channel: nu + C12 -> nu + H7 + 5p + (N*pi_minus + N*pi_plus):
+                    ##     isopdg = int(1000010070)
+                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    else:
+                        print("other possible channels with Be7, Li7, B7, He7, H7: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                        ## other possible channel with Be7, Li7, B7, He7, H7 are produced:
+                        ## dummy isopdg for this case:
+                        ## isopdg = int(70000000)
+
+                # elif (nfn + nfp) == 6:
+                #     # possible isotopes: Li6, Be6, He6, H6:
+                #     if nfp == 3 and nfn == 3 and (nfpim - nfpip) == 0:
+                #         # channel: nu + C12 -> nu + Li6 + 3p + 3n + (N*pi_minus + N*pi_plus):
+                #         isopdg = int(1000030060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 2 and nfn == 4 and (nfpim - nfpip) == -1:
+                #         # channel: nu + C12 -> nu + Li6 + 2p + 4n + (N*pi_minus + (N+1)*pi_plus):
+                #         isopdg = int(1000030060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 4 and nfn == 2 and (nfpim - nfpip) == 1:
+                #         # channel: nu + C12 -> nu + Li6 + 4p + 2n + ((N+1)*pi_minus + N*pi_plus):
+                #         isopdg = int(1000030060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 5 and nfn == 1 and (nfpim - nfpip) == 2:
+                #         # channel: nu + C12 -> nu + Li6 + 5p + n + ((N+2)*pi_minus + N*pi_plus):
+                #         isopdg = int(1000030060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 1 and nfn == 5 and (nfpim - nfpip) == -2:
+                #         # channel: nu + C12 -> nu + Li6 + p + 5n + (N*pi_minus + (N+2)*pi_plus):
+                #         isopdg = int(1000030060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 2 and nfn == 4 and (nfpim - nfpip) == 0:
+                #         # channel: nu + C12 -> nu + Be6 + 2p + 4n + (N*pi_minus + N*pi_plus):
+                #         isopdg = int(1000040060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 4 and nfn == 2 and (nfpim - nfpip) == 0:
+                #         # channel: nu + C12 -> nu + He6 + 4p + 2n + (N*pi_minus + N*pi_plus):
+                #         isopdg = int(1000020060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     elif nfp == 5 and nfn == 1 and (nfpim - nfpip) == 0:
+                #         # channel: nu + C12 -> nu + H6 + 5p + n + (N*pi_minus + N*pi_plus):
+                #         isopdg = int(1000010060)
+                #         isomass = float(get_mass_from_pdg(isopdg))
+                #     else:
+                #         # other possible channel with Li6 ot interactions, where Be6, He6 or H6 are produced:
+                #         # dummy isopdg for this case:
+                #         isopdg = int(60000000)
+
+                else:
+                    print("other possible channels lighter isotopes (mass<=6): nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                    ## other possible isotopes, which can be created (possible isotopes with mass number of 5, 4, 3, 2):
+                    ## dummy isopdg for this case:
+                    ## isopdg = int(50000000)
+
+            else:
+                # target: p, e, N14, O16 or S32 -> no isotope is produced:
+                isopdg = int(0)
+                isomass = float(0.0)
+
+            # add isopdg to the tree (integer):
+            m_isopdg[0] = isopdg
+            # add momentum of isotope to the tree (set momentum=0, because there is no information about the momentum)
+            # (float):
+            m_isopx[0] = float(0)
+            m_isopy[0] = float(0)
+            m_isopz[0] = float(0)
+            # add mass of isotope to the tree (float):
+            m_isomass[0] = isomass
+
+            # get the value of energy of incoming neutrino:
+            ev = rtree_input.GetBranch('Ev').GetLeaf('Ev').GetValue()
+            p_en[0] = ev
+
+            # get the x momentum of incoming neutrino:
+            pxv = rtree_input.GetBranch('pxv').GetLeaf('pxv').GetValue()
+            p_px[0] = pxv
+
+            # get the y momentum of incoming neutrino:
+            pyv = rtree_input.GetBranch('pyv').GetLeaf('pyv').GetValue()
+            p_py[0] = pyv
+
+            # get the x momentum of incoming neutrino:
+            pzv = rtree_input.GetBranch('pzv').GetLeaf('pzv').GetValue()
+            p_pz[0] = pzv
+
+            # get the value of number of final particles:
+            nf = rtree_input.GetBranch('nf').GetLeaf('nf').GetValue()
+            nf = int(nf)
+            n_pars[0] = nf
+
+            # loop over all i final particles in one event:
+            for index in range(nf):
+                # get the value of the final PDG and append it to the array:
+                pdgf = rtree_input.GetBranch('pdgf').GetLeaf('pdgf').GetValue(index)
+                pdgf = int(pdgf)
+                pdg[index] = pdgf
+
+                # get the value of the x-momentum in GeV and append it to the array:
+                pxf = rtree_input.GetBranch('pxf').GetLeaf('pxf').GetValue(index)
+                px[index] = pxf
+
+                # get the value of the x-momentum in GeV and append it to the array:
+                pyf = rtree_input.GetBranch('pyf').GetLeaf('pyf').GetValue(index)
+                py[index] = pyf
+
+                # get the value of the x-momentum in GeV and append it to the array:
+                pzf = rtree_input.GetBranch('pzf').GetLeaf('pzf').GetValue(index)
+                pz[index] = pzf
+
+                # get the value of energy of the final particle in GeV and append it to the array:
+                ef = rtree_input.GetBranch('Ef').GetLeaf('Ef').GetValue(index)
+                energy[index] = ef
+
+                # get the mass of the final particle from its PDG code and append it to the array:
+                mass_value = get_mass_from_pdg(pdgf)
+                mass[index] = mass_value
+
+            # Fill this one event to the TTree and go to the next event:
+            rtree_output.Fill()
+
+    # write TTree to the TFile:
+    rfile_output.Write()
+    rfile_output.Close()
+
+    return
+
+
+def get_channels_from_original_genie_file(rootfile_input):
+    """
+    function to read the 'original' GENIE root-file from Julia check the fractions of the different NC interaction
+    channels from variables nfp, nfn, nfpim, nfpip
+
+    :param rootfile_input: path to the original GENIE ROOT-file (for example: gntp.101.gst.root (string)
+
+    :return:
+    """
+    # load the ROOT file:
+    rfile_input = ROOT.TFile(rootfile_input)
+    # get the TTree from the TFile:
+    rtree_input = rfile_input.Get("gst")
+
+    # Info-me: "gst;13" is a copy of meta data of "gst;14", "gst;14" contains correct data and is read
+
+    # get the number of entries in the ROOT-file:
+    number_entries = rtree_input.GetEntries()
+    # number_entries = 10000
+
+    """ preallocate all arrays: """
+    """ B11 """
+    # number of interaction channel: nu + C12 -> B11 + p (integer):
+    number_c12_b11_p = 0
+    # number of interaction channel: nu + C12 -> B11 + n + pi_plus (integer):
+    number_c12_b11_n_piplus = 0
+    # number of interaction channel: nu + C12 -> B11 + n + pi_minus + 2*pi_plus (integer):
+    number_c12_b11_n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B11 + p + pi_minus + pi_plus (integer):
+    number_c12_b11_p_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B11 + p + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_b11_p_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B11 + pi_plus (integer):
+    number_c12_b11_piplus = 0
+
+    """ C11 """
+    # number of interaction channel: nu + C12 -> C11 + n (integer):
+    number_c12_c11_n = 0
+    # number of interaction channel: nu + C12 -> C11 + p + pi_minus (integer):
+    number_c12_c11_p_piminus = 0
+    # number of interaction channel: nu + C12 -> C11 + n + pi_minus + pi_plus (integer):
+    number_c12_c11_n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> C11 + p + 2*pi_minus + pi_plus (integer):
+    number_c12_c11_p_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> C11 + p + 3*pi_minus + 2*pi_plus (integer):
+    number_c12_c11_p_3piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> C11 + n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_c11_n_2piminus_2piplus = 0
+
+    """ B10 """
+    # number of interaction channel: nu + C12 -> B10 + p + n (integer):
+    number_c12_b10_p_n = 0
+    # number of interaction channel: nu + C12 -> B10 + 2p + pi_minus (integer):
+    number_c12_b10_2p_piminus = 0
+    # number of interaction channel: nu + C12 -> B10 + p + n + pi_minus + pi_plus (integer):
+    number_c12_b10_p_n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B10 + 2n + pi_plus (integer):
+    number_c12_b10_2n_piplus = 0
+    # number of interaction channel: nu + C12 -> B10 + 2n + pi_minus + 2*pi_plus (integer):
+    number_c12_b10_2n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B10 + 2p + 2*pi_minus + pi_plus (integer):
+    number_c12_b10_2p_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B10 + 2p + 3*pi_minus + 2*pi_plus (integer):
+    number_c12_b10_2p_3piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B10 + p + n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_b10_p_n_2piminus_2piplus = 0
+
+    """ C10 """
+    # number of interaction channel: nu + C12 -> C10 + 2n (integer):
+    number_c12_c10_2n = 0
+    # number of interaction channel: nu + C12 -> C10 + p + n + pi_minus (integer):
+    number_c12_c10_p_n_piminus = 0
+    # number of interaction channel: nu + C12 -> C10 + p + n + 2*pi_minus + pi_plus (integer):
+    number_c12_c10_p_n_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> C10 + 2n + pi_minus + pi_plus (integer):
+    number_c12_c10_2n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> C10 + 2p + 2*pi_minus (integer):
+    number_c12_c10_2p_2piminus = 0
+
+    """ Be10 """
+    # number of interaction channel: nu + C12 -> Be10 + 2*p (integer):
+    number_c12_be10_2p = 0
+    # number of interaction channel: nu + C12 -> Be10 + p + n + pi_plus (integer):
+    number_c12_be10_p_n_piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + p + n + pi_minus + 2*pi_plus (integer):
+    number_c12_be10_p_n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + 2*p + pi_minus + pi_plus (integer):
+    number_c12_be10_2p_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + 2*n + 2*pi_plus (integer):
+    number_c12_be10_2n_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + p + n + 2*pi_minus + 3*pi_plus (integer):
+    number_c12_be10_p_n_2piminus_3piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + 2*p + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_be10_2p_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be10 + 2*p + 3*pi_minus + 3*pi_plus (integer):
+    number_c12_be10_2p_3piminus_3piplus = 0
+
+    """ B9 """
+    # number of interaction channel: nu + C12 -> B9 + p + 2n (integer):
+    number_c12_b9_p_2n = 0
+    # number of interaction channel: nu + C12 -> B9 + p + 2n + pi_minus + pi_plus (integer):
+    number_c12_b9_p_2n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B9 + 2p + n + 3*pi_minus + 2*pi_plus (integer):
+    number_c12_b9_2p_n_3piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B9 + 2p + n + pi_minus (integer):
+    number_c12_b9_2p_n_piminus = 0
+    # number of interaction channel: nu + C12 -> B9 + 3n + pi_plus (integer):
+    number_c12_b9_3n_piplus = 0
+    # number of interaction channel: nu + C12 -> B9 + p + 2n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_b9_p_2n_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> B9 + 2p + n + 2*pi_minus+ pi_plus (integer):
+    number_c12_b9_2p_n_2piminus_piplus = 0
+
+    """ Be9 """
+    # number of interaction channel: nu + C12 -> Be9 + 2*p + n (integer):
+    number_c12_be9_2p_n = 0
+    # number of interaction channel: nu + C12 -> Be9 + p + 2n + pi_plus (integer):
+    number_c12_be9_p_2n_piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 3p + pi_minus (integer):
+    number_c12_be9_3p_piminus = 0
+    # number of interaction channel: nu + C12 -> Be9 + p + 2n + pi_minus + 2*pi_plus (integer):
+    number_c12_be9_p_2n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 2p + n + pi_minus + pi_plus (integer):
+    number_c12_be9_2p_n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 2p + n + 3*pi_minus + 3*pi_plus (integer):
+    number_c12_be9_2p_n_3piminus_3piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 2p + n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_be9_2p_n_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 3n + 2*pi_plus (integer):
+    number_c12_be9_3n_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be9 + 3p + 2*pi_minus + pi_plus (integer):
+    number_c12_be9_3p_2piminus_piplus = 0
+
+    """ Be8 """
+    # number of interaction channel: nu + C12 -> Be8 + 2p + 2n (integer):
+    number_c12_be8_2p_2n = 0
+    # number of interaction channel: nu + C12 -> Be8 + 3p + n + pi_minus (integer):
+    number_c12_be8_3p_n_piminus = 0
+    # number of interaction channel: nu + C12 -> Be8 + p + 3n + pi_plus (integer):
+    number_c12_be8_p_3n_piplus = 0
+    # number of interaction channel: nu + C12 -> Be8 + 2p + 2n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_be8_2p_2n_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be8 + 4n + 2*pi_plus (integer):
+    number_c12_be8_4n_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be8 + 2p + 2n + pi_minus * pi_plus (integer):
+    number_c12_be8_2p_2n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Be8 + 3p + n + 2*pi_minus + pi_plus (integer):
+    number_c12_be8_3p_n_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Be8 + 4p + 2*pi_minus (integer):
+    number_c12_be8_4p_2piminus = 0
+
+    """ C9 """
+    # number of interaction channel: nu + C12 -> C9 + p + 2n + pi_minus (integer):
+    number_c12_c9_p_2n_piminus = 0
+    # number of interaction channel: nu + C12 -> C9 + 3n (integer):
+    number_c12_c9_3n = 0
+    # number of interaction channel: nu + C12 -> C9 + 2p + n + 2*pi_minus (integer):
+    number_c12_c9_2p_n_2piminus = 0
+    # number of interaction channel: nu + C12 -> C9 + 3n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_c9_3n_2piminus_2piplus = 0
+
+    """ Be7 """
+    # number of interaction channel: nu + C12 -> Be7 + 2p + 3n (integer):
+    number_c12_be7_2p_3n = 0
+    # number of interaction channel: nu + C12 -> Be7 + p + 4n + pi_plus (integer):
+    number_c12_be7_p_4n_piplus = 0
+    # number of interaction channel: nu + C12 -> Be7 + 2p + 3n + 2*pi_minus + 2*pi_plus (integer):
+    number_c12_be7_2p_3n_2piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Be7 + 3p + 2n + pi_minus (integer):
+    number_c12_be7_3p_2n_piminus = 0
+    # number of interaction channel: nu + C12 -> Be7 + 4p + n + 2*pi_minus (integer):
+    number_c12_be7_4p_n_2piminus = 0
+    # number of interaction channel: nu + C12 -> Be7 + 3p + 2n + 2*pi_minus + pi_plus (integer):
+    number_c12_be7_3p_2n_2piminus_piplus = 0
+
+    """ Li6 """
+    # number of interaction channel: nu + C12 -> Li6 + 3p + 3n (integer):
+    number_c12_li6_3p_3n = 0
+    # number of interaction channel: nu + C12 -> Li6 + 2p + 4n + pi_plus (integer):
+    number_c12_li6_2p_4n_piplus = 0
+    # number of interaction channel: nu + C12 -> Li6 + 5p + n + 2*pi_minus (integer):
+    number_c12_li6_5p_n_2piminus = 0
+    # number of interaction channel: nu + C12 -> Li6 + 2p + 4n + pi_minus + 2*pi_plus (integer):
+    number_c12_li6_2p_4n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Li6 + 4p + 2n + pi_minus (integer):
+    number_c12_li6_4p_2n_piminus = 0
+    # number of interaction channel: nu + C12 -> Li6 + 3p + 3n + pi_minus + pi_plus (integer):
+    number_c12_li6_3p_3n_piminus_piplus = 0
+
+    """ Li8 """
+    # number of interaction channel: nu + C12 -> Li8 + 3p + n (integer):
+    number_c12_li8_3p_n = 0
+    # number of interaction channel: nu + C12 -> Li8 + 4p + pi_minus (integer):
+    number_c12_li8_4p_piminus = 0
+    # number of interaction channel: nu + C12 -> Li8 + 4p + 2*pi_minus + pi_plus (integer):
+    number_c12_li8_4p_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Li8 + 2p + 2n + pi_plus (integer):
+    number_c12_li8_2p_2n_piplus = 0
+    # number of interaction channel: nu + C12 -> Li8 + 3p + n + pi_minus + pi_plus (integer):
+    number_c12_li8_3p_n_piminus_piplus = 0
+
+    """ Li7 """
+    # number of interaction channel: nu + C12 -> Li7 + 2p + 3n + pi_plus (integer):
+    number_c12_li7_2p_3n_piplus = 0
+    # number of interaction channel: nu + C12 -> Li7 + 4p + n + pi_minus (integer):
+    number_c12_li7_4p_n_piminus = 0
+    # number of interaction channel: nu + C12 -> Li7 + 3p + 2n (integer):
+    number_c12_li7_3p_2n = 0
+    # number of interaction channel: nu + C12 -> Li7 + 3p + 2n + pi_minus + pi_plus (integer):
+    number_c12_li7_3p_2n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Li7 + 4p + n + 2*pi_minus + pi_plus (integer):
+    number_c12_li7_4p_n_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Li7 + 2p + 3n + pi_minus + 2*pi_plus (integer):
+    number_c12_li7_2p_3n_piminus_2piplus = 0
+
+    """ B8 """
+    # number of interaction channel: nu + C12 -> B8 + p + 3n (integer):
+    number_c12_b8_p_3n = 0
+    # number of interaction channel: nu + C12 -> B8 + p + 3n + pi_minus + pi_plus (integer):
+    number_c12_b8_p_3n_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B8 + 2p + 2n + 2*pi_minus + pi_plus (integer):
+    number_c12_b8_2p_2n_2piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> B8 + 2p + 2n + pi_minus (integer):
+    number_c12_b8_2p_2n_piminus = 0
+    # number of interaction channel: nu + C12 -> B8 + 4n + pi_plus (integer):
+    number_c12_b8_4n_piplus = 0
+
+    """ Li9 """
+    # number of interaction channel: nu + C12 -> Li9 + 2p + n + pi_plus (integer):
+    number_c12_li9_2p_n_piplus = 0
+    # number of interaction channel: nu + C12 -> Li9 + 3p (integer).
+    number_c12_li9_3p = 0
+    # number of interaction channel: nu + C12 -> Li9 + 3p + pi_minus + pi_plus (integer):
+    number_c12_li9_3p_piminus_piplus = 0
+    # number of interaction channel: nu + C12 -> Li9 + 2p + n + pi_minus + 2*pi_plus (integer):
+    number_c12_li9_2p_n_piminus_2piplus = 0
+    # number of interaction channel: nu + C12 -> Li9 + p + 2n + pi_minus + 3*pi_plus (integer):
+    number_c12_li9_p_2n_piminus_3piplus = 0
+
+    """ C8 """
+    # number of interaction channel: nu + C12 -> C8 + 4n (integer):
+    number_c12_c8_4n = 0
+
+    """ He8 """
+    # number of interaction channel: nu + C12 -> He8 + 4p (integer):
+    number_c12_he8_4p = 0
+
+    """ B7 """
+    # number of interaction channel: nu + C12 -> B7 + p + 4n (integer):
+    number_c12_b7_p_4n = 0
+
+    """ He7 """
+    # number of interaction channel: nu + C12 -> He7 + 4p + n (integer):
+    number_c12_he7_4p_n = 0
+
+    """ H7 """
+    # number of interaction channel: nu + C12 -> H7 + 4p + n (integer):
+    number_c12_h7_5p = 0
+
+    """ Be6 """
+    # number of interaction channel: nu + C12 -> Be6 + 2p + 4n (integer):
+    number_c12_be6_2p_4n = 0
+
+    """ Li5 """
+    # number of interaction channel: nu + C12 -> Li5 + 3p + 4n (integer):
+    number_c12_li5_3p_4n = 0
+
+    """ Li4 """
+    # number of interaction channel: nu + C12 -> Li4 + 3p + 5n (integer):
+    number_c12_li4_3p_5n = 0
+
+    """ He6 """
+    # number of interaction channel: nu + C12 -> He6 + 4p + 2n (integer):
+    number_c12_he6_4p_2n = 0
+
+    """ He5 """
+    # number of interaction channel: nu + C12 -> He5 + 4p + 3n (integer):
+    number_c12_he5_4p_3n = 0
+
+    """ He4 """
+    # number of interaction channel: nu + C12 -> He4 + 4p + 4n (integer):
+    number_c12_he4_4p_4n = 0
+
+    """ He3 """
+    # number of interaction channel: nu + C12 -> He3 + 4p + 5n (integer):
+    number_c12_he3_4p_5n = 0
+
+    """ H6 """
+    # number of interaction channel: nu + C12 -> H6 + 5p + n (integer):
+    number_c12_h6_5p_n = 0
+
+    """ H5 """
+    # number of interaction channel: nu + C12 -> H5 + 5p + 2n (integer):
+    number_c12_h5_5p_2n = 0
+
+    """ H4 """
+    # number of interaction channel: nu + C12 -> H4 + 5p + 3n + ... (integer):
+    number_c12_h4_5p_3n = 0
+
+    """ H3 = tritium """
+    # number of interaction channel: nu + C12 -> H3 + 5p + 4n + ... (integer):
+    number_c12_h3_5p_4n = 0
+
+    """ H2 = deuteron """
+    # number of interaction channel: nu + C12 -> H2 + 5p + 5n + ... (integer):
+    number_c12_h2_5p_5n = 0
+
+    """ C12 """
+    # number of interaction channels: nu + C12 -> nu + C12 + other particles (like pi_minus, pi_plus, kaon_minus,
+    # koan_plus and so on):
+    number_c12_c12 = 0
+
+    """ no isotope (only protons, neutrons, pions): """
+    # number of interaction channels with NO isotope (only proton, neutrons, pions):
+    number_c12_noiso = 0
+
+    """ missing interaction channels: not yet implemented channels: """
+    # number of interaction channels: nu + C12 -> nu + C12 + ...:
+    number_c12_missing = 0
+
+    """ Other targets than C12: """
+    # number of channels without C12 as target (integer):
+    number_no_c12 = 0
+    # number of elastic scattering interactions with protons: nu + p -> nu + p + ... (integer):
+    number_es_p = 0
+    # number of elastic scattering interactions with electrons: nu + electron -> nu + electron + ... (integer):
+    number_es_e = 0
+    # number of elastic scattering interactions with O16: nu + O16 -> nu + O16 + ... (integer):
+    number_es_o16 = 0
+    # number of elastic scattering interactions with N14: nu + N14 -> nu + N14 + ... (integer):
+    number_es_n14 = 0
+    # number of elastic scattering interactions with S32: nu + S32 -> nu + S32 + ... (integer):
+    number_es_s32 = 0
+
+    # number of events for the current interactions (e.g. only NC, or NC + QEL, ...):
+    number_events = 0
+
+    """ Read the data from the TTree: """
+    # loop over every entry, i.e. every event, in the TTree:
+    for event in range(number_entries):
+
+        # get the current event in the TTree:
+        rtree_input.GetEntry(event)
+
+        # is it a quasi-elastic scattering event? (0 = no QEL event, 1 = QEL event):
+        qel = rtree_input.GetBranch('qel').GetLeaf('qel').GetValue()
+        qel = int(qel)
+
+        # is it a NC event? (0 = no NC event, 1 = NC event):
+        nc = rtree_input.GetBranch('nc').GetLeaf('nc').GetValue()
+        nc = int(nc)
+
+        # read only NC and QEL events:
+        # if qel == 1 and nc == 1:
+        if nc == 1:
+
+            # increase the number of events:
+            number_events = number_events + 1
+
+            # get the value of target PDG:
+            tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+            tgt = int(tgt)
+
+            # get the value of number of final p:
+            nfp = rtree_input.GetBranch('nfp').GetLeaf('nfp').GetValue()
+            nfp = int(nfp)
+
+            # get the value of number of final n:
+            nfn = rtree_input.GetBranch('nfn').GetLeaf('nfn').GetValue()
+            nfn = int(nfn)
+
+            # get the value of number of final pi_minus:
+            nfpim = rtree_input.GetBranch('nfpim').GetLeaf('nfpim').GetValue()
+            nfpim = int(nfpim)
+
+            # get the value of number of final pi_plus:
+            nfpip = rtree_input.GetBranch('nfpip').GetLeaf('nfpip').GetValue()
+            nfpip = int(nfpip)
+
+            # get the value of number of final Kaon_minus:
+            nfkm = rtree_input.GetBranch('nfkm').GetLeaf('nfkm').GetValue()
+            nfkm = int(nfkm)
+
+            # get the value of number of final Kaon_plus:
+            nfkp = rtree_input.GetBranch('nfkp').GetLeaf('nfkp').GetValue()
+            nfkp = int(nfkp)
+
+
+            # Get the NC interaction channel of the event:
+            if tgt == 1000060120:
+                # target C12
+
+                # B11:
+                if nfp == 1 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B11 + proton:
+                    number_c12_b11_p = number_c12_b11_p + 1
+
+                elif nfp == 0 and nfn == 1 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B11 + n + pi_plus:
+                    number_c12_b11_n_piplus = number_c12_b11_n_piplus + 1
+
+                elif nfp == 0 and nfn == 1 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B11 + n + pi_minus * 2*pi_plus:
+                    number_c12_b11_n_piminus_2piplus = number_c12_b11_n_piminus_2piplus + 1
+
+                elif nfp == 1 and nfn == 0 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B11 + p + pi_minus + pi_plus:
+                    number_c12_b11_p_piminus_piplus = number_c12_b11_p_piminus_piplus + 1
+
+                elif nfp == 1 and nfn == 0 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B11 + p + 2*pi_minus + 2*pi_plus:
+                    number_c12_b11_p_2piminus_2piplus = number_c12_b11_p_2piminus_2piplus + 1
+
+                elif nfp == 0 and nfn == 0 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B11 + pi_plus:
+                    number_c12_b11_piplus = number_c12_b11_piplus + 1
+
+                # C11:
+                elif nfp == 0 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C11 + n:
+                    number_c12_c11_n = number_c12_c11_n + 1
+
+                elif nfp == 1 and nfn == 0 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C11 + p + pi_minus:
+                    number_c12_c11_p_piminus = number_c12_c11_p_piminus + 1
+
+                elif nfp == 0 and nfn == 1 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> C11 + n + pi_minus + pi_plus:
+                    number_c12_c11_n_piminus_piplus = number_c12_c11_n_piminus_piplus + 1
+
+                elif nfp == 1 and nfn == 0 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> C11 + p + 2*pi_minus + pi_plus:
+                    number_c12_c11_p_2piminus_piplus = number_c12_c11_p_2piminus_piplus + 1
+
+                elif nfp == 1 and nfn == 0 and nfpim == 3 and nfpip == 2:
+                    # interaction channel: nu + C12 -> C11 + p + 3*pi_minus + 2*pi_plus:
+                    number_c12_c11_p_3piminus_2piplus = number_c12_c11_p_3piminus_2piplus + 1
+
+                elif nfp == 0 and nfn == 1 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> C11 + n + 2*pi_minus + 2*pi_plus:
+                    number_c12_c11_n_2piminus_2piplus = number_c12_c11_n_2piminus_2piplus + 1
+
+                # B10:
+                elif nfp == 1 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B10 + p + n:
+                    number_c12_b10_p_n = number_c12_b10_p_n + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B10 + 2*p + pi_minus:
+                    number_c12_b10_2p_piminus = number_c12_b10_2p_piminus + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B10 + p + n + pi_minus + pi_plus:
+                    number_c12_b10_p_n_piminus_piplus = number_c12_b10_p_n_piminus_piplus + 1
+
+                elif nfp == 0 and nfn == 2 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B10 + 2*n + pi_plus:
+                    number_c12_b10_2n_piplus = number_c12_b10_2n_piplus + 1
+
+                elif nfp == 0 and nfn == 2 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B10 + 2*n + pi_minus + 2*pi_plus:
+                    number_c12_b10_2n_piminus_2piplus = number_c12_b10_2n_piminus_2piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B10 + 2*p + 2*pi_minus + pi_plus:
+                    number_c12_b10_2p_2piminus_piplus = number_c12_b10_2p_2piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 3 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B10 + 2*p + 3*pi_minus + 2*pi_plus:
+                    number_c12_b10_2p_3piminus_2piplus = number_c12_b10_2p_3piminus_2piplus + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B10 + p + n + 2*pi_minus + 2*pi_plus:
+                    number_c12_b10_p_n_2piminus_2piplus = number_c12_b10_p_n_2piminus_2piplus + 1
+
+                # C10:
+                elif nfp == 0 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C10 + 2n:
+                    number_c12_c10_2n = number_c12_c10_2n + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C10 + p + n + pi_minus:
+                    number_c12_c10_p_n_piminus = number_c12_c10_p_n_piminus + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> C10 + p + n + 2*pi_minus + pi_plus:
+                    number_c12_c10_p_n_2piminus_piplus = number_c12_c10_p_n_2piminus_piplus + 1
+
+                elif nfp == 0 and nfn == 2 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> C10 + 2*n + pi_minus + pi_plus:
+                    number_c12_c10_2n_piminus_piplus = number_c12_c10_2n_piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 2 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C10 + 2*p + 2*pi_minus:
+                    number_c12_c10_2p_2piminus = number_c12_c10_2p_2piminus + 1
+
+                # Be10:
+                elif nfp == 2 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be10 + 2*p:
+                    number_c12_be10_2p = number_c12_be10_2p + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be10 + p + n + pi_plus:
+                    number_c12_be10_p_n_piplus = number_c12_be10_p_n_piplus + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be10 + p + n + pi_minus + 2*pi_plus:
+                    number_c12_be10_p_n_piminus_2piplus = number_c12_be10_p_n_piminus_2piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be10 + 2*p + pi_minus + pi_plus:
+                    number_c12_be10_2p_piminus_piplus = number_c12_be10_2p_piminus_piplus + 1
+
+                elif nfp == 0 and nfn == 2 and nfpim == 0 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be10 + 2n + 2*pi_plus:
+                    number_c12_be10_2n_2piplus = number_c12_be10_2n_2piplus + 1
+
+                elif nfp == 1 and nfn == 1 and nfpim == 2 and nfpip == 3:
+                    # interaction channel: nu + C12 -> Be10 + p + n + 2*pi_minus + 3*pi_plus:
+                    number_c12_be10_p_n_2piminus_3piplus = number_c12_be10_p_n_2piminus_3piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be10 + 2p + 2*pi_minus + 2*pi_plus:
+                    number_c12_be10_2p_2piminus_2piplus = number_c12_be10_2p_2piminus_2piplus + 1
+
+                elif nfp == 2 and nfn == 0 and nfpim == 3 and nfpip == 3:
+                    # interaction channel: nu + C12 -> Be10 + 2p + 3*pi_minus + 3*pi_plus:
+                    number_c12_be10_2p_3piminus_3piplus = number_c12_be10_2p_3piminus_3piplus + 1
+
+                # B9:
+                elif nfp == 1 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B9 + p + 2*n:
+                    number_c12_b9_p_2n = number_c12_b9_p_2n + 1
+
+                elif nfp == 1 and nfn == 2 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B9 + p + 2n + pi_minus + pi_plus:
+                    number_c12_b9_p_2n_piminus_piplus = number_c12_b9_p_2n_piminus_piplus + 0
+
+                elif nfp == 2 and nfn == 1 and nfpim == 3 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B9 + 2p + n + 3*pi_minus + 2*pi_plus:
+                    number_c12_b9_2p_n_3piminus_2piplus = number_c12_b9_2p_n_3piminus_2piplus + 0
+
+                elif nfp == 2 and nfn == 1 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B9 + 2p + n + pi_minus:
+                    number_c12_b9_2p_n_piminus = number_c12_b9_2p_n_piminus + 0
+
+                elif nfp == 0 and nfn == 3 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B9 + 3n + pi_plus:
+                    number_c12_b9_3n_piplus = number_c12_b9_3n_piplus + 0
+
+                elif nfp == 1 and nfn == 2 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> B9 + p + 2n + 2*pi_minus + 2*pi_plus:
+                    number_c12_b9_p_2n_2piminus_2piplus = number_c12_b9_p_2n_2piminus_2piplus + 0
+
+                elif nfp == 2 and nfn == 1 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B9 + 2p + n + 2*pi_minus + pi_plus:
+                    number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 0
+
+                # Be9:
+                elif nfp == 2 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be9 + 2*p + n:
+                    number_c12_be9_2p_n = number_c12_be9_2p_n + 1
+
+                elif nfp == 1 and nfn == 2 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be9 + p + 2*n + pi_plus:
+                    number_c12_be9_p_2n_piplus = number_c12_be9_p_2n_piplus + 1
+
+                elif nfp == 3 and nfn == 0 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be9 + 3p + pi_minus:
+                    number_c12_be9_3p_piminus = number_c12_be9_3p_piminus + 1
+
+                elif nfp == 1 and nfn == 2 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be9 + p + 2*n + pi_minus + 2*pi_plus:
+                    number_c12_be9_p_2n_piminus_2piplus = number_c12_be9_p_2n_piminus_2piplus + 1
+
+                elif nfp == 2 and nfn == 1 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be9 + 2*p + n + pi_minus + pi_plus:
+                    number_c12_be9_2p_n_piminus_piplus = number_c12_be9_2p_n_piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 1 and nfpim == 3 and nfpip == 3:
+                    # interaction channel: nu + C12 -> Be9 + 2*p + n + 3*pi_minus + 3*pi_plus:
+                    number_c12_be9_2p_n_3piminus_3piplus = number_c12_be9_2p_n_3piminus_3piplus + 1
+
+                elif nfp == 2 and nfn == 1 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be9 + 2*p + n + 2*pi_minus + 2*pi_plus:
+                    number_c12_be9_2p_n_2piminus_2piplus = number_c12_be9_2p_n_2piminus_2piplus + 1
+
+                elif nfp == 0 and nfn == 3 and nfpim == 0 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be9 + 3*n + 2*pi_plus:
+                    number_c12_be9_3n_2piplus = number_c12_be9_3n_2piplus + 1
+
+                elif nfp == 3 and nfn == 0 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be9 + 3*p + 2*pi_minus + pi_plus:
+                    number_c12_be9_3p_2piminus_piplus = number_c12_be9_3p_2piminus_piplus + 1
+
+                # C9:
+                elif nfp == 1 and nfn == 2 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C9 + p + 2*n + pi_minus:
+                    number_c12_c9_p_2n_piminus = number_c12_c9_p_2n_piminus + 1
+
+                elif nfp == 0 and nfn == 3 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C9 + 3*n:
+                    number_c12_c9_3n = number_c12_c9_3n + 1
+
+                elif nfp == 2 and nfn == 1 and nfpim == 2 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C9 + 2*p + n + 2*pi_minus:
+                    number_c12_c9_2p_n_2piminus = number_c12_c9_2p_n_2piminus + 1
+
+                elif nfp == 0 and nfn == 3 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> C9 + 3*n + 2*pi_minus + 2*pi_plus:
+                    number_c12_c9_3n_2piminus_2piplus = number_c12_c9_3n_2piminus_2piplus + 1
+
+                # Li9:
+                elif nfp == 2 and nfn == 1 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li9 + 2*p + n + pi_plus:
+                    number_c12_li9_2p_n_piplus = number_c12_li9_2p_n_piplus + 1
+
+                elif nfp == 3 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li9 + 3*p:
+                    number_c12_li9_3p = number_c12_li9_3p + 1
+
+                elif nfp == 3 and nfn == 0 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li9 + 3*p + pi_minus + pi_plus:
+                    number_c12_li9_3p_piminus_piplus = number_c12_li9_3p_piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 1 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Li9 + 2*p + n + pi_minus + 2*pi_plus:
+                    number_c12_li9_2p_n_piminus_2piplus = number_c12_li9_2p_n_piminus_2piplus + 1
+
+                elif nfp == 1 and nfn == 2 and nfpim == 1 and nfpip == 3:
+                    # interaction channel: nu + C12 -> Li9 + p + 2*n + pi_minus + 3*pi_plus:
+                    number_c12_li9_p_2n_piminus_3piplus = number_c12_li9_p_2n_piminus_3piplus + 1
+
+                # C8:
+                elif nfp == 0 and nfn == 4 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> C8 + 4n:
+                    number_c12_c8_4n = number_c12_c8_4n + 1
+
+                # B8:
+                elif nfp == 1 and nfn == 3 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B8 + p + 3*n:
+                    number_c12_b8_p_3n = number_c12_b8_p_3n + 1
+
+                elif nfp == 1 and nfn == 3 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B8 + p + 3*n + pi_minus + pi_plus:
+                    number_c12_b8_p_3n_piminus_piplus = number_c12_b8_p_3n_piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 2 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B8 + 2*p + 2*n + 2*pi_minus + pi_plus:
+                    number_c12_b8_2p_2n_2piminus_piplus = number_c12_b8_2p_2n_2piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 2 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B8 + 2*p + 2*n + pi_minus:
+                    number_c12_b8_2p_2n_piminus = number_c12_b8_2p_2n_piminus + 1
+
+                elif nfp == 0 and nfn == 4 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> B8 + 4*n + pi_plus:
+                    number_c12_b8_4n_piplus = number_c12_b8_4n_piplus + 1
+
+                # Be8:
+                elif nfp == 2 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be8 + 2*p + 2*n:
+                    number_c12_be8_2p_2n = number_c12_be8_2p_2n + 1
+
+                elif nfp == 3 and nfn == 1 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be8 + 3*p + n + pi_minus:
+                    number_c12_be8_3p_n_piminus = number_c12_be8_3p_n_piminus + 1
+
+                elif nfp == 1 and nfn == 3 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be8 + p + 3*n + pi_plus:
+                    number_c12_be8_p_3n_piplus = number_c12_be8_p_3n_piplus + 1
+
+                elif nfp == 2 and nfn == 2 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be8 + 2*p + 2*n + 2*pi_minus + 2*pi_plus:
+                    number_c12_be8_2p_2n_2piminus_2piplus = number_c12_be8_2p_2n_2piminus_2piplus + 1
+
+                elif nfp == 0 and nfn == 4 and nfpim == 0 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be8 + 4*n + 2*pi_plus:
+                    number_c12_be8_4n_2piplus = number_c12_be8_4n_2piplus + 1
+
+                elif nfp == 2 and nfn == 2 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be8 + 2*p + 2*n + pi_minus + pi_plus:
+                    number_c12_be8_2p_2n_piminus_piplus = number_c12_be8_2p_2n_piminus_piplus + 1
+
+                elif nfp == 3 and nfn == 1 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be8 + 3*p + n + 2*pi_minus + pi_plus:
+                    number_c12_be8_3p_n_2piminus_piplus = number_c12_be8_3p_n_2piminus_piplus + 1
+
+                elif nfp == 4 and nfn == 0 and nfpim == 2 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be8 + 4*p + 2*pi_minus:
+                    number_c12_be8_4p_2piminus = number_c12_be8_4p_2piminus + 1
+
+                # Li8:
+                elif nfp == 3 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li8 + 3*p + n:
+                    number_c12_li8_3p_n = number_c12_li8_3p_n + 1
+
+                elif nfp == 4 and nfn == 0 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li8 + 4*p + pi_minus:
+                    number_c12_li8_4p_piminus = number_c12_li8_4p_piminus + 1
+
+                elif nfp == 4 and nfn == 0 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li8 + 4*p + 2*pi_minus + pi_plus:
+                    number_c12_li8_4p_2piminus_piplus = number_c12_li8_4p_2piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 2 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li8 + 2*p + 2*n + pi_plus:
+                    number_c12_li8_2p_2n_piplus = number_c12_li8_2p_2n_piplus + 1
+
+                elif nfp == 3 and nfn == 1 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li8 + 3*p + n + pi_minus + pi_plus:
+                    number_c12_li8_3p_n_piminus_piplus = number_c12_li8_3p_n_piminus_piplus + 1
+
+                # He8:
+                elif nfp == 4 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He8 + 4p:
+                    number_c12_he8_4p = number_c12_he8_4p + 1
+
+                # B7:
+                elif nfp == 1 and nfn == 4 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> B7 + p + 4n:
+                    number_c12_b7_p_4n = number_c12_b7_p_4n + 1
+
+                # Be7:
+                elif nfp == 2 and nfn == 3 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be7 + 2*p + 3*n:
+                    number_c12_be7_2p_3n = number_c12_be7_2p_3n + 1
+
+                elif nfp == 1 and nfn == 4 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be7 + p + 4*n + pi_plus:
+                    number_c12_be7_p_4n_piplus = number_c12_be7_p_4n_piplus + 1
+
+                elif nfp == 2 and nfn == 3 and nfpim == 2 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Be7 + 2*p + 3*n + 2*pi_minus + 2*pi_plus:
+                    number_c12_be7_2p_3n_2piminus_2piplus = number_c12_be7_2p_3n_2piminus_2piplus + 1
+
+                elif nfp == 3 and nfn == 2 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be7 + 3*p + 2*n + pi_minus:
+                    number_c12_be7_3p_2n_piminus = number_c12_be7_3p_2n_piminus + 1
+
+                elif nfp == 4 and nfn == 1 and nfpim == 2 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be7 + 4*p + n + 2*pi_minus:
+                    number_c12_be7_4p_n_2piminus = number_c12_be7_4p_n_2piminus + 1
+
+                elif nfp == 3 and nfn == 2 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Be7 + 3*p + 2*n + 2*pi_minus + pi_plus:
+                    number_c12_be7_3p_2n_2piminus_piplus = number_c12_be7_3p_2n_2piminus_piplus + 1
+
+                # Li7:
+                elif nfp == 2 and nfn == 3 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li7 + 2*p + 3*n + pi_plus:
+                    number_c12_li7_2p_3n_piplus = number_c12_li7_2p_3n_piplus + 1
+
+                elif nfp == 4 and nfn == 1 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li7 + 4*p + n + pi_minus:
+                    number_c12_li7_4p_n_piminus = number_c12_li7_4p_n_piminus + 1
+
+                elif nfp == 3 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li7 + 3*p + 2*n:
+                    number_c12_li7_3p_2n = number_c12_li7_3p_2n + 1
+
+                elif nfp == 3 and nfn == 2 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li7 + 3*p + 2*n + pi_minus + pi_plus:
+                    number_c12_li7_3p_2n_piminus_piplus = number_c12_li7_3p_2n_piminus_piplus + 1
+
+                elif nfp == 4 and nfn == 1 and nfpim == 2 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li7 + 4*p + n + 2*pi_minus + pi_plus:
+                    number_c12_li7_4p_n_2piminus_piplus = number_c12_li7_4p_n_2piminus_piplus + 1
+
+                elif nfp == 2 and nfn == 3 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Li7 + 2*p + 3*n + pi_minus + 2*pi_plus:
+                    number_c12_li7_2p_3n_piminus_2piplus = number_c12_li7_2p_3n_piminus_2piplus + 1
+
+                # He7:
+                elif nfp == 4 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He7 + 4p + n:
+                    number_c12_he7_4p_n = number_c12_he7_4p_n + 1
+
+                # H7:
+                elif nfp == 5 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> H7 + 5p:
+                    number_c12_h7_5p = number_c12_h7_5p + 1
+
+                # Be6:
+                elif nfp == 2 and nfn == 4 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Be6 + 2p + 4n:
+                    number_c12_be6_2p_4n = number_c12_be6_2p_4n + 1
+
+                # Li6:
+                elif nfp == 3 and nfn == 3 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li6 + 3*p + 3*n:
+                    number_c12_li6_3p_3n = number_c12_li6_3p_3n + 1
+
+                elif nfp == 2 and nfn == 4 and nfpim == 0 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li6 + 2*p + 4*n + pi_plus:
+                    number_c12_li6_2p_4n_piplus = number_c12_li6_2p_4n_piplus + 1
+
+                elif nfp == 5 and nfn == 1 and nfpim == 2 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li6 + 5*p + n + 2*pi_minus:
+                    number_c12_li6_5p_n_2piminus = number_c12_li6_5p_n_2piminus + 1
+
+                elif nfp == 2 and nfn == 4 and nfpim == 1 and nfpip == 2:
+                    # interaction channel: nu + C12 -> Li6 + 2*p + 4*n + pi_minus + 2*pi_plus:
+                    number_c12_li6_2p_4n_piminus_2piplus = number_c12_li6_2p_4n_piminus_2piplus + 1
+
+                elif nfp == 4 and nfn == 2 and nfpim == 1 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li6 + 4*p + 2*n + pi_minus:
+                    number_c12_li6_4p_2n_piminus = number_c12_li6_4p_2n_piminus + 1
+
+                elif nfp == 3 and nfn == 3 and nfpim == 1 and nfpip == 1:
+                    # interaction channel: nu + C12 -> Li6 + 3*p + 3*n + pi_minus + pi_plus:
+                    number_c12_li6_3p_3n_piminus_piplus = number_c12_li6_3p_3n_piminus_piplus + 1
+
+                # Li5:
+                elif nfp == 3 and nfn == 4 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li5 + 3p + 4n:
+                    number_c12_li5_3p_4n = number_c12_li5_3p_4n + 1
+
+                # Li4:
+                elif nfp == 3 and nfn == 5 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> Li4 + 3p + 5n:
+                    number_c12_li4_3p_5n = number_c12_li4_3p_5n + 1
+
+                # He6:
+                elif nfp == 4 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He6 + 4p + 2n:
+                    number_c12_he6_4p_2n = number_c12_he6_4p_2n + 1
+
+                # He5:
+                elif nfp == 4 and nfn == 3 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He5 + 4p + 3n:
+                    number_c12_he5_4p_3n = number_c12_he5_4p_3n + 1
+
+                # He4:
+                elif nfp == 4 and nfn == 4 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He4 + 4p + 4n:
+                    number_c12_he4_4p_4n = number_c12_he4_4p_4n + 1
+
+                # He3:
+                elif nfp == 4 and nfn == 5 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> He3 + 4p + 5n:
+                    number_c12_he3_4p_5n = number_c12_he3_4p_5n + 1
+
+                # H6:
+                elif nfp == 5 and nfn == 1 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> H6 + 5p + n:
+                    number_c12_h6_5p_n = number_c12_h6_5p_n + 1
+
+                # H5:
+                elif nfp == 5 and nfn == 2 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> H5 + 5p + 2n:
+                    number_c12_h5_5p_2n = number_c12_h5_5p_2n + 1
+
+                # H4:
+                elif nfp == 5 and nfn == 3:
+                    # interaction channel: nu + C12 -> H4 + 5p + 3n:
+                    number_c12_h4_5p_3n = number_c12_h4_5p_3n + 1
+
+                # H3:
+                elif nfp == 5 and nfn == 4:
+                    # interaction channel: nu + C12 -> H3 + 5p + 4n:
+                    number_c12_h3_5p_4n = number_c12_h3_5p_4n + 1
+
+                # H2:
+                elif nfp == 5 and nfn == 5:
+                    # interaction channel: nu + C12 -> H2 + 5p + 5n:
+                    number_c12_h2_5p_5n = number_c12_h2_5p_5n + 1
+
+                # C12:
+                elif nfp == 0 and nfn == 0 and nfpim == 0 and nfpip == 0:
+                    # interaction channel: nu + C12 -> nu + C12:
+                    number_c12_c12 = number_c12_c12 + 1
+
+                # no isotope:
+                elif (nfp == 6 and nfn == 6 and nfpim == 0 and nfpip == 0) or \
+                        (nfp == 5 and nfn == 6 and nfpim == 0 and nfpip == 0) or \
+                        (nfp == 6 and nfn == 5 and nfpim == 0 and nfpip == 0) or \
+                        (nfp == 6 and nfn == 4 and nfpim == 0 and nfpip == 0) or \
+                        (nfp == 4 and nfn == 6 and nfpim == 0 and nfpip == 0):
+                    # interaction channel: nu + C12 -> nu + 6p + 6n:
+                    number_c12_noiso = number_c12_noiso + 1
+
+                else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
+                    number_c12_missing = number_c12_missing + 1
+                    print("new interaction channel with nu + C12 ->: nfp={0:d}, nfn={1:d}, nfpim={2:d}, nfpip={3:d}, "
+                          "nfkm={4:d}, nfkp={5:d}".format(nfp, nfn, nfpim, nfpip, nfkm, nfkp))
+
+            else:
+                # NC channel with other target than C12:
+                number_no_c12 = number_no_c12 + 1
+
+                if tgt == 2212:
+                    # proton as target: Es interaction: nu + proton -> nu + proton
+                    number_es_p = number_es_p + 1
+
+                elif tgt == 11:
+                    # electron as target: ES interaction: nu + electron -> nu + electron (maybe also pi_zero or gammas):
+                    number_es_e = number_es_e + 1
+
+                elif tgt == 1000080160:
+                    # O16 as target: ES interaction: nu + O16 -> nu + O16 (maybe also pi_zero or gammas):
+                    number_es_o16 = number_es_o16 + 1
+
+                elif tgt == 1000070140:
+                    # N14 as target: ES interaction: nu + N14 -> nu + N14 (maybe also pi_zero or gammas):
+                    number_es_n14 = number_es_n14 + 1
+
+                elif tgt == 1000160320:
+                    # S32 as target: ES interaction: nu + S32 -> nu + S32 (maybe also pi_zero or gammas):
+                    number_es_s32 = number_es_s32 + 1
+
+                else:
+                    print("other target than C12, p, e, N14, O16, S32: tgt = {0:d}".format(tgt))
+
+
+    """ calculate the fraction of the different NC interaction channels in PERCENT (float): """
+    # B11:
+    frac_c12_b11_p = float(number_c12_b11_p) / float(number_events) * 100
+    frac_c12_b11_n_piplus = float(number_c12_b11_n_piplus) / float(number_events) * 100
+    frac_c12_b11_n_piminus_2piplus = float(number_c12_b11_n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_b11_p_piminus_piplus = float(number_c12_b11_p_piminus_piplus) / float(number_events) * 100
+    frac_c12_b11_p_2piminus_2piplus = float(number_c12_b11_p_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_b11_piplus = float(number_c12_b11_piplus) / float(number_events) * 100
+
+    # C11:
+    frac_c12_c11_n = float(number_c12_c11_n) / float(number_events) * 100
+    frac_c12_c11_p_piminus = float(number_c12_c11_p_piminus) / float(number_events) * 100
+    frac_c12_c11_n_piminus_piplus = float(number_c12_c11_n_piminus_piplus) / float(number_events) * 100
+    frac_c12_c11_p_2piminus_piplus = float(number_c12_c11_p_2piminus_piplus) / float(number_events) * 100
+    frac_c12_c11_p_3piminus_2piplus = float(number_c12_c11_p_3piminus_2piplus) / float(number_events) * 100
+    frac_c12_c11_n_2piminus_2piplus = float(number_c12_c11_n_2piminus_2piplus) / float(number_events) * 100
+
+    # B10:
+    frac_c12_b10_p_n = float(number_c12_b10_p_n) / float(number_events) * 100
+    frac_c12_b10_2p_piminus = float(number_c12_b10_2p_piminus) / float(number_events) * 100
+    frac_c12_b10_p_n_piminus_piplus = float(number_c12_b10_p_n_piminus_piplus) / float(number_events) * 100
+    frac_c12_b10_2n_piplus = float(number_c12_b10_2n_piplus) / float(number_events) * 100
+    frac_c12_b10_2n_piminus_2piplus = float(number_c12_b10_2n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_b10_2p_2piminus_piplus = float(number_c12_b10_2p_2piminus_piplus) / float(number_events) * 100
+    frac_c12_b10_2p_3piminus_2piplus = float(number_c12_b10_2p_3piminus_2piplus) / float(number_events) * 100
+    frac_c12_b10_p_n_2piminus_2piplus = float(number_c12_b10_p_n_2piminus_2piplus) / float(number_events) * 100
+
+    # C10:
+    frac_c12_c10_2n = float(number_c12_c10_2n) / float(number_events) * 100
+    frac_c12_c10_p_n_piminus = float(number_c12_c10_p_n_piminus) / float(number_events) * 100
+    frac_c12_c10_p_n_2piminus_piplus = float(number_c12_c10_p_n_2piminus_piplus) / float(number_events) * 100
+    frac_c12_c10_2n_piminus_piplus = float(number_c12_c10_2n_piminus_piplus) / float(number_events) * 100
+    frac_c12_c10_2p_2piminus = float(number_c12_c10_2p_2piminus) / float(number_events) * 100
+
+    # Be10:
+    frac_c12_be10_2p = float(number_c12_be10_2p) / float(number_events) * 100
+    frac_c12_be10_p_n_piplus = float(number_c12_be10_p_n_piplus) / float(number_events) * 100
+    frac_c12_be10_p_n_piminus_2piplus = float(number_c12_be10_p_n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_be10_2p_piminus_piplus = float(number_c12_be10_2p_piminus_piplus) / float(number_events) * 100
+    frac_c12_be10_2n_2piplus = float(number_c12_be10_2n_2piplus) / float(number_events) * 100
+    frac_c12_be10_p_n_2piminus_3piplus = float(number_c12_be10_p_n_2piminus_3piplus) / float(number_events) * 100
+    frac_c12_be10_2p_2piminus_2piplus = float(number_c12_be10_2p_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_be10_2p_3piminus_3piplus = float(number_c12_be10_2p_3piminus_3piplus) / float(number_events) * 100
+
+    # B9:
+    frac_c12_b9_p_2n = float(number_c12_b9_p_2n) / float(number_events) * 100
+    frac_c12_b9_p_2n_piminus_piplus = float(number_c12_b9_p_2n_piminus_piplus) / float(number_events) * 100
+    frac_c12_b9_2p_n_3piminus_2piplus = float(number_c12_b9_2p_n_3piminus_2piplus) / float(number_events) * 100
+    frac_c12_b9_2p_n_piminus = float(number_c12_b9_2p_n_piminus) / float(number_events) * 100
+    frac_c12_b9_3n_piplus = float(number_c12_b9_3n_piplus) / float(number_events) * 100
+    frac_c12_b9_p_2n_2piminus_2piplus = float(number_c12_b9_p_2n_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_b9_2p_n_2piminus_piplus = float(number_c12_b9_2p_n_2piminus_piplus) / float(number_events) * 100
+
+    # Be9:
+    frac_c12_be9_2p_n = float(number_c12_be9_2p_n) / float(number_events) * 100
+    frac_c12_be9_p_2n_piplus = float(number_c12_be9_p_2n_piplus) / float(number_events) * 100
+    frac_c12_be9_3p_piminus = float(number_c12_be9_3p_piminus) / float(number_events) * 100
+    frac_c12_be9_p_2n_piminus_2piplus = float(number_c12_be9_p_2n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_be9_2p_n_piminus_piplus = float(number_c12_be9_2p_n_piminus_piplus) / float(number_events) * 100
+    frac_c12_be9_2p_n_3piminus_3piplus = float(number_c12_be9_2p_n_3piminus_3piplus) / float(number_events) * 100
+    frac_c12_be9_2p_n_2piminus_2piplus = float(number_c12_be9_2p_n_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_be9_3n_2piplus = float(number_c12_be9_3n_2piplus) / float(number_events) * 100
+    frac_c12_be9_3p_2piminus_piplus = float(number_c12_be9_3p_2piminus_piplus) / float(number_events) * 100
+
+    # Be8:
+    frac_c12_be8_2p_2n = float(number_c12_be8_2p_2n) / float(number_events) * 100
+    frac_c12_be8_3p_n_piminus = float(number_c12_be8_3p_n_piminus) / float(number_events) * 100
+    frac_c12_be8_p_3n_piplus = float(number_c12_be8_p_3n_piplus) / float(number_events) * 100
+    frac_c12_be8_2p_2n_2piminus_2piplus = float(number_c12_be8_2p_2n_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_be8_4n_2piplus = float(number_c12_be8_4n_2piplus) / float(number_events) * 100
+    frac_c12_be8_2p_2n_piminus_piplus = float(number_c12_be8_2p_2n_piminus_piplus) / float(number_events) * 100
+    frac_c12_be8_3p_n_2piminus_piplus = float(number_c12_be8_3p_n_2piminus_piplus) / float(number_events) * 100
+    frac_c12_be8_4p_2piminus = float(number_c12_be8_4p_2piminus) / float(number_events) * 100
+
+    # C9:
+    frac_c12_c9_p_2n_piminus = float(number_c12_c9_p_2n_piminus) / float(number_events) * 100
+    frac_c12_c9_3n = float(number_c12_c9_3n) / float(number_events) * 100
+    frac_c12_c9_2p_n_2piminus = float(number_c12_c9_2p_n_2piminus) / float(number_events) * 100
+    frac_c12_c9_3n_2piminus_2piplus = float(number_c12_c9_3n_2piminus_2piplus) / float(number_events) * 100
+
+    # Be7:
+    frac_c12_be7_2p_3n = float(number_c12_be7_2p_3n) / float(number_events) * 100
+    frac_c12_be7_p_4n_piplus = float(number_c12_be7_p_4n_piplus) / float(number_events) * 100
+    frac_c12_be7_2p_3n_2piminus_2piplus = float(number_c12_be7_2p_3n_2piminus_2piplus) / float(number_events) * 100
+    frac_c12_be7_3p_2n_piminus = float(number_c12_be7_3p_2n_piminus) / float(number_events) * 100
+    frac_c12_be7_4p_n_2piminus = float(number_c12_be7_4p_n_2piminus) / float(number_events) * 100
+    frac_c12_be7_3p_2n_2piminus_piplus = float(number_c12_be7_3p_2n_2piminus_piplus) / float(number_events) * 100
+
+    # Li6:
+    frac_c12_li6_3p_3n = float(number_c12_li6_3p_3n) / float(number_events) * 100
+    frac_c12_li6_2p_4n_piplus = float(number_c12_li6_2p_4n_piplus) / float(number_events) * 100
+    frac_c12_li6_5p_n_2piminus = float(number_c12_li6_5p_n_2piminus) / float(number_events) * 100
+    frac_c12_li6_2p_4n_piminus_2piplus = float(number_c12_li6_2p_4n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_li6_4p_2n_piminus = float(number_c12_li6_4p_2n_piminus) / float(number_events) * 100
+    frac_c12_li6_3p_3n_piminus_piplus = float(number_c12_li6_3p_3n_piminus_piplus) / float(number_events) * 100
+
+    # Li8:
+    frac_c12_li8_3p_n = float(number_c12_li8_3p_n) / float(number_events) * 100
+    frac_c12_li8_4p_piminus = float(number_c12_li8_4p_piminus) / float(number_events) * 100
+    frac_c12_li8_4p_2piminus_piplus = float(number_c12_li8_4p_2piminus_piplus) / float(number_events) * 100
+    frac_c12_li8_2p_2n_piplus = float(number_c12_li8_2p_2n_piplus) / float(number_events) * 100
+    frac_c12_li8_3p_n_piminus_piplus = float(number_c12_li8_3p_n_piminus_piplus) / float(number_events) * 100
+
+    # Li7:
+    frac_c12_li7_2p_3n_piplus = float(number_c12_li7_2p_3n_piplus) / float(number_events) * 100
+    frac_c12_li7_4p_n_piminus = float(number_c12_li7_4p_n_piminus) / float(number_events) * 100
+    frac_c12_li7_3p_2n = float(number_c12_li7_3p_2n) / float(number_events) * 100
+    frac_c12_li7_3p_2n_piminus_piplus = float(number_c12_li7_3p_2n_piminus_piplus) / float(number_events) * 100
+    frac_c12_li7_4p_n_2piminus_piplus = float(number_c12_li7_4p_n_2piminus_piplus) / float(number_events) * 100
+    frac_c12_li7_2p_3n_piminus_2piplus = float(number_c12_li7_2p_3n_piminus_2piplus) / float(number_events) * 100
+
+    # B8:
+    frac_c12_b8_p_3n = float(number_c12_b8_p_3n) / float(number_events) * 100
+    frac_c12_b8_p_3n_piminus_piplus = float(number_c12_b8_p_3n_piminus_piplus) / float(number_events) * 100
+    frac_c12_b8_2p_2n_2piminus_piplus = float(number_c12_b8_2p_2n_2piminus_piplus) / float(number_events) * 100
+    frac_c12_b8_2p_2n_piminus = float(number_c12_b8_2p_2n_piminus) / float(number_events) * 100
+    frac_c12_b8_4n_piplus = float(number_c12_b8_4n_piplus) / float(number_events) * 100
+
+    # Li9:
+    frac_c12_li9_2p_n_piplus = float(number_c12_li9_2p_n_piplus) / float(number_events) * 100
+    frac_c12_li9_3p = float(number_c12_li9_3p) / float(number_events) * 100
+    frac_c12_li9_3p_piminus_piplus = float(number_c12_li9_3p_piminus_piplus) / float(number_events) * 100
+    frac_c12_li9_2p_n_piminus_2piplus = float(number_c12_li9_2p_n_piminus_2piplus) / float(number_events) * 100
+    frac_c12_li9_p_2n_piminus_3piplus = float(number_c12_li9_p_2n_piminus_3piplus) / float(number_events) * 100
+
+    # C8:
+    frac_c12_c8_4n = float(number_c12_c8_4n) / float(number_events) * 100
+
+    # He8:
+    frac_c12_he8_4p = float(number_c12_he8_4p) / float(number_events) * 100
+
+    # B7:
+    frac_c12_b7_p_4n = float(number_c12_b7_p_4n) / float(number_events) * 100
+
+    # He7:
+    frac_c12_he7_4p_n = float(number_c12_he7_4p_n) / float(number_events) * 100
+
+    # H7:
+    frac_c12_h7_5p = float(number_c12_h7_5p) / float(number_events) * 100
+
+    # Be6:
+    frac_c12_be6_2p_4n = float(number_c12_be6_2p_4n) / float(number_events) * 100
+
+    # Li5:
+    frac_c12_li5_3p_4n = float(number_c12_li5_3p_4n) / float(number_events) * 100
+
+    # Li4:
+    frac_c12_li4_3p_5n = float(number_c12_li4_3p_5n) / float(number_events) * 100
+
+    # He6:
+    frac_c12_he6_4p_2n = float(number_c12_he6_4p_2n) / float(number_events) * 100
+
+    # He5:
+    frac_c12_he5_4p_3n = float(number_c12_he5_4p_3n) / float(number_events) * 100
+
+    # He4:
+    frac_c12_he4_4p_4n = float(number_c12_he4_4p_4n) / float(number_events) * 100
+
+    # He3:
+    frac_c12_he3_4p_5n = float(number_c12_he3_4p_5n) / float(number_events) * 100
+
+    # H6:
+    frac_c12_h6_5p_n = float(number_c12_h6_5p_n) / float(number_events) * 100
+
+    # H5:
+    frac_c12_h5_5p_2n = float(number_c12_h5_5p_2n) / float(number_events) * 100
+
+    # H4:
+    frac_c12_h4_5p_3n = float(number_c12_h4_5p_3n) / float(number_events) * 100
+
+    # H3:
+    frac_c12_h3_5p_4n = float(number_c12_h3_5p_4n) / float(number_events) * 100
+
+    # H2:
+    frac_c12_h2_5p_5n = float(number_c12_h2_5p_5n) / float(number_events) * 100
+
+    # C12:
+    frac_c12_c12 = float(number_c12_c12) / float(number_events) * 100
+
+    # no isotope (only protons, neutrons, pions):
+    frac_c12_noiso = float(number_c12_noiso) / float(number_events) * 100
+
+    # missing interaction channels:
+    frac_c12_missing = float(number_c12_missing) / float(number_events) * 100
+
+    # Other targets than C12:
+    frac_no_c12 = float(number_no_c12) / float(number_events) * 100
+    frac_es_p = float(number_es_p) / float(number_events) * 100
+    frac_es_e = float(number_es_e) / float(number_events) * 100
+    frac_es_o16 = float(number_es_o16) / float(number_events) * 100
+    frac_es_n14 = float(number_es_n14) / float(number_events) * 100
+    frac_es_s32 = float(number_es_s32) / float(number_events) * 100
+
+
+    return number_events, \
+           frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus, \
+           frac_c12_b11_p_2piminus_2piplus, frac_c12_b11_piplus, \
+           frac_c12_c11_n, frac_c12_c11_p_piminus, frac_c12_c11_n_piminus_piplus, frac_c12_c11_p_2piminus_piplus, \
+           frac_c12_c11_p_3piminus_2piplus, frac_c12_c11_n_2piminus_2piplus, \
+           frac_c12_b10_p_n, frac_c12_b10_2p_piminus, frac_c12_b10_p_n_piminus_piplus, frac_c12_b10_2n_piplus, \
+           frac_c12_b10_2n_piminus_2piplus, frac_c12_b10_2p_2piminus_piplus, frac_c12_b10_2p_3piminus_2piplus, \
+           frac_c12_b10_p_n_2piminus_2piplus, \
+           frac_c12_c10_2n, frac_c12_c10_p_n_piminus, frac_c12_c10_p_n_2piminus_piplus, frac_c12_c10_2n_piminus_piplus,\
+           frac_c12_c10_2p_2piminus, \
+           frac_c12_be10_2p, frac_c12_be10_p_n_piplus, frac_c12_be10_p_n_piminus_2piplus, \
+           frac_c12_be10_2p_piminus_piplus, frac_c12_be10_2n_2piplus, frac_c12_be10_p_n_2piminus_3piplus, \
+           frac_c12_be10_2p_2piminus_2piplus, frac_c12_be10_2p_3piminus_3piplus, \
+           frac_c12_b9_p_2n, frac_c12_b9_p_2n_piminus_piplus, frac_c12_b9_2p_n_3piminus_2piplus, \
+           frac_c12_b9_2p_n_piminus, frac_c12_b9_3n_piplus, frac_c12_b9_p_2n_2piminus_2piplus, \
+           frac_c12_b9_2p_n_2piminus_piplus, \
+           frac_c12_be9_2p_n, frac_c12_be9_p_2n_piplus, frac_c12_be9_3p_piminus, frac_c12_be9_p_2n_piminus_2piplus, \
+           frac_c12_be9_2p_n_piminus_piplus, frac_c12_be9_2p_n_3piminus_3piplus, frac_c12_be9_2p_n_2piminus_2piplus, \
+           frac_c12_be9_3n_2piplus, frac_c12_be9_3p_2piminus_piplus, \
+           frac_c12_be8_2p_2n, frac_c12_be8_3p_n_piminus, frac_c12_be8_p_3n_piplus, \
+           frac_c12_be8_2p_2n_2piminus_2piplus, frac_c12_be8_4n_2piplus, frac_c12_be8_2p_2n_piminus_piplus, \
+           frac_c12_be8_3p_n_2piminus_piplus, frac_c12_be8_4p_2piminus, \
+           frac_c12_c9_p_2n_piminus, frac_c12_c9_3n, frac_c12_c9_2p_n_2piminus, frac_c12_c9_3n_2piminus_2piplus, \
+           frac_c12_be7_2p_3n, frac_c12_be7_p_4n_piplus, frac_c12_be7_2p_3n_2piminus_2piplus, \
+           frac_c12_be7_3p_2n_piminus, frac_c12_be7_4p_n_2piminus, frac_c12_be7_3p_2n_2piminus_piplus, \
+           frac_c12_li6_3p_3n, frac_c12_li6_2p_4n_piplus, frac_c12_li6_5p_n_2piminus, \
+           frac_c12_li6_2p_4n_piminus_2piplus, frac_c12_li6_4p_2n_piminus, frac_c12_li6_3p_3n_piminus_piplus, \
+           frac_c12_li8_3p_n, frac_c12_li8_4p_piminus, frac_c12_li8_4p_2piminus_piplus, frac_c12_li8_2p_2n_piplus, \
+           frac_c12_li8_3p_n_piminus_piplus, \
+           frac_c12_li7_2p_3n_piplus, frac_c12_li7_4p_n_piminus, frac_c12_li7_3p_2n, frac_c12_li7_3p_2n_piminus_piplus,\
+           frac_c12_li7_4p_n_2piminus_piplus, frac_c12_li7_2p_3n_piminus_2piplus, \
+           frac_c12_b8_p_3n, frac_c12_b8_p_3n_piminus_piplus, frac_c12_b8_2p_2n_2piminus_piplus, \
+           frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus, \
+           frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus, \
+           frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus, \
+           frac_c12_c8_4n, frac_c12_he8_4p, frac_c12_b7_p_4n, frac_c12_he7_4p_n, frac_c12_h7_5p, frac_c12_be6_2p_4n, \
+           frac_c12_li5_3p_4n, frac_c12_li4_3p_5n, \
+           frac_c12_he6_4p_2n, frac_c12_he5_4p_3n, frac_c12_he4_4p_4n, frac_c12_he3_4p_5n, frac_c12_h6_5p_n, \
+           frac_c12_h5_5p_2n, frac_c12_h4_5p_3n, frac_c12_h3_5p_4n, \
+           frac_c12_h2_5p_5n, frac_c12_c12,\
+           frac_c12_noiso, \
+           frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_missing
+
+
 def get_mass_from_pdg(pdg):
     """
     function to get the mass in GeV of a particle from its PDG ID (Monte Carlo Particle Number Scheme)
-    (values taken from NCGenerator.cc, )
+    (masses taken from NCGenerator.cc, )
 
     :param pdg: PDG ID of the particle (integer)
     :return: mass[pdg]: mass of the particle in GeV (float)
@@ -79,24 +1801,74 @@ def get_mass_from_pdg(pdg):
     mass = dict()
     # mass of gamma:
     mass[22] = 0
+    # mass of electron:
+    mass[11] = 0.000511
+    # mass of positron:
+    mass[-11] = 0.000511
+    # mass of electron-neutrino:
+    mass[12] = 0
+    # mass of electron-antineutrino:
+    mass[-12] = 0
+    # mass of muon (https://de.wikipedia.org/wiki/Myon):
+    mass[13] = 0.105658
+    # mass of anti-muon (https://de.wikipedia.org/wiki/Myon):
+    mass[-13] = 0.105658
+    # mass of muon-neutrino:
+    mass[14] = 0
+    # mass of muon-antineutrino:
+    mass[-14] = 0
     # mass of pion_0:
     mass[111] = 0.13957
     # mass of pion_plus:
     mass[211] = 0.13957
     # mass of pion_minus:
     mass[-211] = 0.13957
+    # mass of Kaon plus (http://pdg.lbl.gov/2018/reviews/rpp2018-rev-charged-kaon-mass.pdf):
+    mass[321] = 0.493677
+    # mass of Kaon minus (http://pdg.lbl.gov/2018/reviews/rpp2018-rev-charged-kaon-mass.pdf):
+    mass[-321] = 0.493677
+    # mass of Kaon 0 (http://pdg.lbl.gov/2015/tables/rpp2015-tab-mesons-strange.pdf):
+    mass[311] = 0.497611
+    # mass of anti Kaon 0 (http://pdg.lbl.gov/2015/tables/rpp2015-tab-mesons-strange.pdf):
+    mass[-311] = 0.497611
+    # mass of Lambda (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Lambda.pdf):
+    mass[3122] = 1.115683
+    # mass of anti-Lambda (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Lambda.pdf):
+    mass[-3122] = 1.115683
+    # mass of sigma plus (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Sigma.pdf):
+    mass[3222] = 1.18937
+    # mass of sigma minus (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Sigma.pdf):
+    mass[3112] = 1.197449
+    # mass of sigma_0 (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Sigma.pdf):
+    mass[3212] = 1.192642
+    # mass of anti_sigma_0 (http://pdg.lbl.gov/2017/tables/rpp2017-tab-baryons-Sigma.pdf):
+    mass[-3212] = 1.192642
     # mass of neutron:
     mass[2112] = 0.93957
+    # mass of anti-neutron:
+    mass[-2112] = 0.93957
     # proton:
     mass[2212] = 0.93827
+    # mass of anti-proton:
+    mass[-2212] = 0.93827
     # deuterium H2 (stable):
     mass[1000010020] = 1.8756
     # tritium H3:
     mass[1000010030] = 2.8089
+    # H6 (https://en.wikipedia.org/wiki/Isotopes_of_hydrogen) (6.044u * 0.93149 GeV/u):
+    mass[1000010060] = 6.044 * 0.93149
+    # H7 (https://en.wikipedia.org/wiki/Isotopes_of_hydrogen):
+    mass[1000010070] = 7.052 * 0.93149
     # He3 (stable):
     mass[1000020030] = 2.8084
     # He4 or alpha (stable):
     mass[1000020040] = 3.7274
+    # He6 (https://en.wikipedia.org/wiki/Isotopes_of_helium) (6.018u * 0.93149 GeV/u):
+    mass[1000020060] = 6.019 * 0.93149
+    # He7 (https://en.wikipedia.org/wiki/Isotopes_of_helium):
+    mass[1000020070] = 7.028 * 0.93149
+    # He8 (https://en.wikipedia.org/wiki/Isotopes_of_helium):
+    mass[1000020080] = 8.034 * 0.93149
     # Li6 (stable):
     mass[1000030060] = 5.6015
     # Li7 (stable):
@@ -105,6 +1877,8 @@ def get_mass_from_pdg(pdg):
     mass[1000030080] = 7.4708
     # Li9:
     mass[1000030090] = 8.4061
+    # Be6 (https://en.wikipedia.org/wiki/Isotopes_of_beryllium) (6.020u * 0.93149 GeV/u):
+    mass[1000040060] = 6.020 * 0.93149
     # Be7:
     mass[1000040070] = 6.5344
     # Be8:
@@ -113,6 +1887,8 @@ def get_mass_from_pdg(pdg):
     mass[1000040090] = 8.3925
     # Be10:
     mass[1000040100] = 9.3249
+    # B7 (https://en.wikipedia.org/wiki/Isotopes_of_boron) (7.030u * 0.93149 GeV/u):
+    mass[1000050070] = 7.030 * 0.93149
     # B8:
     mass[1000050080] = 7.4728
     # B9:
@@ -121,6 +1897,8 @@ def get_mass_from_pdg(pdg):
     mass[1000050100] = 9.3244
     # B11 (stable):
     mass[1000050110] = 10.2522
+    # C8 (https://en.wikipedia.org/wiki/Isotopes_of_carbon) (8.038u * 0.93149 GeV/u):
+    mass[1000060080] = 8.038 * 0.93149
     # C9:
     mass[1000060090] = 8.4100
     # C10:
@@ -129,13 +1907,44 @@ def get_mass_from_pdg(pdg):
     mass[1000060110] = 10.2542
     # C12 (stable):
     mass[1000060120] = 11.1748
+    # O16 (stable) (15.999u * 0.93149 GeV/u):
+    mass[1000080160] = 15.999 * 0.93149
+    # N14 (stable):
+    mass[1000070140] = 14.0067 * 0.93149
+    # S32 (stable):
+    mass[1000160320] = 32.065 * 0.93149
+
+    """ set dummy value to very rare particles: """
+    # Lambda_c+:
+    mass[4122] = 0
+    # Sigma_c+:
+    mass[4212] = 0
+    # Sigma_c++:
+    mass[4222] = 0
+    # D_0:
+    mass[421] = 0
+    # anti-D_0:
+    mass[-421] = 0
+    # D_plus:
+    mass[411] = 0
+    # D_minus:
+    mass[-411] = 0
+    # Kaon long:
+    mass[130] = 0
+    # Kaon short:
+    mass[310] = 0
+    # D_s plus:
+    mass[431] = 0
+    # anti D_s minus:
+    mass[-431] = 0
+
 
     return mass[pdg]
 
 
 def get_number_of_p_and_n_of_isotope(pdg_id):
     """
-    function to get the number of protons and neutrons of a nulcei from its PDG ID
+    function to get the number of protons and neutrons of a nuclei from its PDG ID
 
     :param pdg_id: PDG ID of the nuclei (float)
     :return:
@@ -338,7 +2147,7 @@ def get_neutrino_energy(projectile_pdg, projectile_energy, bin_width, event_rate
     neutrino energy of the different types of neutrinos (electron-neutrino, electron-antineutrino, muon-neutrino,
     muon-antineutrino, tau-neutrino, tau-antineutrino).
     Also the total number of events for each neutrino type and the fraction of each neutrino type to the total number
-    of events is calcualted.
+    of events is calculated.
 
     :param projectile_pdg: PDG ID of the projectile, i.e. of the incoming neutrino (array float)
     :param projectile_energy: energy of the projectile, i.e. of the incoming neutrinos, in GeV (array of float)
@@ -538,7 +2347,7 @@ def get_target_ratio(projectile_energy, target_pdg, bin_width):
             energy_nu_s32 = np.append(energy_nu_s32, energy)
 
         else:
-            print("WARNING (in function get_target_ratio(): NOT only C12 or protons as targets!")
+            print("WARNING (in function get_target_ratio(): new target particle!")
             print(target_pdg[index])
 
 
@@ -603,8 +2412,6 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     number_entries = len(channel_id)
 
     """ preallocate arrays and variables: """
-    number_no_c12 = 0
-
     """ B11 """
     # number of interaction channel: nu + C12 -> B11 + p (integer):
     number_c12_b11_p = 0
@@ -692,7 +2499,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     number_c12_be10_other = 0
 
     """ B9 """
-    # number of interaction channel: nu + C12 -> B9 + p + 2*n (integer):
+    # number of interaction channel: nu + C12 -> B9 + p + 2n (integer):
     number_c12_b9_p_2n = 0
     # number of interaction channel: nu + C12 -> B9 + p + 2n + pi_minus + pi_plus (integer):
     number_c12_b9_p_2n_piminus_piplus = 0
@@ -853,6 +2660,107 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     # number of interaction channel: nu + C12 -> Li9 + ...:
     number_c12_li9_other = 0
 
+    """ C8 """
+    # number of interaction channel: nu + C12 -> C8 + 4n (integer):
+    number_c12_c8_4n = 0
+    # number of interaction channel: nu + C12 -> C8 + 4n + N*pi_minus + N*pi_minus (integer):
+    number_c12_c8_4n_other = 0
+
+    """ He8 """
+    # number of interaction channel: nu + C12 -> He8 + 4p (integer):
+    number_c12_he8_4p = 0
+    # number of interaction channel: nu + C12 -> He8 + 4p + N*pi_minus + N*pi_minus (integer):
+    number_c12_he8_4p_other = 0
+
+    """ B7 """
+    # number of interaction channel: nu + C12 -> B7 + p + 4n (integer):
+    number_c12_b7_p_4n = 0
+    # number of interaction channel: nu + C12 -> B7 + p + 4n + N*pi_minus + N*pi_minus (integer):
+    number_c12_b7_p_4n_other = 0
+
+    """ He7 """
+    # number of interaction channel: nu + C12 -> He7 + 4p + n (integer):
+    number_c12_he7_4p_n = 0
+    # number of interaction channel: nu + C12 -> He7 + 4p + n + N*pi_minus + N*pi_minus (integer):
+    number_c12_he7_4p_n_other = 0
+
+    """ H7 """
+    # number of interaction channel: nu + C12 -> H7 + 4p + n (integer):
+    number_c12_h7_5p = 0
+    # number of interaction channel: nu + C12 -> H7 + 4p + n + N*pi_minus + N*pi_minus (integer):
+    number_c12_h7_5p_other = 0
+
+    """ Be6 """
+    # number of interaction channel: nu + C12 -> Be6 + 2p + 4n (integer):
+    number_c12_be6_2p_4n = 0
+    # number of interaction channel: nu + C12 -> Be6 + 2p + 4n + N*pi_minus + N*pi_minus (integer):
+    number_c12_be6_2p_4n_other = 0
+
+    """ He6 """
+    # number of interaction channel: nu + C12 -> He6 + 4p + 2n (integer):
+    number_c12_he6_4p_2n = 0
+    # number of interaction channel: nu + C12 -> He6 + 4p + 2n + N*pi_minus + N*pi_minus (integer):
+    number_c12_he6_4p_2n_other = 0
+
+    """ H6 """
+    # number of interaction channel: nu + C12 -> H6 + 5p + n (integer):
+    number_c12_h6_5p_n = 0
+    # number of interaction channel: nu + C12 -> H6 + 5p + n + N*pi_minus + N*pi_minus (integer):
+    number_c12_h6_5p_n_other = 0
+
+    """ C12 """
+    # number of interaction channels: nu + C12 -> nu + C12 + other particles (like pi_minus, pi_plus, kaon_minus,
+    # koan_plus and so on):
+    number_c12_c12 = 0
+
+    """ no isotope (only protons, neutrons, pions): """
+    # number of interaction channels with NO isotope (only proton, neutrons, pions):
+    number_c12_noiso = 0
+    # number of interaction channels with no isotope (nu + C12 -> nu + 5p + 6n + pi_plus):
+    number_c12_noiso_5p_6n = 0
+
+    """ other channels, where C11 or B11 is produced: """
+    number_c12_mass11u = 0
+
+    """ other channels, where C10, B10 or Be10 is produced: """
+    number_c12_mass10u = 0
+
+    """ other channels, where C9, B9, Be9 or Li9 is produced:"""
+    number_c12_mass9u = 0
+
+    """ other channels, where C8, B8, Be8, Li8 or He8 is produced: """
+    number_c12_mass8u = 0
+
+    """ other channels, where B7, Be7, Li7, He7 or H7 is produced: """
+    number_c12_mass7u = 0
+
+    """ other channels, where Be6, Li6, He6 or H6 is produced: """
+    number_c12_mass6u = 0
+
+    """ other channels, where isotopes have mass <= 5u: """
+    number_c12_mass5orless = 0
+
+    """ faulty interaction channels: isotopes are missing (no isotopes with Z<3 and (N-Z)<3 are considered): """
+    # number of interaction channels: nu + C12 -> nu + C12 + ...:
+    number_c12_faulty = 0
+
+    """ Other targets than C12: """
+    # number of channels without C12 as target (integer):
+    number_no_c12 = 0
+    # number of elastic scattering interactions with protons: nu + p -> nu + p + ... (integer):
+    number_es_p = 0
+    # number of elastic scattering interactions with electrons: nu + electron -> nu + electron + ... (integer):
+    number_es_e = 0
+    # number of elastic scattering interactions with O16: nu + O16 -> nu + O16 + ... (integer):
+    number_es_o16 = 0
+    # number of elastic scattering interactions with N14: nu + N14 -> nu + N14 + ... (integer):
+    number_es_n14 = 0
+    # number of elastic scattering interactions with S32: nu + S32 -> nu + S32 + ... (integer):
+    number_es_s32 = 0
+
+
+    number_otherisotope = 0
+
     # loop over all entries of the array:
     for index in range(number_entries):
 
@@ -889,6 +2797,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_b11_piplus = number_c12_b11_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_b11_other = number_c12_b11_other + 1
                     # print("new interaction channel with nu + C12 -> B11: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -923,6 +2832,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_c11_n_2piminus_2piplus = number_c12_c11_n_2piminus_2piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_c11_other = number_c12_c11_other + 1
                     # print("new interaction channel with nu + C12 -> C11: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -965,6 +2875,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_b10_p_n_2piminus_2piplus = number_c12_b10_p_n_2piminus_2piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_b10_other = number_c12_b10_other + 1
                     # print("new interaction channel with nu + C12 -> B10: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -995,6 +2906,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_c10_2p_2piminus = number_c12_c10_2p_2piminus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_c10_other = number_c12_c10_other + 1
                     # print("new interaction channel with nu + C12 -> C10: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1037,6 +2949,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_be10_2p_3piminus_3piplus = number_c12_be10_2p_3piminus_3piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_be10_other = number_c12_be10_other + 1
                     # print("new interaction channel with nu + C12 -> Be10: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1075,6 +2988,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 0
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_b9_other = number_c12_b9_other + 1
                     # print("new interaction channel with nu + C12 -> B9: channel ID = {0:.0f}"
                     # .format(channel_id[index]))
@@ -1121,6 +3035,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_be9_3p_2piminus_piplus = number_c12_be9_3p_2piminus_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_be9_other = number_c12_be9_other + 1
                     # print("new interaction channel with nu + C12 -> Be9: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1163,6 +3078,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_be8_4p_2piminus = number_c12_be8_4p_2piminus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_be8_other = number_c12_be8_other + 1
                     # print("new interaction channel with nu + C12 -> Be8: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1189,6 +3105,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_c9_3n_2piminus_2piplus = number_c12_c9_3n_2piminus_2piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_c9_other = number_c12_c9_other + 1
                     # print("new interaction channel with nu + C12 -> C9: channel ID = {0:.0f}"
                     # .format(channel_id[index]))
@@ -1223,6 +3140,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_be7_3p_2n_2piminus_piplus = number_c12_be7_3p_2n_2piminus_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_be7_other = number_c12_be7_other + 1
                     # print("new interaction channel with nu + C12 -> Be7: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1257,6 +3175,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_li6_3p_3n_piminus_piplus = number_c12_li6_3p_3n_piminus_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_li6_other = number_c12_li6_other + 1
                     # print("new interaction channel with nu + C12 -> Li6: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1287,6 +3206,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_li8_3p_n_piminus_piplus = number_c12_li8_3p_n_piminus_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_li8_other = number_c12_li8_other + 1
                     # print("new interaction channel with nu + C12 -> Li8: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1321,6 +3241,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_li7_2p_3n_piminus_2piplus = number_c12_li7_2p_3n_piminus_2piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_li7_other = number_c12_li7_other + 1
                     # print("new interaction channel with nu + C12 -> Li7: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1351,6 +3272,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_b8_4n_piplus = number_c12_b8_4n_piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_b8_other = number_c12_b8_other + 1
                     # print("new interaction channel with nu + C12 -> B8: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
@@ -1381,20 +3303,230 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
                     number_c12_li9_p_2n_piminus_3piplus = number_c12_li9_p_2n_piminus_3piplus + 1
 
                 else:
+                    # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
                     number_c12_li9_other = number_c12_li9_other + 1
                     # print("new interaction channel with nu + C12 -> Li9: channel ID = {0:.0f}"
                     #       .format(channel_id[index]))
 
 
+            elif isotope_pdg[index] == 1000060080:
+                # for C8:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 0 and num_n == 4 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> C8 + 4n:
+                    number_c12_c8_4n = number_c12_c8_4n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (C8 + 4n + N*pi_minus + N*pi_plus):
+                    number_c12_c8_4n_other = number_c12_c8_4n_other + 1
+
+
+            elif isotope_pdg[index] == 1000020080:
+                # for He8:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 4 and num_n == 0 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> He8 + 4p:
+                    number_c12_he8_4p = number_c12_he8_4p + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (He8 + 4p + N*pi_minus + N*pi_plus):
+                    number_c12_he8_4p_other = number_c12_he8_4p_other + 1
+
+
+            elif isotope_pdg[index] == 1000050070:
+                # for B7:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 1 and num_n == 4 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> B7 + p + 4n:
+                    number_c12_b7_p_4n = number_c12_b7_p_4n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (B7 + p + 4n + N*pi_minus + N*pi_plus):
+                    number_c12_b7_p_4n_other = number_c12_b7_p_4n_other + 1
+
+
+            elif isotope_pdg[index] == 1000020070:
+                # for He7:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 4 and num_n == 1 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> He7 + 4p + n:
+                    number_c12_he7_4p_n = number_c12_he7_4p_n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (He7 + 4p + n + N*pi_minus + N*pi_plus):
+                    number_c12_he7_4p_n_other = number_c12_he7_4p_n_other + 1
+
+
+            elif isotope_pdg[index] == 1000010070:
+                # for H7:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 5 and num_n == 0 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> H7 + 5p:
+                    number_c12_h7_5p = number_c12_h7_5p + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (H7 + 5p + N*pi_minus + N*pi_plus):
+                    number_c12_h7_5p_other = number_c12_h7_5p_other + 1
+
+
+            elif isotope_pdg[index] == 1000040060:
+                # for Be6:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 2 and num_n == 4 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> Be6 + 2p + 4n:
+                    number_c12_be6_2p_4n = number_c12_be6_2p_4n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (Be6 + 2p + 4n + N*pi_minus + N*pi_plus):
+                    number_c12_be6_2p_4n_other = number_c12_be6_2p_4n_other + 1
+
+
+            elif isotope_pdg[index] == 1000020060:
+                # for He6:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 4 and num_n == 2 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> He6 + 4p + 2n:
+                    number_c12_he6_4p_2n = number_c12_he6_4p_2n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (He6 + 4p + 2n + N*pi_minus + N*pi_plus):
+                    number_c12_he6_4p_2n_other = number_c12_he6_4p_2n_other + 1
+
+
+            elif isotope_pdg[index] == 1000010060:
+                # for H6:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+
+                if num_p == 5 and num_n == 1 and num_pi_minus == 0 and num_pi_plus == 0:
+                    # interaction channel: nu + C12 -> H6 + 5p + n:
+                    number_c12_h6_5p_n = number_c12_h6_5p_n + 1
+
+                else:
+                    # interaction channels like above, BUT with N pi_minus and pi_plus
+                    # (H6 + 5p + n + N*pi_minus + N*pi_plus):
+                    number_c12_h6_5p_n_other = number_c12_h6_5p_n_other + 1
+
+
+            elif isotope_pdg[index] == 110000000:
+                # other channels: nu + C12 -> nu + C11/B11 + ...:
+                number_c12_mass11u = number_c12_mass11u + 1
+
+
+            elif isotope_pdg[index] == 100000000:
+                # other channels: nu + C12 -> nu + C10/B10/Be10 + ...:
+                number_c12_mass10u = number_c12_mass10u + 1
+
+
+            elif isotope_pdg[index] == 90000000:
+                # other channels: nu + C12 -> nu + C9/B9/Be9/Li9 + ...:
+                number_c12_mass9u = number_c12_mass9u + 1
+
+
+            elif isotope_pdg[index] == 80000000:
+                # other channels: nu + C12 -> nu + C8/B8/Be8/Li8/He8 + ...:
+                number_c12_mass8u = number_c12_mass8u + 1
+
+
+            elif isotope_pdg[index] == 70000000:
+                # other channels: nu + C12 -> nu + B7/Be7/Li7/He7/H7 + ...:
+                number_c12_mass7u = number_c12_mass7u + 1
+
+
+            elif isotope_pdg[index] == 60000000:
+                # other channels: nu + C12 -> nu + Be6/Li6/He6/H6 + ...:
+                number_c12_mass6u = number_c12_mass6u + 1
+
+
+            elif isotope_pdg[index] == 50000000:
+                # other channels with isotopes with mass <= 5u:
+                number_c12_mass5orless = number_c12_mass5orless + 1
+
+
+            elif isotope_pdg[index] == 1000060120:
+                # for C12 as product:
+                number_c12_c12 = number_c12_c12 + 1
+
+
+            elif isotope_pdg[index] == 0:
+                # No isotope as product (only proton, neutron, pion, ...):
+                # number of p, n, pi_minus, pi_plus after NC interaction:
+                num_p, num_n, num_pi_minus, num_pi_plus = get_number_of_particles_of_channelid(channel_id[index])
+                # number of p and n of the target particle:
+                num_p_target, num_n_target = get_number_of_p_and_n_of_isotope(target_pdg[index])
+                # mass number (sum of p and n) of the target particle:
+                mass_number_target = num_p_target + num_n_target
+
+                if mass_number_target == (num_p + num_n):
+                    # possible interaction channel: nu + C12 -> nu + X*p + Y*n + ...:
+                    number_c12_noiso = number_c12_noiso + 1
+
+                elif num_p == 5 and num_n == 6 and (num_pi_plus - num_pi_minus) == 1:
+                    # possible interaction channel: nu + C12 -> nu + 5p + 6n + (X*pi_plus - Y*pi_minus)):
+                    number_c12_noiso_5p_6n = number_c12_noiso_5p_6n + 1
+
+                else:
+                    print("new interaction channel without isotope (nu + C12 -> nu + N*p + M*n + ...), isopdg = {0:.0f}"
+                          ", channel ID = {1:.0f}".format(isotope_pdg[index], channel_id[index]))
+
+
             else:
                 print("other isotope than expected: {0:.0f}, corresponding channel ID = {1:.0f}"
                       .format(isotope_pdg[index], channel_id[index]))
-                # lala = 1
+                number_otherisotope = number_otherisotope + 1
+
 
         else:
-            # print("other target than C12: target PDG = {0:.0f}, channel ID = {1:.0f}, isotope PDG = {2:.0f}"
-                  # .format(target_pdg[index], channel_id[index], isotope_pdg[index]))
+            # other target than C12
+
+            # number of events with NO C12 as target:
             number_no_c12 = number_no_c12 + 1
+
+            # check the channel ID of the interaction (either channel_id == 2 or channel_id == 3):
+            if channel_id[index] == 2:
+                # channel_id == 2: ES interaction: nu + p -> nu + p (maybe also pi_zero or gammas):
+                number_es_p = number_es_p + 1
+
+            elif channel_id[index] == 3:
+
+                if target_pdg[index] == 11:
+                    # electron as target: ES interaction: nu + electron -> nu + electron (maybe also pi_zero or gammas):
+                    number_es_e = number_es_e + 1
+
+                elif target_pdg[index] == 1000080160:
+                    # O16 as target: ES interaction: nu + O16 -> nu + O16 (maybe also pi_zero or gammas):
+                    number_es_o16 = number_es_o16 + 1
+
+                elif target_pdg[index] == 1000070140:
+                    # N14 as target: ES interaction: nu + N14 -> nu + N14 (maybe also pi_zero or gammas):
+                    number_es_n14 = number_es_n14 + 1
+
+                elif target_pdg[index] == 1000160320:
+                    # S32 as target: ES interaction: nu + S32 -> nu + S32 (maybe also pi_zero or gammas):
+                    number_es_s32 = number_es_s32 + 1
+
+                else:
+                    print("new target PDG for channel ID = 3: target PDG = {0:.0f}".format(target_pdg[index]))
+
+            else:
+                print("new channel ID with NO C12 target: target PDG = {0:.0f}, channel ID = {1:.0f}, "
+                      "isotope PDG = {2:.0f}".format(target_pdg[index], channel_id[index], isotope_pdg[index]))
+
+
+    print(number_otherisotope)
 
 
     """ calculate the fraction of the different NC interaction channels in PERCENT (float): """
@@ -1424,7 +3556,7 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     frac_c12_b10_2n_piminus_2piplus = float(number_c12_b10_2n_piminus_2piplus) / float(number_entries) * 100
     frac_c12_b10_2p_2piminus_piplus = float(number_c12_b10_2p_2piminus_piplus) / float(number_entries) * 100
     frac_c12_b10_2p_3piminus_2piplus = float(number_c12_b10_2p_3piminus_2piplus) / float(number_entries) * 100
-    frac_c12_b10_p_n_2piminus_2piplus = float(number_c12_b10_p_n_2piminus_2piplus) / float( number_entries) * 100
+    frac_c12_b10_p_n_2piminus_2piplus = float(number_c12_b10_p_n_2piminus_2piplus) / float(number_entries) * 100
     frac_c12_b10_other = float(number_c12_b10_other) / float(number_entries) * 100
 
     # C10:
@@ -1537,8 +3669,64 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     frac_c12_li9_p_2n_piminus_3piplus = float(number_c12_li9_p_2n_piminus_3piplus) / float(number_entries) * 100
     frac_c12_li9_other = float(number_c12_li9_other) / float(number_entries) * 100
 
+    # C8:
+    frac_c12_c8_4n = float(number_c12_c8_4n) / float(number_entries) * 100
+    frac_c12_c8_4n_other = float(number_c12_c8_4n_other) / float(number_entries) * 100
 
+    # He8:
+    frac_c12_he8_4p = float(number_c12_he8_4p) / float(number_entries) * 100
+    frac_c12_he8_4p_other = float(number_c12_he8_4p_other) / float(number_entries) * 100
+
+    # B7:
+    frac_c12_b7_p_4n = float(number_c12_b7_p_4n) / float(number_entries) * 100
+    frac_c12_b7_p_4n_other = float(number_c12_b7_p_4n_other) / float(number_entries) * 100
+
+    # He7:
+    frac_c12_he7_4p_n = float(number_c12_he7_4p_n) / float(number_entries) * 100
+    frac_c12_he7_4p_n_other = float(number_c12_he7_4p_n_other) / float(number_entries) * 100
+
+    # H7:
+    frac_c12_h7_5p = float(number_c12_h7_5p) / float(number_entries) * 100
+    frac_c12_h7_5p_other = float(number_c12_h7_5p_other) / float(number_entries) * 100
+
+    # Be6:
+    frac_c12_be6_2p_4n = float(number_c12_be6_2p_4n) / float(number_entries) * 100
+    frac_c12_be6_2p_4n_other = float(number_c12_be6_2p_4n_other) / float(number_entries) * 100
+
+    # He6:
+    frac_c12_he6_4p_2n = float(number_c12_he6_4p_2n) / float(number_entries) * 100
+    frac_c12_he6_4p_2n_other = float(number_c12_he6_4p_2n_other) / float(number_entries) * 100
+
+    # H6:
+    frac_c12_h6_5p_n = float(number_c12_h6_5p_n) / float(number_entries) * 100
+    frac_c12_h6_5p_n_other = float(number_c12_h6_5p_n_other) / float(number_entries) * 100
+
+    # missing channels:
+    frac_c12_mass11u = float(number_c12_mass11u) / float(number_entries) * 100
+    frac_c12_mass10u = float(number_c12_mass10u) / float(number_entries) * 100
+    frac_c12_mass9u = float(number_c12_mass9u) / float(number_entries) * 100
+    frac_c12_mass8u = float(number_c12_mass8u) / float(number_entries) * 100
+    frac_c12_mass7u = float(number_c12_mass7u) / float(number_entries) * 100
+    frac_c12_mass6u = float(number_c12_mass6u) / float(number_entries) * 100
+    frac_c12_mass5orless = float(number_c12_mass5orless) / float(number_entries) * 100
+
+    # C12:
+    frac_c12_c12 = float(number_c12_c12) / float(number_entries) * 100
+
+    # no isotope (only protons, neutrons, pions):
+    frac_c12_noiso = float(number_c12_noiso) / float(number_entries) * 100
+    frac_c12_noiso_5p_6n = float(number_c12_noiso_5p_6n) / float(number_entries) * 100
+
+    # faulty interaction channels: isotopes are missing (no isotopes with Z<3 and (N-Z)<3 are considered):
+    frac_c12_faulty = float(number_c12_faulty) / float(number_entries) * 100
+
+    # Other targets than C12:
     frac_no_c12 = float(number_no_c12) / float(number_entries) * 100
+    frac_es_p = float(number_es_p) / float(number_entries) * 100
+    frac_es_e = float(number_es_e) / float(number_entries) * 100
+    frac_es_o16 = float(number_es_o16) / float(number_entries) * 100
+    frac_es_n14 = float(number_es_n14) / float(number_entries) * 100
+    frac_es_s32 = float(number_es_s32) / float(number_entries) * 100
 
 
     return frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus, \
@@ -1578,4 +3766,44 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
            frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus, frac_c12_b8_other, \
            frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus, \
            frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus, frac_c12_li9_other, \
-           number_no_c12, frac_no_c12
+           frac_c12_c8_4n, frac_c12_c8_4n_other, frac_c12_he8_4p, frac_c12_he8_4p_other, \
+           frac_c12_b7_p_4n, frac_c12_b7_p_4n_other, frac_c12_he7_4p_n, frac_c12_he7_4p_n_other, \
+           frac_c12_h7_5p, frac_c12_h7_5p_other, frac_c12_be6_2p_4n, frac_c12_be6_2p_4n_other, \
+           frac_c12_he6_4p_2n, frac_c12_he6_4p_2n_other, frac_c12_h6_5p_n, frac_c12_h6_5p_n_other, \
+           frac_c12_mass11u, frac_c12_mass10u, frac_c12_mass9u, frac_c12_mass8u, frac_c12_mass7u, frac_c12_mass6u, \
+           frac_c12_mass5orless, \
+           frac_c12_c12, frac_c12_noiso, frac_c12_noiso_5p_6n, \
+           frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_faulty
+
+
+def check_high_channelid(channel_id, final_pdg):
+    """
+    function to check the channel IDs with large value and to see which particle are produced for this channels.
+
+    :param channel_id: ID of the NC interaction channel, defines the product particles of the NC interactions
+    (array of float)
+    :param final_pdg: PDG ID of all final particles for each event (list of arrays of floats)
+    :return:
+    """
+
+    # get the number of entries of the array (integer):
+    number_entries = len(channel_id)
+
+    # loop over all entries:
+    for index in range(number_entries):
+
+        # check, if channel ID is larger than 5 digits:
+        if channel_id[index] > 100000:
+
+            print("----------------------------------")
+            print("channel ID: {0:.0f}".format(channel_id[index]))
+            print("final particles:")
+            print(final_pdg[index][:])
+            print("----------------------------------")
+
+        else:
+            continue
+
+    return
+
+

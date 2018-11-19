@@ -47,24 +47,28 @@ now = date.strftime("%Y-%m-%d %H:%M")
 
 
 # set SAVE_FIG, defines if figures are saved:
-SAVE_FIG = False
+SAVE_FIG = True
 
 # set SAVE_TXT, defines if txt files are saved:
-SAVE_TXT = False
+SAVE_TXT = True
 
 # set SHOW_PLOT, defines if the figures are shown:
-SHOW_PLOT = False
+SHOW_PLOT = True
 
 
 # set the path of the inputs:
-input_path = "/home/astro/blum/juno/test_output_DSNB_gen/input/"
+# input_path = "/home/astro/blum/juno/test_output_DSNB_gen/input"
+input_path = "/home/astro/blum/juno/atmoNC/data_converted_qel_NC/output_generator/"
 
 # file name of the input file:
-# input_name = input_path + "test_100events.root"
-input_name = input_path + "test_11330events_newVersion_seed11330.root"
+input_name = input_path + "gen_11330evts_qel_NC.root"
+# input_name = input_path + "test_11330events_newVersion_seed11330.root"
+# input_name = input_path + "test_113300events_newVersion_seed6.root"
+# input_name = input_path + "test_1133000events_newVersion_seed5.root"
 
 # set the path, where the outputs are saved:
-output_path = "/home/astro/blum/juno/test_output_DSNB_gen/output/"
+output_path = "/home/astro/blum/juno/atmoNC/data_converted_qel_NC/output_checkoutNC/"
+# output_path = "/home/astro/blum/juno/test_output_DSNB_gen/output/"
 
 
 # bin-width of the array, which represents the incoming neutrino energy (in GeV) (float):
@@ -114,48 +118,56 @@ else:
 # (C12 and proton):
 (Energy_nu_incoming_1, Event_NC_C12, Event_ES_proton, Event_NC_N14, Event_NC_O16, Event_ES_electron, Event_NC_S32,
  Number_NC_C12, Number_ES_proton, Number_NC_N14, Number_NC_O16, Number_ES_electron, Number_NC_S32,
- Frac_NC_C12, Frac_ES_proton, Frac_NC_N14, Frac_NC_O16, Frac_ES_electron, Frac_NC_S32) \
+ Frac_NC_C12, Frac_ES_proton_target, Frac_NC_N14_target, Frac_NC_O16_target, Frac_ES_electron_target,
+ Frac_NC_S32_target) \
     = NC_background_functions.get_target_ratio(projectile_E, target_PDG, bin_width_incoming)
 
 
 # get the number of events of the different types on NC interaction channels:
-Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus, Frac_C12_B11_p_piminus_piplus, \
-Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus, Frac_C12_B11_other, \
-Frac_C12_C11_n, Frac_C12_C11_p_piminus, Frac_C12_C11_n_piminus_piplus, Frac_C12_C11_p_2piminus_piplus, \
-Frac_C12_C11_p_3piminus_2piplus, Frac_C12_C11_n_2piminus_2piplus, Frac_C12_C11_other, \
-Frac_C12_B10_p_n, Frac_C12_B10_2p_piminus, Frac_C12_B10_p_n_piminus_piplus, \
-Frac_C12_B10_2n_piplus, Frac_C12_B10_2n_piminus_2piplus, Frac_C12_B10_2p_2piminus_piplus, \
-Frac_C12_B10_2p_3piminus_2piplus, Frac_C12_B10_p_n_2piminus_2piplus, Frac_C12_B10_other, \
-Frac_C12_C10_2n, Frac_C12_C10_p_n_piminus, Frac_C12_C10_p_n_2piminus_piplus, Frac_C12_C10_2n_piminus_piplus, \
-Frac_C12_C10_2p_2piminus, Frac_C12_C10_other, \
-Frac_C12_Be10_2p, Frac_C12_Be10_p_n_piplus, Frac_C12_Be10_p_n_piminus_2piplus, Frac_C12_Be10_2p_piminus_piplus, \
-Frac_C12_Be10_2n_2piplus, Frac_C12_Be10_p_n_2piminus_3piplus, Frac_C12_Be10_2p_2piminus_2piplus, \
-Frac_C12_Be10_2p_3piminus_3piplus, Frac_C12_Be10_other, \
-Frac_C12_B9_p_2n, Frac_C12_B9_p_2n_piminus_piplus, Frac_C12_B9_2p_n_3piminus_2piplus, Frac_C12_B9_2p_n_piminus, \
-Frac_C12_B9_3n_piplus, Frac_C12_B9_p_2n_2piminus_2piplus, Frac_C12_B9_2p_n_2piminus_piplus, Frac_C12_B9_other, \
-Frac_C12_Be9_2p_n, Frac_C12_Be9_p_2n_piplus, Frac_C12_Be9_3p_piminus, Frac_C12_Be9_p_2n_piminus_2piplus, \
-Frac_C12_Be9_2p_n_piminus_piplus, Frac_C12_Be9_2p_n_3piminus_3piplus, Frac_C12_Be9_2p_n_2piminus_2piplus, \
-Frac_C12_Be9_3n_2piplus, Frac_C12_Be9_3p_2piminus_piplus, Frac_C12_Be9_other, \
-Frac_C12_Be8_2p_2n, Frac_C12_Be8_3p_n_piminus, Frac_C12_Be8_p_3n_piplus, Frac_C12_Be8_2p_2n_2piminus_2piplus, \
-Frac_C12_Be8_4n_2piplus, Frac_C12_Be8_2p_2n_piminus_piplus, Frac_C12_Be8_3p_n_2piminus_piplus, \
-Frac_C12_Be8_4p_2piminus, Frac_C12_Be8_other, \
-Frac_C12_C9_p_2n_piminus, Frac_C12_C9_3n, Frac_C12_C9_2p_n_2piminus, Frac_C12_C9_3n_2piminus_2piplus, \
-Frac_C12_C9_other, \
-Frac_C12_Be7_2p_3n, Frac_C12_Be7_p_4n_piplus, Frac_C12_Be7_2p_3n_2piminus_2piplus, Frac_C12_Be7_3p_2n_piminus, \
-Frac_C12_Be7_4p_n_2piminus, Frac_C12_Be7_3p_2n_2piminus_piplus, Frac_C12_Be7_other, \
-Frac_C12_Li6_3p_3n, Frac_C12_Li6_2p_4n_piplus, Frac_C12_Li6_5p_n_2piminus, Frac_C12_Li6_2p_4n_piminus_2piplus, \
-Frac_C12_Li6_4p_2n_piminus, Frac_C12_Li6_3p_3n_piminus_piplus, Frac_C12_Li6_other, \
-Frac_C12_Li8_3p_n, Frac_C12_Li8_4p_piminus, Frac_C12_Li8_4p_2piminus_piplus, Frac_C12_Li8_2p_2n_piplus, \
-Frac_C12_Li8_3p_n_piminus_piplus, Frac_C12_Li8_other, \
-Frac_C12_Li7_2p_3n_piplus, Frac_C12_Li7_4p_n_piminus, Frac_C12_Li7_3p_2n, Frac_C12_Li7_3p_2n_piminus_piplus, \
-Frac_C12_Li7_4p_n_2piminus_piplus, Frac_C12_Li7_2p_3n_piminus_2piplus, Frac_C12_Li7_other, \
-Frac_C12_B8_p_3n, Frac_C12_B8_p_3n_piminus_piplus, Frac_C12_B8_2p_2n_2piminus_piplus, Frac_C12_B8_2p_2n_piminus, \
-Frac_C12_B8_4n_piplus, Frac_C12_B8_other, \
-Frac_C12_Li9_2p_n_piplus, Frac_C12_Li9_3p, Frac_C12_Li9_3p_piminus_piplus, Frac_C12_Li9_2p_n_piminus_2piplus, \
-Frac_C12_Li9_p_2n_piminus_3piplus, Frac_C12_Li9_other, \
-Number_no_C12, Frac_no_C12 \
+(Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus, Frac_C12_B11_p_piminus_piplus,
+ Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus, Frac_C12_B11_other,
+ Frac_C12_C11_n, Frac_C12_C11_p_piminus, Frac_C12_C11_n_piminus_piplus, Frac_C12_C11_p_2piminus_piplus,
+ Frac_C12_C11_p_3piminus_2piplus, Frac_C12_C11_n_2piminus_2piplus, Frac_C12_C11_other,
+ Frac_C12_B10_p_n, Frac_C12_B10_2p_piminus, Frac_C12_B10_p_n_piminus_piplus,
+ Frac_C12_B10_2n_piplus, Frac_C12_B10_2n_piminus_2piplus, Frac_C12_B10_2p_2piminus_piplus,
+ Frac_C12_B10_2p_3piminus_2piplus, Frac_C12_B10_p_n_2piminus_2piplus, Frac_C12_B10_other,
+ Frac_C12_C10_2n, Frac_C12_C10_p_n_piminus, Frac_C12_C10_p_n_2piminus_piplus, Frac_C12_C10_2n_piminus_piplus,
+ Frac_C12_C10_2p_2piminus, Frac_C12_C10_other,
+ Frac_C12_Be10_2p, Frac_C12_Be10_p_n_piplus, Frac_C12_Be10_p_n_piminus_2piplus, Frac_C12_Be10_2p_piminus_piplus,
+ Frac_C12_Be10_2n_2piplus, Frac_C12_Be10_p_n_2piminus_3piplus, Frac_C12_Be10_2p_2piminus_2piplus,
+ Frac_C12_Be10_2p_3piminus_3piplus, Frac_C12_Be10_other,
+ Frac_C12_B9_p_2n, Frac_C12_B9_p_2n_piminus_piplus, Frac_C12_B9_2p_n_3piminus_2piplus, Frac_C12_B9_2p_n_piminus,
+ Frac_C12_B9_3n_piplus, Frac_C12_B9_p_2n_2piminus_2piplus, Frac_C12_B9_2p_n_2piminus_piplus, Frac_C12_B9_other,
+ Frac_C12_Be9_2p_n, Frac_C12_Be9_p_2n_piplus, Frac_C12_Be9_3p_piminus, Frac_C12_Be9_p_2n_piminus_2piplus,
+ Frac_C12_Be9_2p_n_piminus_piplus, Frac_C12_Be9_2p_n_3piminus_3piplus, Frac_C12_Be9_2p_n_2piminus_2piplus,
+ Frac_C12_Be9_3n_2piplus, Frac_C12_Be9_3p_2piminus_piplus, Frac_C12_Be9_other,
+ Frac_C12_Be8_2p_2n, Frac_C12_Be8_3p_n_piminus, Frac_C12_Be8_p_3n_piplus, Frac_C12_Be8_2p_2n_2piminus_2piplus,
+ Frac_C12_Be8_4n_2piplus, Frac_C12_Be8_2p_2n_piminus_piplus, Frac_C12_Be8_3p_n_2piminus_piplus,
+ Frac_C12_Be8_4p_2piminus, Frac_C12_Be8_other,
+ Frac_C12_C9_p_2n_piminus, Frac_C12_C9_3n, Frac_C12_C9_2p_n_2piminus, Frac_C12_C9_3n_2piminus_2piplus,
+ Frac_C12_C9_other,
+ Frac_C12_Be7_2p_3n, Frac_C12_Be7_p_4n_piplus, Frac_C12_Be7_2p_3n_2piminus_2piplus, Frac_C12_Be7_3p_2n_piminus,
+ Frac_C12_Be7_4p_n_2piminus, Frac_C12_Be7_3p_2n_2piminus_piplus, Frac_C12_Be7_other,
+ Frac_C12_Li6_3p_3n, Frac_C12_Li6_2p_4n_piplus, Frac_C12_Li6_5p_n_2piminus, Frac_C12_Li6_2p_4n_piminus_2piplus,
+ Frac_C12_Li6_4p_2n_piminus, Frac_C12_Li6_3p_3n_piminus_piplus, Frac_C12_Li6_other,
+ Frac_C12_Li8_3p_n, Frac_C12_Li8_4p_piminus, Frac_C12_Li8_4p_2piminus_piplus, Frac_C12_Li8_2p_2n_piplus,
+ Frac_C12_Li8_3p_n_piminus_piplus, Frac_C12_Li8_other,
+ Frac_C12_Li7_2p_3n_piplus, Frac_C12_Li7_4p_n_piminus, Frac_C12_Li7_3p_2n, Frac_C12_Li7_3p_2n_piminus_piplus,
+ Frac_C12_Li7_4p_n_2piminus_piplus, Frac_C12_Li7_2p_3n_piminus_2piplus, Frac_C12_Li7_other,
+ Frac_C12_B8_p_3n, Frac_C12_B8_p_3n_piminus_piplus, Frac_C12_B8_2p_2n_2piminus_piplus, Frac_C12_B8_2p_2n_piminus,
+ Frac_C12_B8_4n_piplus, Frac_C12_B8_other,
+ Frac_C12_Li9_2p_n_piplus, Frac_C12_Li9_3p, Frac_C12_Li9_3p_piminus_piplus, Frac_C12_Li9_2p_n_piminus_2piplus,
+ Frac_C12_Li9_p_2n_piminus_3piplus, Frac_C12_Li9_other,
+ Frac_C12_C8_4n, Frac_C12_C8_4n_other, Frac_C12_He8_4p, Frac_C12_He8_4p_other, Frac_C12_B7_p_4n, Frac_C12_B7_p_4n_other,
+ Frac_C12_He7_4p_n, Frac_C12_He7_4p_n_other, Frac_C12_H7_5p, Frac_C12_H7_5p_other,
+ Frac_C12_Be6_2p_4n, Frac_C12_Be6_2p_4n_other, Frac_C12_He6_4p_2n, Frac_C12_He6_4p_2n_other,
+ Frac_C12_H6_5p_n, Frac_C12_H6_5p_n_other,
+ Frac_C12_mass11u, Frac_C12_mass10u, Frac_C12_mass9u, Frac_C12_mass8u, Frac_C12_mass7u, Frac_C12_mass6u,
+ Frac_C12_mass5orless,
+ Frac_C12_C12, Frac_C12_NoIso, Frac_C12_NoIso_5p_6n,
+ Frac_no_C12, Frac_ES_proton_chID, Frac_ES_electron_chID, Frac_ES_O16_chID, Frac_ES_N14_chID, Frac_ES_S32_chID,
+ Frac_C12_faulty) \
     = NC_background_functions.get_interaction_channel(NC_inter_ch_ID, isotope_PDG, target_PDG)
-
 
 
 """ Display Output of 'get_neutrino_energy()' in plot: """
@@ -195,11 +207,11 @@ plt.title("Energy spectrum of atmospheric neutrinos (interacting via NC in the J
 plt.legend(fontsize=12)
 
 if SAVE_FIG:
-    plt.savefig(output_path + "incoming_neutrino_spectrum.png")
+    plt.savefig(output_path + "incoming_neutrino_spectrum_{0:.0f}evts.png".format(NumEvent))
 
 """ Save information about the ratio of incoming neutrinos into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "incoming_neutrino_ratio.txt",
+    np.savetxt(output_path + "incoming_neutrino_spectrum_{0:.0f}evts.txt".format(NumEvent),
                np.array([NumEvent, Number_nu_e_IN, Number_nu_e_bar_IN, Number_nu_mu_IN, Number_nu_mu_bar_IN,
                          Number_nu_tau_IN, Number_nu_tau_bar_IN, Frac_nu_e_IN, Frac_nu_e_bar_IN, Frac_nu_mu_IN,
                          Frac_nu_mu_bar_IN, Frac_nu_tau_IN, Frac_nu_tau_bar_IN]), fmt='%4.5f',
@@ -233,7 +245,7 @@ if Number_NC_C12 != 0:
 if Number_ES_proton != 0:
     plt.plot(Energy_nu_incoming_1[:-1], Event_ES_proton, drawstyle='steps', color='r',
              label="ES interaction on protons: $N_{events} = $"+"{0:.2f}; fraction = {1:.2f}%"
-             .format(Number_ES_proton, Frac_ES_proton))
+             .format(Number_ES_proton, Frac_ES_proton_target))
 
 plt.xlim(xmin=0)
 plt.ylim(ymin=0)
@@ -243,14 +255,14 @@ plt.title("Neutrino energy spectrum for NC interactions with different targets",
 plt.legend(fontsize=12)
 
 if SAVE_FIG:
-    plt.savefig(output_path + "target_ratio.png")
+    plt.savefig(output_path + "target_ratio_{0:.0f}evts.png".format(NumEvent))
 
 """ Save information about the target ratio into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "target_ratio.txt",
+    np.savetxt(output_path + "target_ratio_{0:.0f}evts.txt".format(NumEvent),
                np.array([NumEvent, Number_NC_C12, Number_ES_proton, Number_NC_N14, Number_NC_O16, Number_ES_electron,
-                         Number_NC_S32, Frac_NC_C12, Frac_ES_proton, Frac_NC_N14, Frac_NC_O16, Frac_ES_electron,
-                         Frac_NC_S32]), fmt='%4.5f',
+                         Number_NC_S32, Frac_NC_C12, Frac_ES_proton_target, Frac_NC_N14_target, Frac_NC_O16_target,
+                         Frac_ES_electron_target, Frac_NC_S32_target]), fmt='%4.5f',
                header="Information about the number and ratio of the target particles in the JUNO liquid scintillator\n"
                       "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
                       "Number of events in the input file,\n"
@@ -271,7 +283,7 @@ if SAVE_TXT:
 
 """ Save information from get_interaction_channel() into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "NC_interaction_channels.txt",
+    np.savetxt(output_path + "NC_interaction_channels_{0:.0f}evts.txt".format(NumEvent),
                np.array([Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus,
                          Frac_C12_B11_p_piminus_piplus, Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus,
                          Frac_C12_B11_other,
@@ -314,7 +326,15 @@ if SAVE_TXT:
                          Frac_C12_B8_2p_2n_piminus, Frac_C12_B8_4n_piplus, Frac_C12_B8_other,
                          Frac_C12_Li9_2p_n_piplus, Frac_C12_Li9_3p, Frac_C12_Li9_3p_piminus_piplus,
                          Frac_C12_Li9_2p_n_piminus_2piplus, Frac_C12_Li9_p_2n_piminus_3piplus, Frac_C12_Li9_other,
-                         Number_no_C12, Frac_no_C12]), fmt='%4.5f',
+                         Frac_C12_C8_4n, Frac_C12_C8_4n_other, Frac_C12_He8_4p, Frac_C12_He8_4p_other,
+                         Frac_C12_B7_p_4n, Frac_C12_B7_p_4n_other, Frac_C12_He7_4p_n, Frac_C12_He7_4p_n_other,
+                         Frac_C12_H7_5p, Frac_C12_H7_5p_other, Frac_C12_Be6_2p_4n, Frac_C12_Be6_2p_4n_other,
+                         Frac_C12_He6_4p_2n, Frac_C12_He6_4p_2n_other, Frac_C12_H6_5p_n, Frac_C12_H6_5p_n_other,
+                         Frac_C12_mass11u, Frac_C12_mass10u, Frac_C12_mass9u, Frac_C12_mass8u, Frac_C12_mass7u,
+                         Frac_C12_mass6u, Frac_C12_mass5orless,
+                         Frac_C12_C12, Frac_C12_NoIso, Frac_C12_NoIso_5p_6n,
+                         Frac_no_C12, Frac_ES_proton_chID, Frac_ES_electron_chID, Frac_ES_O16_chID, Frac_ES_N14_chID,
+                         Frac_ES_S32_chID, Frac_C12_faulty]), fmt='%4.5f',
                header="Information about the number of the different NC interaction channels\n"
                       "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
                       "Fraction of NC channel nu + C12 -> B11 + p,\n"
@@ -426,8 +446,39 @@ if SAVE_TXT:
                       "Fraction of NC channel nu + C12 -> Li9 + 2p + n + pi_minus + 2*pi_plus,\n"
                       "Fraction of NC channel nu + C12 -> Li9 + p + 2n + pi_minus + 3*pi_plus,\n"
                       "Fraction of other NC channels of nu + C12 -> Li9 + ...,\n"
-                      "Number of NC channel WITHOUT C12,\n"
-                      "Fraction of NC channels WITHOUT C12:"
+                      "Fraction of NC channel nu + C12 -> C8 + 4n,\n"
+                      "Fraction of NC channel nu + C12 -> C8 + 4n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> He8 + 4p,\n"
+                      "Fraction of NC channel nu + C12 -> He8 + 4p + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> B7 + p + 4n,\n"
+                      "Fraction of NC channel nu + C12 -> B7 + p + 4n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> He7 + 4p + n,\n"
+                      "Fraction of NC channel nu + C12 -> He7 + 4p + n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> H7 + 5p,\n"
+                      "Fraction of NC channel nu + C12 -> H7 + 5p + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> Be6 + 2p + 4n,\n"
+                      "Fraction of NC channel nu + C12 -> Be6 + 2p + 4n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> He6 + 4p + 2n,\n"
+                      "Fraction of NC channel nu + C12 -> He6 + 4p + 2n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of NC channel nu + C12 -> H6 + 5p + n,\n"
+                      "Fraction of NC channel nu + C12 -> H6 + 5p + n + N*pi_minus + N*pi_plus,\n"
+                      "Fraction of other NC channels nu + C12 -> C11/B11 + ...\n"
+                      "Fraction of other NC channels nu + C12 -> C10/B10/Be10 + ...\n"
+                      "Fraction of other NC channels nu + C12 -> C9/B9/Be9/Li9 + ...\n"
+                      "Fraction of other NC channels nu + C12 -> C8/B8/Be8/Li8/He8 + ...\n"
+                      "Fraction of other NC channels nu + C12 -> B7/Be7/Li7/He7/H7 + ...\n"
+                      "Fraction of other NC channels nu + C12 -> Be6/Li6/He6/H6 + ...\n"
+                      "Fraction of NC channels with isotopes with mass <=5: nu + C12 -> X + ...\n"
+                      "Fraction of NC channels nu + C12 -> nu + C12 + ...,\n"
+                      "Fraction of NC channels without isotope nu + C12 -> nu + X*p + Y*n + Z*pion,\n"
+                      "Fraction of NC channels without isotope nu + C12 -> nu + 5p + 6n + 1pi_plus,\n"
+                      "Fraction of NC channels WITHOUT C12 as target,\n"
+                      "Fraction of ES channel nu + p -> nu + p + ...,\n"
+                      "Fraction of ES channel nu + electron -> nu + electron + ...,\n"
+                      "Fraction of ES channel nu + O16 -> nu + O16 + ...,\n"
+                      "Fraction of ES channel nu + N14 -> nu + N14 + ...,\n"
+                      "Fraction of ES channel nu + S32 -> nu + S32 + ...,\n"
+                      "Fraction of faulty interactions (isotopes or particles are missing):"
                .format(input_name, now))
 
 
