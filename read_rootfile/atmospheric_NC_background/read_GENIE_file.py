@@ -1,6 +1,14 @@
 """ Script to read the 'original' ROOT file from Julia's GENIE simulation to investigate the different NC interaction
     channels.
 
+    The output txt file with the fraction of the different interaction channels is saved in
+    "/home/astro/blum/juno/atmoNC/interaction_channels_qel_NC_{0:d}evts.txt".
+
+    In "interaction_channels_edit.ods" the channels are sorted descending.
+
+    In python script "display_interaction_channels.py", the main interaction channels are displayed with their
+    fractions.
+
 """
 
 
@@ -75,7 +83,7 @@ output_path = "/home/astro/blum/juno/atmoNC/"
 
 """ Save information from get_interaction_channel() into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "interaction_channels_NC_{0:d}evts.txt".format(Number_Events),
+    np.savetxt(output_path + "interaction_channels_qel_NC_{0:d}evts.txt".format(Number_Events),
                np.array([Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus,
                          Frac_C12_B11_p_piminus_piplus, Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus,
                          Frac_C12_C11_n, Frac_C12_C11_p_piminus, Frac_C12_C11_n_piminus_piplus,

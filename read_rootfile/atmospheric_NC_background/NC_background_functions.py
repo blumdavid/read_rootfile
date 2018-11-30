@@ -69,9 +69,450 @@ class NCData:
 """
 
 
+def read_sample_detsim_user(rootfile_input):
+    """
+    function to read the
+    :param rootfile_input:
+    :return:
+    """
+    # load the ROOT file:
+    rfile = ROOT.TFile(rootfile_input)
+    # get the "evt"-TTree from the TFile:
+    rtree_evt = rfile.Get("evt")
+    # get the "geninfo"-TTree from the TFile:
+    rtree_geninfo = rfile.Get("geninfo")
+    # get the "prmtrkdep"-TTree from the TFile:
+    rtree_prmtrkdep = rfile.Get("prmtrkdep")
+
+    # get the number of events in the geninfo Tree:
+    number_events_geninfo = rtree_geninfo.GetEntries()
+    # get the number of events in the prmtrkdep Tree:
+    number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
+    if number_events_geninfo == number_events_prmtrkdep:
+        number_events = number_events_geninfo
+    else:
+        number_events = 0
+        print("ERROR: number of events in the Trees are NOT equal!!")
+
+    # preallocate array of visible energy of prompt signal (energy in MeV) (np.array of float):
+    e_vis = np.array([])
+    # preallocate array, where event ID of the IBD like events is saved (np.array of float):
+    evt_id_ibd = np.array([])
+
+    # loop over every event, i.e. every event, in the TTree:
+    for event in range(number_events):
+
+        """ preallocate arrays: """
+        # PDG ID of initial particles of geninfo tree of each particle in the event:
+        pdgid_init_geninfo = np.array([])
+        # initial position in x-direction in millimeter of each particle in the event:
+        x_init = np.array([])
+        # initial position in y-direction in millimeter of each particle in the event:
+        y_init = np.array([])
+        # initial position in z-direction in millimeter of each particle in the event:
+        z_init = np.array([])
+        # initial time in nanoseconds of each particle in the event:
+        time_init = np.array([])
+        # exit or stopping position in x-direction in millimeter of each particle in the event:
+        x_exit = np.array([])
+        # exit or stopping position in y-direction in millimeter of each particle in the event:
+        y_exit = np.array([])
+        # exit or stopping position in z-direction in millimeter of each particle in the event:
+        z_exit = np.array([])
+        # exit or stopping time in nanoseconds of each particle in the event:
+        time_exit = np.array([])
+        # deposited energy of each particle in the event in MeV:
+        e_dep = np.array([])
+        # visible energy (quenched deposited energy) of each particle in the event in MeV:
+        e_qdep = np.array([])
+
+        # PDG ID of each particle in the event:
+        pdgid = np.array([])
+
+        """ first read the "geninfo" Tree"""
+        # get the current event in the TTree:
+        rtree_geninfo.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get the value of the number of initial particles:
+        n_par_geninfo = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # loop over the number of particles to get information about every particle in the event:
+        for index in range(n_par_geninfo):
+
+            # get the value of the initial PDG ID:
+            init_pdgid_geninfo = int(rtree_geninfo.GetBranch('InitPDGID').GetLeaf('InitPDGID').GetValue(index))
+            pdgid_init_geninfo = np.append(pdgid_init_geninfo, init_pdgid_geninfo)
+
+            # get initial x position:
+            init_x = rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index)
+            x_init = np.append(x_init, init_x)
+
+            # get initial y position:
+            init_y = rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index)
+            y_init = np.append(y_init, init_y)
+
+            # get initial z position:
+            init_z = rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index)
+            z_init = np.append(z_init, init_z)
+
+            # get initial time:
+            init_time = rtree_geninfo.GetBranch('InitTime').GetLeaf('InitTime').GetValue(index)
+            time_init = np.append(time_init, init_time)
+
+            # get exit/stopping x-position:
+            exit_x = rtree_geninfo.GetBranch('ExitX').GetLeaf('ExitX').GetValue(index)
+            x_exit = np.append(x_exit, exit_x)
+
+            # get exit/stopping y-position:
+            exit_y = rtree_geninfo.GetBranch('ExitY').GetLeaf('ExitY').GetValue(index)
+            y_exit = np.append(y_exit, exit_y)
+
+            # get exit/stopping z-position:
+            exit_z = rtree_geninfo.GetBranch('ExitZ').GetLeaf('ExitZ').GetValue(index)
+            z_exit = np.append(z_exit, exit_z)
+
+            # get the exit/stopping time:
+            exit_time = rtree_geninfo.GetBranch('ExitT').GetLeaf('ExitT').GetValue(index)
+            time_exit = np.append(time_exit, exit_time)
+
+        """ then read the "prmtrkdep" Tree"""
+        # get the current event in the TTree:
+        rtree_prmtrkdep.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_prmtrkdep = int(rtree_prmtrkdep.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get the value of the number of initial particles:
+        n_par_prmtrkdep = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # check event ID of the Trees:
+        if evt_id_prmtrkdep == evt_id_geninfo:
+            evt_id = evt_id_geninfo
+        else:
+            evt_id = 0
+            print("ERROR: event ID in the Trees are NOT equal!!")
+
+        # check number of initial particles of the Trees:
+        if n_par_prmtrkdep == n_par_geninfo:
+            n_par = n_par_geninfo
+        else:
+            n_par = 0
+            print("ERROR: number of initial particles in the Trees are NOT equal!!")
+
+        # loop over the number of particles to get information about every particle in the event:
+        for index in range(n_par):
+
+            # get the value of the PDG ID:
+            pdgid_prmtrkdep = int(rtree_prmtrkdep.GetBranch('PDGID').GetLeaf('PDGID').GetValue(index))
+            # check PDG ID of the Trees:
+            if pdgid_prmtrkdep == pdgid_init_geninfo[index]:
+                pdgid = np.append(pdgid, pdgid_prmtrkdep)
+            else:
+                pdgid = np.append(pdgid, 0)
+                print("ERROR: PDG ID in the Trees are NOT equal!!")
+
+            # get deposited energy:
+            dep_e = rtree_prmtrkdep.GetBranch('edep').GetLeaf('edep').GetValue(index)
+            e_dep = np.append(e_dep, dep_e)
+
+            # get visible energy:
+            qdep_e = rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index)
+            e_qdep = np.append(e_qdep, qdep_e)
+
+
+        """ Does the event mimic an IBD signal? """
+        # preallocate flag (array of boolean):
+        is_prompt_signal = np.array([])
+        is_delayed_signal = np.array([])
+
+        # set flags:
+        for index in range(n_par):
+            # calculate the distance of the particle to the center of the event:
+            r_init = np.sqrt(x_init[index]**2 + y_init[index]**2 + z_init[index]**2)
+            r_exit = np.sqrt(x_exit[index]**2 + y_exit[index]**2 + z_exit[index]**2)
+
+            # set is_prompt_signal flag (criteria: 10 MeV <= edep <= 105 MeV AND r_init < 17m AND r_exit < 17m):
+            if 10.0 <= e_dep[index] <= 105.0 and r_init < 17000 and r_exit < 17000:
+                is_prompt_signal = np.append(is_prompt_signal, True)
+            else:
+                is_prompt_signal = np.append(is_prompt_signal, False)
+
+            # set is_delayed_signal flag (criteria: 1.9 MeV <= edep <= 2.5 MeV AND r_init < 17m AND r_exit < 17m):
+            if 1.9 <= e_dep[index] <= 2.5 and r_init < 17000 and r_exit < 17000:
+                is_delayed_signal = np.append(is_delayed_signal, True)
+            else:
+                is_delayed_signal = np.append(is_delayed_signal, False)
+
+        # check if there are prompt and delayed signals in the event
+        check_prompt = np.count_nonzero(is_prompt_signal)
+        check_delayed = np.count_nonzero(is_delayed_signal)
+        if check_prompt == 0 or check_delayed == 0:
+            # no prompt signal OR no delayed signal in the event -> go to the next event
+            continue
+
+        # get the index/particle of the event that can be prompt or delayed signal, respectively (np.array):
+        index_prompt = np.where(is_prompt_signal)[0]
+        index_delayed = np.where(is_delayed_signal)[0]
+
+
+        if len(index_prompt) == 1 and len(index_delayed) == 1:
+            """ 1 possible prompt AND 1 possible delayed signal: """
+            # only one prompt and one delayed signal. Get first entry of the array:
+            index_p = index_prompt[0]
+            index_d = index_delayed[0]
+
+            # check if initial time of possible prompt and delayed signals in the event is 0:
+            if time_init[index_p] == 0 and time_init[index_d] == 0:
+
+                # calculate the time difference delta_t between delayed and prompt signal:
+                delta_t = time_exit[index_d] - time_exit[index_p]
+
+                # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
+                if 600 < delta_t < 1000000:
+
+                    # calculate distance from prompt to delayed:
+                    distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
+                                           (y_exit[index_p] - y_exit[index_d])**2 +
+                                           (z_exit[index_p] - z_exit[index_d])**2)
+
+                    # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
+                    if distance_p_d < 1500:
+
+                        # append evt_id of the IBD like signal to evt_id_ibd array:
+                        evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                        # append Qedep of the prompt signal to the e_vis array:
+                        e_vis = np.append(e_vis, e_qdep[index_p])
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                print("WARNING: initial time is not 0 for possible prompt and delayed signal in event {0:d}"
+                      .format(evt_id))
+
+
+        elif len(index_prompt) > 1 and len(index_delayed) == 1:
+            """ more than 1 possible prompt signals, BUT only 1 possible delayed signal: """
+            # preallocate value that represents the number of IBD-like signals in this event:
+            number_ibd_evts = 0
+
+            # loop over the possible prompt signals in the event:
+            for index in range(len(index_prompt)):
+                # get the index of the prompt signal in the array:
+                index_p = index_prompt[index]
+                # only one possible delayed signal in the event:
+                index_d = index_delayed[0]
+
+                # check if initial time of possible prompt and delayed signals in the event is 0:
+                if time_init[index_p] == 0 and time_init[index_d] == 0:
+
+                    # calculate the time difference delta_t between delayed and prompt signal:
+                    delta_t = time_exit[index_d] - time_exit[index_p]
+
+                    # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
+                    if 600 < delta_t < 1000000:
+
+                        # calculate distance from prompt to delayed:
+                        distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
+                                               (y_exit[index_p] - y_exit[index_d])**2 +
+                                               (z_exit[index_p] - z_exit[index_d])**2)
+
+                        # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
+                        if distance_p_d < 1500:
+
+                            # increment number of IBD-lie signals in this event:
+                            number_ibd_evts = number_ibd_evts + 1
+
+                            # append evt_id of the IBD like signal to evt_id_ibd array:
+                            evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                            # append Qedep of the prompt signal to the e_vis array:
+                            e_vis = np.append(e_vis, e_qdep[index_p])
+                        else:
+                            continue
+                    else:
+                        continue
+                else:
+                    print("WARNING: initial time is not 0 for possible prompt and delayed signal in event {0:d}"
+                          .format(evt_id))
+
+            # if there is 0 or 1 IBD-like signal in the event, go to the next event. If not print warning.
+            if number_ibd_evts <= 1:
+                continue
+            else:
+                print("WARNING: more than 1 IBD-like signal in event {2:d}: n_IBD_like = {0:.0f}, prompt = {1:.0f}"
+                      .format(number_ibd_evts, check_prompt, evt_id))
+                print("-----------> not yet included!")
+
+
+        elif len(index_prompt) == 1 and len(index_delayed) > 1:
+            """ 1 possible prompt signal, BUT more than 1 possible delayed signals"""
+            # preallocate value that represents the number of IBD-like signals in this event:
+            number_ibd_evts = 0
+
+            # loop over the possible delayed signals in the event:
+            for index in range(len(index_delayed)):
+                # only one index of the prompt signal in the event:
+                index_p = index_prompt[0]
+                # get index of possible delayed signal in the array:
+                index_d = index_delayed[index]
+
+                # check if initial time of possible prompt and delayed signals in the event is 0:
+                if time_init[index_p] == 0 and time_init[index_d] == 0:
+
+                    # calculate the time difference delta_t between delayed and prompt signal:
+                    delta_t = time_exit[index_d] - time_exit[index_p]
+
+                    # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
+                    if 600 < delta_t < 1000000:
+
+                        # calculate distance from prompt to delayed:
+                        distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
+                                               (y_exit[index_p] - y_exit[index_d])**2 +
+                                               (z_exit[index_p] - z_exit[index_d])**2)
+
+                        # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
+                        if distance_p_d < 1500:
+
+                            # increment number of IBD-like signals in this event:
+                            number_ibd_evts = number_ibd_evts + 1
+
+                        else:
+                            continue
+                    else:
+                        continue
+                else:
+                    print("WARNING: initial time is not 0 for possible prompt and delayed signal in event {0:d}"
+                          .format(evt_id))
+
+            # if there is no or more than 1 IBD-like signal in the event, go to next event (neutron multiplicity cut!).
+            # If there is only one IBD-like event, store the visible energy.
+            if number_ibd_evts == 1:
+                # append evt_id of the IBD like signal to evt_id_ibd array:
+                evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                # append Qedep of the prompt signal to the e_vis array:
+                e_vis = np.append(e_vis, e_qdep[index_prompt[0]])
+
+            else:
+                continue
+
+
+        else:
+            """ More than 1 possible prompt signal AND more than 1 possible delayed signal 
+                (len(index_prompt) > 1 and len(index_delayed) > 1) """
+            # preallocate array that represents the number of IBD-like signals in this event
+            # (array of length index_prompt):
+            array_number_ibd = np.zeros(len(index_prompt))
+
+            # preallocate array, where the indices of the event of the "real" delayed signals (which correspond to
+            # this prompt signal) are stored:
+            array_delayed_index = np.array([])
+
+            # loop over possible prompt signals in this event:
+            for index1 in range(len(index_prompt)):
+
+                # preallocate value that represents the number of IBD-like signals in this event
+                # (this value is then included in array_number_ibd):
+                number_ibd_prompt = 0
+
+                # get the index of the prompt signal in the array:
+                index_p = index_prompt[index1]
+
+                # loop over the possible delayed signals in the event:
+                for index2 in range(len(index_delayed)):
+
+                    # get index of possible delayed signal in the event:
+                    index_d = index_delayed[index2]
+
+                    # check if initial time of possible prompt and delayed signals in the event is 0:
+                    if time_init[index_p] == 0 and time_init[index_d] == 0:
+
+                        # calculate the time difference delta_t between delayed and prompt signal:
+                        delta_t = time_exit[index_d] - time_exit[index_p]
+
+                        # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
+                        if 600 < delta_t < 1000000:
+
+                            # calculate distance from prompt to delayed:
+                            distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
+                                                   (y_exit[index_p] - y_exit[index_d])**2 +
+                                                   (z_exit[index_p] - z_exit[index_d])**2)
+
+                            # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
+                            if distance_p_d < 1500:
+
+                                # increment number of IBD-like signals for this possible prompt signal in this event:
+                                number_ibd_prompt = number_ibd_prompt + 1
+
+                                # store the index of the delayed signal in the event:
+                                index_real_delayed = index_d
+
+                            else:
+                                continue
+                        else:
+                            continue
+                    else:
+                        print("WARNING: initial time is not 0 for possible prompt and delayed signal in event {0:d}"
+                              .format(evt_id))
+
+                # if there is no or more than 1 IBD-like signal in the event for this prompt signal, go to next event
+                # (neutron multiplicity cut!).
+                # If there is only one IBD-like event, store the visible energy.
+                if number_ibd_prompt == 1:
+
+                    # include number of IBD-like signals for this prompt event to the array:
+                    array_number_ibd[index1] = number_ibd_prompt
+
+                    # store index of the delayed signal to the array:
+                    array_delayed_index = np.append(array_delayed_index, index_real_delayed)
+
+                else:
+                    # 0 or more than one IBD-like signals for this prompt signal in this event
+                    # -> go to the next prompt signal
+                    continue
+
+            # check array_number_ibd and array_delayed_index:
+            if len(array_delayed_index) == 0:
+                # this means, that there is no IBD-like signal in this event (either 0 or more than 1 delayed signal)
+                continue
+
+            elif len(array_delayed_index) == 1:
+                # this means, that there is 1 prompt signal and 1 corresponding delayed signal
+                # -> therefore 1 IBD-like signal:
+
+                # append evt_id of the IBD like signal to evt_id_ibd array:
+                evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                # get the index of the prompt signal in the event:
+                which_index = np.where(array_delayed_index == 1)[0]
+                # check if there is just one entry equal to 1 in the array_delayed_index:
+                if len(which_index) == 1:
+                    correct_prompt_index = which_index[0]
+
+                    # append Qedep of this prompt signal to the e_vis array:
+                    e_vis = np.append(e_vis, e_qdep[index_prompt[correct_prompt_index]])
+                else:
+                    print("ERROR in line 504")
+                    continue
+
+            else:
+                print("WARNING: More than 1 possible prompt signal to only 1 possible delayed signal: evt ID = {0:d}, "
+                      "array_number_ibd = {1:d}, array_delayed_index = {2:d}"
+                      .format(evt_id, array_number_ibd, array_delayed_index))
+                print("----------> not yet included!!!!")
+
+    return evt_id_ibd, e_vis
+
+
+
 def convert_genie_file_for_generator(rootfile_input, path_output):
     """
-    function to convert the 'original' GENIE root-file from Julia to a root-file, which can be used as input for the
+    function to convert the 'original' GENIE root-file of Julia to a root-file, which can be used as input for the
     DSNB-NC.exe generator of JUNO offline.
 
     INFO:
@@ -185,8 +626,8 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
         nc = int(nc)
 
         # read only NC and QEL events:
-        # if qel == 1 and nc == 1:
-        if nc == 1:
+        if qel == 1 and nc == 1:
+            # if nc == 1:
 
             # set the event number:
             event_number[0] = event
@@ -289,9 +730,6 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                     else:
                         print("other possible channels with B11 and C11: nfp={0:d}, nfn={1:d}, nfpim={2:d}, nfpip={3:d}"
                               .format(nfp, nfn, nfpim, nfpip))
-                        ## other possible channel with B11 and C11 (interactions with Be11 and Li11 are not possible):
-                        ## dummy isopdg for this case:
-                        ## isopdg = int(110000000)
 
                 elif (nfp + nfn) == 2:
                     # possible isotopes: B10, C10, Be10
@@ -334,9 +772,6 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                     else:
                         print("other possible channels with C10, B10, Be10: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
                               "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
-                        ## other possible channel with B10, C10, Be10 (interaction with N10, Li10, He10 are not possible)
-                        ## dummy isopdg for this case:
-                        ##isopdg = int(100000000)
 
                 elif (nfp + nfn) == 3:
                     # possible isotopes: B9, C9, Be9, Li9
@@ -399,12 +834,9 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                     else:
                         print("other possible channels with B9, C9, Be9, Li9: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
                               "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
-                        ## other possible channel with B9, C9, Be9, Li9 (interactions with He9 are not possible):
-                        ## dummy isopdg for this case:
-                        ## isopdg = int(90000000)
 
                 elif (nfp + nfn) == 4:
-                    # possible isotopes: C8, B8, Be8, Li8, He8
+                    # possible isotopes: B8, Li8
                     if nfp == 1 and nfn == 3 and (nfpim - nfpip) == 0:
                         # channel: nu + C12 -> nu + B8 + p + 3n + (N*pi_minus + N*pi_plus):
                         isopdg = int(1000050080)
@@ -419,24 +851,25 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                         isomass = float(get_mass_from_pdg(isopdg))
                     elif nfp == 2 and nfn == 2 and (nfpim - nfpip) == 0:
                         # channel: nu + C12 -> nu + Be8 + 2p + 2n + (N*pi_minus + N*pi_plus):
-                        isopdg = int(1000040080)
-                        isomass = float(get_mass_from_pdg(isopdg))
-                    elif nfp == 3 and nfn == 1 and (nfpim - nfpip) == 1:
+                        print("Be8")
+                        # isopdg = int(1000040080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    # elif nfp == 3 and nfn == 1 and (nfpim - nfpip) == 1:
                         # channel: nu + C12 -> nu + Be8 + 3p + n + ((N+1)*pi_minus + N*pi_plus):
-                        isopdg = int(1000040080)
-                        isomass = float(get_mass_from_pdg(isopdg))
-                    elif nfp == 1 and nfn == 3 and (nfpim - nfpip) == -1:
+                        # isopdg = int(1000040080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    # elif nfp == 1 and nfn == 3 and (nfpim - nfpip) == -1:
                         # channel: nu + C12 -> nu + Be8 + p + 3n + (N*pi_minus + (N+1)*pi_plus):
-                        isopdg = int(1000040080)
-                        isomass = float(get_mass_from_pdg(isopdg))
-                    elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == -2:
+                        # isopdg = int(1000040080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    # elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == -2:
                         # channel: nu + C12 -> nu + Be8 + 4n + (N*pi_minus + (N+2)*pi_plus):
-                        isopdg = int(1000040080)
-                        isomass = float(get_mass_from_pdg(isopdg))
-                    elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 2:
+                        # isopdg = int(1000040080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    # elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 2:
                         # channel: nu + C12 -> nu + Be8 + 4p + ((N+2)*pi_minus + N*pi_plus):
-                        isopdg = int(1000040080)
-                        isomass = float(get_mass_from_pdg(isopdg))
+                        # isopdg = int(1000040080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
                     elif nfp == 3 and nfn == 1 and (nfpim - nfpip) == 0:
                         # channel: nu + C12 -> nu + Li8 + 3p + n + (N*pi_minus + N*pi_plus):
                         isopdg = int(1000030080)
@@ -453,20 +886,20 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                         # channel: nu + C12 -> nu + Li8 + p + 3n + (N*pi_minus + (N+2)*pi_plus):
                         isopdg = int(1000030080)
                         isomass = float(get_mass_from_pdg(isopdg))
-                    ## elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == 0:
-                    ##     # channel: nu + C12 -> nu + C8 + 4n + (N*pi_minus + N*pi_plus):
-                    ##     isopdg = int(1000060080)
-                    ##     isomass = float(get_mass_from_pdg(isopdg))
-                    ## elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 0:
-                    ##     # channel: nu + C12 -> nu + He8 + 4p + (N*pi_minus + N*pi_plus):
-                    ##     isopdg = int(1000020080)
-                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 0 and nfn == 4 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + C8 + 4n + (N*pi_minus + N*pi_plus):
+                        print("C8")
+                        # isopdg = int(1000060080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 0 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + He8 + 4p + (N*pi_minus + N*pi_plus):
+                        print("He8")
+                        # isopdg = int(1000020080)
+                        # isomass = float(get_mass_from_pdg(isopdg))
                     else:
                         print("other possible channels with B8, Be8, Li8, C8, He8: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
                               "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
-                        ## other possible channel with B8, Be8, Li8, C8, He8 are produced:
-                        ## dummy isopdg for this case:
-                        ## isopdg = int(80000000)
+
 
                 elif (nfn + nfp) == 5:
                     # possible isotopes: Be7, Li7, B7, He7, H7
@@ -498,27 +931,27 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                         # channel: nu + C12 -> nu + Li7 + 4p + n + ((N+1)*pi_minus + N*pi_plus):
                         isopdg = int(1000030070)
                         isomass = float(get_mass_from_pdg(isopdg))
-                    ## elif nfp == 1 and nfn == 4 and (nfpim - nfpip) == 0:
-                    ##     # channel: nu + C12 -> nu + B7 + p + 4n + (N*pi_minus + N*pi_plus):
-                    ##     isopdg = int(1000050070)
-                    ##     isomass = float(get_mass_from_pdg(isopdg))
-                    ## elif nfp == 4 and nfn == 1 and (nfpim - nfpip) == 0:
-                    ##     # channel: nu + C12 -> nu + He7 + 4p + n + (N*pi_minus + N*pi_plus):
-                    ##     isopdg = int(1000020070)
-                    ##     isomass = float(get_mass_from_pdg(isopdg))
-                    ## elif nfp == 5 and nfn == 0 and (nfpim - nfpip) == 0:
-                    ##     # channel: nu + C12 -> nu + H7 + 5p + (N*pi_minus + N*pi_plus):
-                    ##     isopdg = int(1000010070)
-                    ##     isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 1 and nfn == 4 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + B7 + p + 4n + (N*pi_minus + N*pi_plus):
+                        print("B7")
+                        # isopdg = int(1000050070)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 4 and nfn == 1 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + He7 + 4p + n + (N*pi_minus + N*pi_plus):
+                        print("He7")
+                        # isopdg = int(1000020070)
+                        # isomass = float(get_mass_from_pdg(isopdg))
+                    elif nfp == 5 and nfn == 0 and (nfpim - nfpip) == 0:
+                        # channel: nu + C12 -> nu + H7 + 5p + (N*pi_minus + N*pi_plus):
+                        print("H7")
+                        # isopdg = int(1000010070)
+                        # isomass = float(get_mass_from_pdg(isopdg))
                     else:
                         print("other possible channels with Be7, Li7, B7, He7, H7: nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
                               "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
-                        ## other possible channel with Be7, Li7, B7, He7, H7 are produced:
-                        ## dummy isopdg for this case:
-                        ## isopdg = int(70000000)
 
                 # elif (nfn + nfp) == 6:
-                #     # possible isotopes: Li6, Be6, He6, H6:
+                # possible isotopes: Li6, Be6, He6, H6:
                 #     if nfp == 3 and nfn == 3 and (nfpim - nfpip) == 0:
                 #         # channel: nu + C12 -> nu + Li6 + 3p + 3n + (N*pi_minus + N*pi_plus):
                 #         isopdg = int(1000030060)
@@ -557,11 +990,9 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
                 #         isopdg = int(60000000)
 
                 else:
-                    print("other possible channels lighter isotopes (mass<=6): nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
-                              "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
-                    ## other possible isotopes, which can be created (possible isotopes with mass number of 5, 4, 3, 2):
-                    ## dummy isopdg for this case:
-                    ## isopdg = int(50000000)
+                    # print("other possible channels lighter isotopes (mass<=7): nfp={0:d}, nfn={1:d}, nfpim={2:d}, "
+                    #       "nfpip={3:d}".format(nfp, nfn, nfpim, nfpip))
+                    lala = 1
 
             else:
                 # target: p, e, N14, O16 or S32 -> no isotope is produced:
@@ -989,8 +1420,8 @@ def get_channels_from_original_genie_file(rootfile_input):
         nc = int(nc)
 
         # read only NC and QEL events:
-        # if qel == 1 and nc == 1:
-        if nc == 1:
+        if qel == 1 and nc == 1:
+            # if nc == 1:
 
             # increase the number of events:
             number_events = number_events + 1
@@ -1172,27 +1603,27 @@ def get_channels_from_original_genie_file(rootfile_input):
 
                 elif nfp == 1 and nfn == 2 and nfpim == 1 and nfpip == 1:
                     # interaction channel: nu + C12 -> B9 + p + 2n + pi_minus + pi_plus:
-                    number_c12_b9_p_2n_piminus_piplus = number_c12_b9_p_2n_piminus_piplus + 0
+                    number_c12_b9_p_2n_piminus_piplus = number_c12_b9_p_2n_piminus_piplus + 1
 
                 elif nfp == 2 and nfn == 1 and nfpim == 3 and nfpip == 2:
                     # interaction channel: nu + C12 -> B9 + 2p + n + 3*pi_minus + 2*pi_plus:
-                    number_c12_b9_2p_n_3piminus_2piplus = number_c12_b9_2p_n_3piminus_2piplus + 0
+                    number_c12_b9_2p_n_3piminus_2piplus = number_c12_b9_2p_n_3piminus_2piplus + 1
 
                 elif nfp == 2 and nfn == 1 and nfpim == 1 and nfpip == 0:
                     # interaction channel: nu + C12 -> B9 + 2p + n + pi_minus:
-                    number_c12_b9_2p_n_piminus = number_c12_b9_2p_n_piminus + 0
+                    number_c12_b9_2p_n_piminus = number_c12_b9_2p_n_piminus + 1
 
                 elif nfp == 0 and nfn == 3 and nfpim == 0 and nfpip == 1:
                     # interaction channel: nu + C12 -> B9 + 3n + pi_plus:
-                    number_c12_b9_3n_piplus = number_c12_b9_3n_piplus + 0
+                    number_c12_b9_3n_piplus = number_c12_b9_3n_piplus + 1
 
                 elif nfp == 1 and nfn == 2 and nfpim == 2 and nfpip == 2:
                     # interaction channel: nu + C12 -> B9 + p + 2n + 2*pi_minus + 2*pi_plus:
-                    number_c12_b9_p_2n_2piminus_2piplus = number_c12_b9_p_2n_2piminus_2piplus + 0
+                    number_c12_b9_p_2n_2piminus_2piplus = number_c12_b9_p_2n_2piminus_2piplus + 1
 
                 elif nfp == 2 and nfn == 1 and nfpim == 2 and nfpip == 1:
                     # interaction channel: nu + C12 -> B9 + 2p + n + 2*pi_minus + pi_plus:
-                    number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 0
+                    number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 1
 
                 # Be9:
                 elif nfp == 2 and nfn == 1 and nfpim == 0 and nfpip == 0:
@@ -2758,9 +3189,6 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     # number of elastic scattering interactions with S32: nu + S32 -> nu + S32 + ... (integer):
     number_es_s32 = 0
 
-
-    number_otherisotope = 0
-
     # loop over all entries of the array:
     for index in range(number_entries):
 
@@ -2965,27 +3393,27 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
 
                 elif num_p == 1 and num_n == 2 and num_pi_minus == 1 and num_pi_plus == 1:
                     # interaction channel: nu + C12 -> B9 + p + 2n + pi_minus + pi_plus:
-                    number_c12_b9_p_2n_piminus_piplus = number_c12_b9_p_2n_piminus_piplus + 0
+                    number_c12_b9_p_2n_piminus_piplus = number_c12_b9_p_2n_piminus_piplus + 1
 
                 elif num_p == 2 and num_n == 1 and num_pi_minus == 3 and num_pi_plus == 2:
                     # interaction channel: nu + C12 -> B9 + 2p + n + 3*pi_minus + 2*pi_plus:
-                    number_c12_b9_2p_n_3piminus_2piplus = number_c12_b9_2p_n_3piminus_2piplus + 0
+                    number_c12_b9_2p_n_3piminus_2piplus = number_c12_b9_2p_n_3piminus_2piplus + 1
 
                 elif num_p == 2 and num_n == 1 and num_pi_minus == 1 and num_pi_plus == 0:
                     # interaction channel: nu + C12 -> B9 + 2p + n + pi_minus:
-                    number_c12_b9_2p_n_piminus = number_c12_b9_2p_n_piminus + 0
+                    number_c12_b9_2p_n_piminus = number_c12_b9_2p_n_piminus + 1
 
                 elif num_p == 0 and num_n == 3 and num_pi_minus == 0 and num_pi_plus == 1:
                     # interaction channel: nu + C12 -> B9 + 3n + pi_plus:
-                    number_c12_b9_3n_piplus = number_c12_b9_3n_piplus + 0
+                    number_c12_b9_3n_piplus = number_c12_b9_3n_piplus + 1
 
                 elif num_p == 1 and num_n == 2 and num_pi_minus == 2 and num_pi_plus == 2:
                     # interaction channel: nu + C12 -> B9 + p + 2n + 2*pi_minus + 2*pi_plus:
-                    number_c12_b9_p_2n_2piminus_2piplus = number_c12_b9_p_2n_2piminus_2piplus + 0
+                    number_c12_b9_p_2n_2piminus_2piplus = number_c12_b9_p_2n_2piminus_2piplus + 1
 
                 elif num_p == 2 and num_n == 1 and num_pi_minus == 2 and num_pi_plus == 1:
                     # interaction channel: nu + C12 -> B9 + 2p + n + 2*pi_minus + pi_plus:
-                    number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 0
+                    number_c12_b9_2p_n_2piminus_piplus = number_c12_b9_2p_n_2piminus_piplus + 1
 
                 else:
                     # interaction channels, that are not covered above, and channels with Kaon or Sigma-Baryon:
@@ -3486,7 +3914,6 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
             else:
                 print("other isotope than expected: {0:.0f}, corresponding channel ID = {1:.0f}"
                       .format(isotope_pdg[index], channel_id[index]))
-                number_otherisotope = number_otherisotope + 1
 
 
         else:
@@ -3524,9 +3951,6 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
             else:
                 print("new channel ID with NO C12 target: target PDG = {0:.0f}, channel ID = {1:.0f}, "
                       "isotope PDG = {2:.0f}".format(target_pdg[index], channel_id[index], isotope_pdg[index]))
-
-
-    print(number_otherisotope)
 
 
     """ calculate the fraction of the different NC interaction channels in PERCENT (float): """
@@ -3807,3 +4231,187 @@ def check_high_channelid(channel_id, final_pdg):
     return
 
 
+def check_nc_qel_from_original_genie_file(rootfile_input):
+    """
+    function to check the variables 'nc' and 'qel' of the 'original' GENIE root-file from Julia.
+
+    :param rootfile_input: path to the original GENIE ROOT-file (for example: gntp.101.gst.root (string)
+
+    :return:
+    """
+    # load the ROOT file:
+    rfile_input = ROOT.TFile(rootfile_input)
+    # get the TTree from the TFile:
+    rtree_input = rfile_input.Get("gst")
+
+    # Info-me: "gst;13" is a copy of meta data of "gst;14", "gst;14" contains correct data and is read
+
+    # get the number of entries in the ROOT-file:
+    # number_entries = rtree_input.GetEntries()
+    number_entries = 10
+
+    """ Read the data from the TTree: """
+    # loop over every entry, i.e. every event, in the TTree:
+    for event in range(number_entries):
+
+        # get the current event in the TTree:
+        rtree_input.GetEntry(event)
+
+        # is it a quasi-elastic scattering event? (0 = no QEL event, 1 = QEL event):
+        qel = rtree_input.GetBranch('qel').GetLeaf('qel').GetValue()
+        qel = int(qel)
+
+        # is it a NC event? (0 = no NC event, 1 = NC event):
+        nc = rtree_input.GetBranch('nc').GetLeaf('nc').GetValue()
+        nc = int(nc)
+
+        # get the value of target PDG:
+        tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+        tgt = int(tgt)
+
+        # final particles:
+        # get the value of number of final p:
+        nfp = rtree_input.GetBranch('nfp').GetLeaf('nfp').GetValue()
+        nfp = int(nfp)
+
+        # get the value of number of final n:
+        nfn = rtree_input.GetBranch('nfn').GetLeaf('nfn').GetValue()
+        nfn = int(nfn)
+
+        # get the value of number of final pi_minus:
+        nfpim = rtree_input.GetBranch('nfpim').GetLeaf('nfpim').GetValue()
+        nfpim = int(nfpim)
+
+        # get the value of number of final pi_plus:
+        nfpip = rtree_input.GetBranch('nfpip').GetLeaf('nfpip').GetValue()
+        nfpip = int(nfpip)
+
+        # get value of number of final pi_zero:
+        nfpi0 = rtree_input.GetBranch('nfpi0').Getleaf('nfpi0').GetValue()
+        nfpi0 = int(nfpi0)
+
+        # get the value of number of final Kaon_minus:
+        nfkm = rtree_input.GetBranch('nfkm').GetLeaf('nfkm').GetValue()
+        nfkm = int(nfkm)
+
+        # get the value of number of final Kaon_plus:
+        nfkp = rtree_input.GetBranch('nfkp').GetLeaf('nfkp').GetValue()
+        nfkp = int(nfkp)
+
+        # get value of number of final K_zero:
+        nfk0 = rtree_input.GetBranch('nfk0').Getleaf('nfk0').GetValue()
+        nfk0 = int(nfk0)
+
+        # get value of number of final gamma, electron, positron:
+        nfem = rtree_input.GetBranch('nfem').Getleaf('nfem').GetValue()
+        nfem = int(nfem)
+
+        # get value of number of final other hadrons:
+        nfother = rtree_input.GetBranch('nfother').Getleaf('nfother').GetValue()
+        nfother = int(nfother)
+
+        # primary particles:
+        # get the value of number of primary p:
+        nip = rtree_input.GetBranch('nip').GetLeaf('nip').GetValue()
+        nip = int(nip)
+
+        # get the value of number of primary n:
+        nin = rtree_input.GetBranch('nin').GetLeaf('nin').GetValue()
+        nin = int(nin)
+
+        # get the value of number of primary pi_minus:
+        nipim = rtree_input.GetBranch('nipim').GetLeaf('nipim').GetValue()
+        nipim = int(nipim)
+
+        # get the value of number of primary pi_plus:
+        nipip = rtree_input.GetBranch('nipip').GetLeaf('nipip').GetValue()
+        nipip = int(nipip)
+
+        # get value of number of primary pi_zero:
+        nipi0 = rtree_input.GetBranch('nipi0').Getleaf('nipi0').GetValue()
+        nipi0 = int(nipi0)
+
+        # get the value of number of primary Kaon_minus:
+        nikm = rtree_input.GetBranch('nikm').GetLeaf('nikm').GetValue()
+        nikm = int(nikm)
+
+        # get the value of number of primary Kaon_plus:
+        nikp = rtree_input.GetBranch('nikp').GetLeaf('nikp').GetValue()
+        nikp = int(nikp)
+
+        # get value of number of primary K_zero:
+        nik0 = rtree_input.GetBranch('nik0').Getleaf('nik0').GetValue()
+        nik0 = int(nik0)
+
+        # get value of number of primary gamma, electron, positron:
+        niem = rtree_input.GetBranch('niem').Getleaf('niem').GetValue()
+        niem = int(niem)
+
+        # get value of number of primary other hadrons:
+        niother = rtree_input.GetBranch('niother').Getleaf('niother').GetValue()
+        niother = int(niother)
+
+        # check primary and final particles:
+        if tgt == 1000060120:
+            # target C12
+
+            # B11:
+            if nfp == 1 and nfn == 0 and nfpim == 0 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> B11 + proton:
+                print("nu + C12 -> nu + B11 + p: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+
+            elif nfp == 0 and nfn == 1 and nfpim == 0 and nfpip == 1 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> B11 + n + pi_plus:
+                print("nu + C12 -> nu + B11 + n + pi_plus: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+            # C11:
+            elif nfp == 0 and nfn == 1 and nfpim == 0 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> C11 + n:
+                print("nu + C12 -> nu + C11 + n: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+
+            elif nfp == 1 and nfn == 0 and nfpim == 1 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> C11 + p + pi_minus:
+                print("nu + C12 -> nu + C11 + p + pi_minus: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+
+            # B10:
+            elif nfp == 1 and nfn == 1 and nfpim == 0 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> B10 + p + n:
+                print("nu + C12 -> nu + B10 + p + n: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+
+            elif nfp == 2 and nfn == 0 and nfpim == 1 and nfpip == 0 and nfkm == 0 and nfkp == 0:
+                # interaction channel: nu + C12 -> B10 + 2*p + pi_minus:
+                print("nu + C12 -> nu + B10 + 2p + pi_minus: nc={0}, qel={1},\n "
+                      "nfpi0={2:d}, nfk0={3:d}, nfem={4:d}, nfother={5:d}\n"
+                      "nip={6:d}, nin={7:d}, nipip={8:d}, nipim={9:d}, nipi0={10:d}, nikp={11:d}, nikm={12:d}, "
+                      "nik0={13:d}, niem={14:d}, niother={15:d}".format(nc, qel, nfpi0, nfk0, nfem, nfother, nip, nin,
+                                                                        nipip, nipim, nipi0, nikp, nikm, nik0, niem,
+                                                                        niother))
+
+            else:
+                continue
+
+    return
