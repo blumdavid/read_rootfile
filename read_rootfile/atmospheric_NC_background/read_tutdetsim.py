@@ -45,8 +45,25 @@ input_path = "/home/astro/blum/juno/atmoNC/data_QEL_NC/output_detsim/"
 # file name of the input file:
 input_name = input_path + "sample_detsim_user_test.root"
 
+""" set the different cut properties: """
+# fiducial volume cut in mm:
+R_cut = 17000
+# prompt energy cut in MeV:
+E_prompt_min = 10.0
+E_prompt_max = 105.0
+# delayed energy cut in MeV:
+E_delayed_min = 1.9
+E_delayed_max = 2.5
+# time cut between prompt and delayed signal in ns:
+time_cut_min = 600
+time_cut_max = 1000000
+# distance cut between prompt and delayed signal in mm:
+Distance_cut = 1500
+
 # get the visible energy of the prompt signal from events that mimic IBD signals (E_vis in MeV) (np.array):
-evt_ID_IBD, E_vis = NC_background_functions.read_sample_detsim_user(input_name)
+evt_ID_IBD, E_vis = NC_background_functions.read_sample_detsim_user(input_name, R_cut, E_prompt_min, E_prompt_max,
+                                                                    E_delayed_min, E_delayed_max, time_cut_min,
+                                                                    time_cut_max, Distance_cut)
 
 print(evt_ID_IBD)
 print(E_vis)

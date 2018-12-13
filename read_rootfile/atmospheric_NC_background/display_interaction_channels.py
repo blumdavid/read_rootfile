@@ -94,4 +94,45 @@ plt.title('Atmospheric NC QEL neutrino interactions on $^{12}C$\n'
           '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
 plt.grid(axis='x')
 
+
+""" insert the fractions of the different interaction channels from 'interaction_channels_edit.ods', 
+    sheet 'Sorted_Information 2'. These fractions contain 74.80581% of all interaction channels 
+    (fractions of nu + C12 -> ... in %): """
+F_nu_B11_p = 20.9711
+F_nu_C11_n = 18.7591
+F_nu_B10_p_n = 13.9626
+F_nu_C11_p_piminus = 3.3507
+F_nu_Be10_2p = 3.3229
+F_nu_C10_2n = 3.2678
+F_nu_B11_n_piplus = 2.6327
+F_nu_B9_p_2n = 2.0312
+F_nu_Be9_2p_n = 1.6938
+F_nu_noiso = 1.6814
+F_nu_Be8_2p_2n = 1.1800
+F_nu_C10_p_n_piminus = 1.0105
+F_nu_Be10_p_n_piplus = 0.9422
+
+channels_2 = ('$^{10}Be$ + $p$ + $n$ + $\pi^+$', '$^{10}C$ + $p$ + $n$ + $\pi^-$', '$^8Be$ + $2p$ + $2n$',
+              'no isotope (only $p$, $n$, $\pi$, ...)', '$^9Be$ + $2p$ + $n$', '$^9B$ + $p$ + $2n$',
+              '$^{11}B$ + $n$ + $\pi^+$', '$^{10}C$ + $2n$', '$^{10}Be$ + $2p$',
+              '$^{11}C$ + $p$ + $\pi^-$', '$^{10}B$ + $p$ + $n$', '$^{11}C$ + $n$', '$^{11}B$ + $p$')
+
+pos_2 = np.arange(len(channels_2))
+
+fractions_2 = np.array([F_nu_Be10_p_n_piplus, F_nu_C10_p_n_piminus, F_nu_Be8_2p_2n, F_nu_noiso, F_nu_Be9_2p_n,
+                        F_nu_B9_p_2n, F_nu_B11_n_piplus, F_nu_C10_2n, F_nu_Be10_2p, F_nu_C11_p_piminus, F_nu_B10_p_n,
+                        F_nu_C11_n, F_nu_B11_p])
+
+""" display in bar chart """
+fig2, ax2 = plt.subplots()
+horizontal_bars_2 = ax2.barh(pos_2, fractions_2, align='center', alpha=0.9)
+label_barh(ax2, horizontal_bars_2, "{:.4}", is_inside=False, fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(pos_2, channels_2, fontsize=12)
+plt.xlabel('fraction in %', fontsize=12)
+plt.title('75% of all atmospheric NC neutrino interactions on $^{12}C$\n'
+          '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
+plt.grid(axis='x')
+
+
 plt.show()

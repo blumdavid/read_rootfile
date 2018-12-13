@@ -69,10 +69,22 @@ class NCData:
 """
 
 
-def read_sample_detsim_user(rootfile_input):
+def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
+                            time_cut_min, time_cut_max, distance_cut):
     """
-    function to read the
-    :param rootfile_input:
+    function to read the sample_detsim_user.root file and to get visible energy of the prompt signal of
+    the IBD-like signals.
+
+    :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
+    :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
+    :param e_prompt_min: minimal prompt energy from energy cut in MeV, normally e_prompt_min = 10 MeV
+    :param e_prompt_max: maximal prompt energy from energy cut in MeV, normally e_prompt_max = 105 MeV
+    :param e_delayed_min: minimal delayed energy from energy cut in MeV, normally e_delayed_min = 1.9 MeV
+    :param e_delayed_max: maximal delayed energy from energy cut in MeV, normally e_delayed_max = 2.5 MeV
+    :param time_cut_min: minimal time difference delayed to prompt in ns, normally time_cut_min = 600 ns
+    :param time_cut_max: maximal time difference delayed to prompt in ns, normally time_cut_max = 1 ms = 1 000 000 ns
+    :param distance_cut: distance cut between prompt and delayed signal in mm, normally distance_cut < 1.5 m = 1500 mm
+
     :return:
     """
     # load the ROOT file:
@@ -235,13 +247,13 @@ def read_sample_detsim_user(rootfile_input):
             r_exit = np.sqrt(x_exit[index]**2 + y_exit[index]**2 + z_exit[index]**2)
 
             # set is_prompt_signal flag (criteria: 10 MeV <= edep <= 105 MeV AND r_init < 17m AND r_exit < 17m):
-            if 10.0 <= e_dep[index] <= 105.0 and r_init < 17000 and r_exit < 17000:
+            if e_prompt_min <= e_dep[index] <= e_prompt_max and r_init < r_cut and r_exit < r_cut:
                 is_prompt_signal = np.append(is_prompt_signal, True)
             else:
                 is_prompt_signal = np.append(is_prompt_signal, False)
 
             # set is_delayed_signal flag (criteria: 1.9 MeV <= edep <= 2.5 MeV AND r_init < 17m AND r_exit < 17m):
-            if 1.9 <= e_dep[index] <= 2.5 and r_init < 17000 and r_exit < 17000:
+            if e_delayed_min <= e_dep[index] <= e_delayed_max and r_init < r_cut and r_exit < r_cut:
                 is_delayed_signal = np.append(is_delayed_signal, True)
             else:
                 is_delayed_signal = np.append(is_delayed_signal, False)
@@ -271,7 +283,7 @@ def read_sample_detsim_user(rootfile_input):
                 delta_t = time_exit[index_d] - time_exit[index_p]
 
                 # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
-                if 600 < delta_t < 1000000:
+                if time_cut_min < delta_t < time_cut_max:
 
                     # calculate distance from prompt to delayed:
                     distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
@@ -279,7 +291,7 @@ def read_sample_detsim_user(rootfile_input):
                                            (z_exit[index_p] - z_exit[index_d])**2)
 
                     # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
-                    if distance_p_d < 1500:
+                    if distance_p_d < distance_cut:
 
                         # append evt_id of the IBD like signal to evt_id_ibd array:
                         evt_id_ibd = np.append(evt_id_ibd, evt_id)
@@ -300,6 +312,10 @@ def read_sample_detsim_user(rootfile_input):
             # preallocate value that represents the number of IBD-like signals in this event:
             number_ibd_evts = 0
 
+            # preallocate array, where the visible energy of the prompt signals of the IBD-like signal is stored
+            # (energy in MeV):
+            array_e_vis = np.array([])
+
             # loop over the possible prompt signals in the event:
             for index in range(len(index_prompt)):
                 # get the index of the prompt signal in the array:
@@ -314,7 +330,7 @@ def read_sample_detsim_user(rootfile_input):
                     delta_t = time_exit[index_d] - time_exit[index_p]
 
                     # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
-                    if 600 < delta_t < 1000000:
+                    if time_cut_min < delta_t < time_cut_max:
 
                         # calculate distance from prompt to delayed:
                         distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
@@ -322,16 +338,14 @@ def read_sample_detsim_user(rootfile_input):
                                                (z_exit[index_p] - z_exit[index_d])**2)
 
                         # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
-                        if distance_p_d < 1500:
+                        if distance_p_d < distance_cut:
 
                             # increment number of IBD-lie signals in this event:
                             number_ibd_evts = number_ibd_evts + 1
 
-                            # append evt_id of the IBD like signal to evt_id_ibd array:
-                            evt_id_ibd = np.append(evt_id_ibd, evt_id)
+                            # append visible energy of the prompt signal to the array (energy in MeV):
+                            array_e_vis = np.append(array_e_vis, e_qdep[index_p])
 
-                            # append Qedep of the prompt signal to the e_vis array:
-                            e_vis = np.append(e_vis, e_qdep[index_p])
                         else:
                             continue
                     else:
@@ -340,9 +354,23 @@ def read_sample_detsim_user(rootfile_input):
                     print("WARNING: initial time is not 0 for possible prompt and delayed signal in event {0:d}"
                           .format(evt_id))
 
-            # if there is 0 or 1 IBD-like signal in the event, go to the next event. If not print warning.
-            if number_ibd_evts <= 1:
+            # if there is 1 IBD-like signal in the event, store information in array. If there is NO IBD-like signal
+            # go to the next event. Else: not print warning.
+            if number_ibd_evts == 1:
+                # check, if len(array_e_vis) is also equal to 1:
+                if number_ibd_evts != len(array_e_vis):
+                    print("ERROR: Number of IBD-like events different to length of 'array_e_vis' (evt_ID = {0:d})"
+                          .format(evt_id))
+
+                # append evt_id of the IBD like signal to evt_id_ibd array:
+                evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                # append Qedep of the prompt signal to the e_vis array:
+                e_vis = np.append(e_vis, array_e_vis[0])
+
+            elif number_ibd_evts == 0:
                 continue
+
             else:
                 print("WARNING: more than 1 IBD-like signal in event {2:d}: n_IBD_like = {0:.0f}, prompt = {1:.0f}"
                       .format(number_ibd_evts, check_prompt, evt_id))
@@ -368,7 +396,7 @@ def read_sample_detsim_user(rootfile_input):
                     delta_t = time_exit[index_d] - time_exit[index_p]
 
                     # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
-                    if 600 < delta_t < 1000000:
+                    if time_cut_min < delta_t < time_cut_max:
 
                         # calculate distance from prompt to delayed:
                         distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
@@ -376,7 +404,7 @@ def read_sample_detsim_user(rootfile_input):
                                                (z_exit[index_p] - z_exit[index_d])**2)
 
                         # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
-                        if distance_p_d < 1500:
+                        if distance_p_d < distance_cut:
 
                             # increment number of IBD-like signals in this event:
                             number_ibd_evts = number_ibd_evts + 1
@@ -436,7 +464,7 @@ def read_sample_detsim_user(rootfile_input):
                         delta_t = time_exit[index_d] - time_exit[index_p]
 
                         # time cut criteria: 600 ns <= delta_t <= 1.0 ms (1.0 ms = 1000000 ns):
-                        if 600 < delta_t < 1000000:
+                        if time_cut_min < delta_t < time_cut_max:
 
                             # calculate distance from prompt to delayed:
                             distance_p_d = np.sqrt((x_exit[index_p] - x_exit[index_d])**2 +
@@ -444,7 +472,7 @@ def read_sample_detsim_user(rootfile_input):
                                                    (z_exit[index_p] - z_exit[index_d])**2)
 
                             # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
-                            if distance_p_d < 1500:
+                            if distance_p_d < distance_cut:
 
                                 # increment number of IBD-like signals for this possible prompt signal in this event:
                                 number_ibd_prompt = number_ibd_prompt + 1
@@ -497,7 +525,7 @@ def read_sample_detsim_user(rootfile_input):
                     # append Qedep of this prompt signal to the e_vis array:
                     e_vis = np.append(e_vis, e_qdep[index_prompt[correct_prompt_index]])
                 else:
-                    print("ERROR in line 504")
+                    print("ERROR in line 528")
                     continue
 
             else:
@@ -507,7 +535,6 @@ def read_sample_detsim_user(rootfile_input):
                 print("----------> not yet included!!!!")
 
     return evt_id_ibd, e_vis
-
 
 
 def convert_genie_file_for_generator(rootfile_input, path_output):
@@ -625,9 +652,15 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
         nc = rtree_input.GetBranch('nc').GetLeaf('nc').GetValue()
         nc = int(nc)
 
+        # get the value of target PDG:
+        tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+        tgt = int(tgt)
+
         # read only NC and QEL events:
-        if qel == 1 and nc == 1:
-            # if nc == 1:
+        # if qel == 1 and nc == 1:
+
+        # read only NC events and interactions on C12:
+        if nc == 1 and tgt == 1000060120:
 
             # set the event number:
             event_number[0] = event
@@ -638,8 +671,8 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
             p_pdg[0] = neu
 
             # get the value of target PDG:
-            tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
-            tgt = int(tgt)
+            # tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+            # tgt = int(tgt)
             t_pdg[0] = tgt
 
             # get the value of number of final p:
@@ -1419,15 +1452,19 @@ def get_channels_from_original_genie_file(rootfile_input):
         nc = rtree_input.GetBranch('nc').GetLeaf('nc').GetValue()
         nc = int(nc)
 
+        # get the value of target PDG:
+        tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+
         # read only NC and QEL events:
-        if qel == 1 and nc == 1:
-            # if nc == 1:
+        # if qel == 1 and nc == 1:
+        # if nc == 1:
+        if nc == 1 and tgt == 1000060120:
 
             # increase the number of events:
             number_events = number_events + 1
 
             # get the value of target PDG:
-            tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
+            # tgt = rtree_input.GetBranch('tgt').GetLeaf('tgt').GetValue()
             tgt = int(tgt)
 
             # get the value of number of final p:
@@ -2431,6 +2468,55 @@ def get_number_of_particles_of_channelid(channel_id):
         print("channel ID = 3 in get_number_of_particles_of_channelid()")
 
     return number_p, number_n, number_pion_minus, number_pion_plus
+
+
+def get_number_of_particles_of_deexid(deex_id):
+    """
+    Function to calculate the number of different particles which are produced by deexcitation of isotopes.
+
+    :param deex_id: deexcitation channel ID from DSNB-NC generator (more information in ~/juno/test_output_DSNB_gen/)
+
+    :return:
+    """
+    # preallocate variables:
+    number_n = 0
+    number_p = 0
+    number_deuterium = 0
+    number_tritium = 0
+    number_he3 = 0
+    number_alpha = 0
+
+    if deex_id > 0:
+        # deex_id > 0 -> nucleus is de-excited:
+        # number of neutrons:
+        number_n = int((deex_id - 1000000) / 100000)
+        # number of protons:
+        number_p = int((deex_id - 1000000 - number_n*100000) / 10000)
+        # number of deuterium:
+        number_deuterium = int((deex_id - 1000000 - number_n*100000 - number_p*10000) / 1000)
+        # number of tritium:
+        number_tritium = int((deex_id - 1000000 - number_n*100000 - number_p*10000 - number_deuterium*1000) / 100)
+        # number of He3:
+        number_he3 = int((deex_id - 1000000 - number_n*100000 - number_p*10000 - number_deuterium*1000 -
+                          number_tritium*100) / 10)
+        # number of alpha/He4:
+        number_alpha = int(deex_id - 1000000 - number_n*100000 - number_p*10000 - number_deuterium*1000 -
+                           number_tritium*100 - number_he3*10)
+
+    elif deex_id == 0:
+        # set all numbers to 0:
+        number_n = 0
+        number_p = 0
+        number_deuterium = 0
+        number_tritium = 0
+        number_he3 = 0
+        number_alpha = 0
+
+    else:
+        print("ERROR in get_number_of_particles_of deexid: deex_id is negative: deex_id = {0:d}".format(deex_id))
+
+
+    return number_n, number_p, number_deuterium, number_tritium, number_he3, number_alpha
 
 
 def read_nc_data(rootfile):
@@ -4198,6 +4284,849 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
            frac_c12_mass5orless, \
            frac_c12_c12, frac_c12_noiso, frac_c12_noiso_5p_6n, \
            frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_faulty
+
+
+def get_deex_channel(deex_id, isotope_pdg, target_pdg):
+    """
+    function to calculate the different deexcitation channels of the different isotopes, which were produced by
+    neutral current interaction of atmospheric neutrinos (deex_id, isotope_pdg, target_pdg from root file from output
+    of DSNB-NC generator)
+
+    :param deex_id: ID of the deexcitation channel: defines, which particles are produced in the deexitation (array)
+    :param isotope_pdg: PDG ID of the isotope produced through NC interaction (array)
+    :param target_pdg: PDG ID of the target particle (array)
+
+    :return:
+    """
+
+    # get the number of entries of the array (integer):
+    number_entries = len(target_pdg)
+    # number_entries = 1000
+
+    """ preallocate the variables: """
+    # preallocate number of events with C12 as target:
+    number_target_c12 = 0
+    # number of NC interaction without C12 as target:
+    number_no_c12 = 0
+    # number of NC interaction with 'light' isotopes (isotopes, where no TALYS deexcitation root file exists),
+    # where deex_id = 0:
+    number_light_iso = 0
+
+    """ C11 """
+    # number of events, where C11 is not excited:
+    number_c11_notex = 0
+    # number of events, where C11 de-excites:
+    number_c11_deex = 0
+    # C11* -> p + alpha + Li6:
+    number_c11_li6_p_alpha = 0
+    # C11* -> alpha + Be7:
+    number_c11_be7_alpha = 0
+    # C11* -> p + B10:
+    number_c11_b10_p = 0
+    # C11* -> n + p + B9:
+    number_c11_b9_n_p = 0
+    # C11* -> p + d + Be8:
+    number_c11_be8_p_d = 0
+    # C11* -> 2p + Be9:
+    number_c11_be9_2p = 0
+    # C11* -> d + B9:
+    number_c11_b9_d = 0
+    # C11* -> He3 + Be8:
+    number_c11_be8_he3 = 0
+    # C11* -> n + C10:
+    number_c11_c10_n = 0
+    # C11* -> d + alpha + Li5:
+    number_c11_li5_d_alpha = 0
+    # C11* -> n + p + alpha + Li5:
+    number_c11_li5_n_p_alpha = 0
+    # deexcitations of C11 not yet included:
+    number_c11_missing = 0
+
+    """ B11 """
+    # number of events, where B11 is not excited:
+    number_b11_notex = 0
+    # number of events, where B11 de-excites:
+    number_b11_deex = 0
+    # B11* -> n + alpha + Li6:
+    number_b11_li6_n_alpha = 0
+    # B11* -> 2n + B9:
+    number_b11_b9_2n = 0
+    # B11* -> n + d + Be8:
+    number_b11_be8_n_d = 0
+    # B11* -> d + Be9:
+    number_b11_be9_d = 0
+    # B11* -> p + Be10:
+    number_b11_be10_p = 0
+    # B11* -> n + B10:
+    number_b11_b10_n = 0
+    # B11* -> n + p + Be9:
+    number_b11_be9_n_p = 0
+    # B11* -> alpha + Li7:
+    number_b11_li7_alpha = 0
+    # B11* -> t + Be8:
+    number_b11_be8_t = 0
+    # B11* -> d + alpha + He5:
+    number_b11_he5_d_alpha = 0
+    # B11* -> p + alpha + He6:
+    number_b11_he6_p_alpha = 0
+    # B11* -> 2n + p + Be8:
+    number_b11_be8_2n_p = 0
+    # deexcitations of B11 not yet included:
+    number_b11_missing = 0
+
+    """ C10 """
+    # number of events, where C10 is not excited:
+    number_c10_notex = 0
+    # number of events, where C10 de-excites:
+    number_c10_deex = 0
+    # C10* -> p + B9:
+    number_c10_b9_p = 0
+    # C10* -> p + d + Be7:
+    number_c10_be7_p_d = 0
+    # C10* -> p + He3 + Li6:
+    number_c10_li6_p_he3 = 0
+    # C10* -> p + d + He3 + He4:
+    number_c10_he4_p_d_he3 = 0
+    # C10* -> 2p + d + Li6:
+    number_c10_li6_2p_d = 0
+    # C10* -> 2p + Be8:
+    number_c10_be8_2p = 0
+    # C10* -> n + 2p + Be7:
+    number_c10_be7_n_2p = 0
+    # C10* -> n + 3p + Li6:
+    number_c10_li6_n_3p = 0
+    # C10* -> n + p + d + Be6:
+    number_c10_be6_n_p_d = 0
+    # C10* -> n + 2p + d + Li5:
+    number_c10_li5_n_2p_d = 0
+    # C10* -> p + d + alpha + He3:
+    number_c10_he3_p_d_alpha = 0
+    # C10* -> d + He3 + Li5:
+    number_c10_li5_d_he3 = 0
+    # C10* -> p + 2d + Li5:
+    number_c10_li5_p_2d = 0
+    # C10* -> n + 2p + alpha + He3:
+    number_c10_he3_n_2p_alpha = 0
+    # C10* -> n + p + alpha + Li4:
+    number_c10_li4_n_p_alpha = 0
+    # C10* -> n + p + B8:
+    number_c10_b8_n_p = 0
+    # C10* -> d + B8:
+    number_c10_b8_d = 0
+    # C10* -> p + t + Be6
+    number_c10_be6_p_t = 0
+    # C10* -> n + 2p + He3 + He4
+    number_c10_he4_n_2p_he3 = 0
+    # C10* -> n + p + He3 + Li5
+    number_c10_li5_n_p_he3 = 0
+    # deexcitations of C10 not yet included:
+    number_c10_missing = 0
+
+    """ B10 """
+    # number of events, where B10 is not excited:
+    number_b10_notex = 0
+    # number of events, where B10 de-excites:
+    number_b10_deex = 0
+    # B10* -> p + Be9:
+    number_b10_be9_p = 0
+    # B10* -> d + Be8:
+    number_b10_be8_d = 0
+    # B10* -> n + B9:
+    number_b10_b9_n = 0
+    # B10* -> t + Be7:
+    number_b10_be7_t = 0
+    # B10* -> n + p + Be8:
+    number_b10_be8_n_p = 0
+    # B10* -> He3 + Li7:
+    number_b10_li7_he3 = 0
+    # B10* -> p + alpha + He5:
+    number_b10_he5_p_alpha = 0
+    # B10* -> alpha + Li6:
+    number_b10_li6_alpha = 0
+    # B10* -> n + alpha + Li5:
+    number_b10_li5_n_alpha = 0
+    # B10* -> p + d + Li7:
+    number_b10_li7_p_d = 0
+    # deexcitations of B10 not yet included:
+    number_b10_missing = 0
+
+    """ Be10 """
+    # number of events, where Be10 is not excited:
+    number_be10_notex = 0
+    # number of events, where Be10 de-excites:
+    number_be10_deex = 0
+    # Be10* -> 2n + d + Li6:
+    number_be10_li6_2n_d = 0
+    # Be10* -> 2n + p + Li7:
+    number_be10_li7_2n_p = 0
+    # Be10* -> n + 2p + He7:
+    number_be10_he7_n_2p = 0
+    # Be10* -> n + t + Li6:
+    number_be10_li6_n_t = 0
+    # Be10* -> 3n + p + Li6:
+    number_be10_li6_3n_p = 0
+    # Be10* -> n + 2d + He5:
+    number_be10_he5_n_2d = 0
+    # Be10* -> 2n + Be8:
+    number_be10_be8_2n = 0
+    # Be10* -> n + alpha + He5:
+    number_be10_he5_n_alpha = 0
+    # Be10* -> n + d + alpha + tritium:
+    number_be10_t_n_d_alpha = 0
+    # Be10* -> n + p + Li8:
+    number_be10_li8_n_p = 0
+    # Be10* -> n + d + t + He4:
+    number_be10_he4_n_d_t = 0
+    # Be10* -> n + p + t + He5:
+    number_be10_he5_n_p_t = 0
+    # Be10* -> n + d + Li7:
+    number_be10_li7_n_d = 0
+    # Be10* -> n + p + alpha + H4:
+    number_be10_h4_n_p_alpha = 0
+    # Be10* -> 2n + p + d + He5:
+    number_be10_he5_2n_p_d = 0
+    # Be10* -> n + Be9:
+    number_be10_be9_n = 0
+    # Be10* -> n + p + d + He6:
+    number_be10_he6_n_p_d = 0
+    # Be10* -> d + t + He5:
+    number_be10_he5_d_t = 0
+    # Be10* -> d + alpha + H4:
+    number_be10_h4_d_alpha = 0
+    # Be10* -> 2n + p + t + He4:
+    number_be10_he4_2n_p_t = 0
+    # deexcitations of Be10 not yet included:
+    number_be10_missing = 0
+
+    """ C9 """
+    # number of events, where C9 is not excited:
+    number_c9_notex = 0
+    # number of events, where C9 de-excites:
+    number_c9_deex = 0
+    # C9* -> 2p + Be7:
+    number_c9_be7_2p = 0
+    # deexcitations of C9 not yet included:
+    number_c9_missing = 0
+
+    """ B9 """
+    # number of events, where B9 is not excited:
+    number_b9_notex = 0
+    # number of events, where B9 de-excites:
+    number_b9_deex = 0
+    # B9* -> p + Be8:
+    number_b9_be8_p = 0
+    # deexcitations of B9 not yet included:
+    number_b9_missing = 0
+
+    """ Be9 """
+    # number of events, where Be9 is not excited:
+    number_be9_notex = 0
+    # number of events, where Be9 de-excites:
+    number_be9_deex = 0
+    # Be9* -> p + Li8:
+    number_be9_li8_p = 0
+    # deexcitations of Be9 not yet included:
+    number_be9_missing = 0
+
+    """ Li9 """
+    # number of events, where Li9 is not excited:
+    number_li9_notex = 0
+    # number of events, where Li9 de-excites:
+    number_li9_deex = 0
+    # Li9* -> n + alpha + H4:
+    number_li9_h4_n_alpha = 0
+    # Li9* -> d + He7:
+    number_li9_he7_d = 0
+    # Li9* -> n + Li8:
+    number_li9_li8_n = 0
+    # deexcitations of Li9 not yet included:
+    number_li9_missing = 0
+
+    """ B8 """
+    # number of events, where B8 is not excited:
+    number_b8_notex = 0
+    # number of events, where B8 de-excites:
+    number_b8_deex = 0
+    # B8* -> 2p + Li6:
+    number_b8_li6_2p = 0
+    # deexcitations of B8 not yet included:
+    number_b8_missing = 0
+
+    """ Li8 """
+    # number of events, where Li8 is not excited:
+    number_li8_notex = 0
+    # number of events, where Li8 de-excites:
+    number_li8_deex = 0
+    # Li8* -> n + Li7:
+    number_li8_li7_n = 0
+    # Li8* -> 2n + Li6:
+    number_li8_li6_2n = 0
+    # deexcitations of Li8 not yet included:
+    number_li8_missing = 0
+
+    """ Be7 """
+    # number of events, where Be7 is not excited:
+    number_be7_notex = 0
+    # number of events, where Be7 de-excites:
+    number_be7_deex = 0
+    # Be7* -> d + Li5:
+    number_be7_li5_d = 0
+    # Be7* -> p + Li6:
+    number_be7_li6_p = 0
+    # deexcitations of Be7 not yet included:
+    number_be7_missing = 0
+
+    """ Li7 """
+    # number of events, where Li7 is not excited:
+    number_li7_notex = 0
+    # number of events, where Li7 de-excites:
+    number_li7_deex = 0
+    # Li7* -> n + Li6:
+    number_li7_li6_n = 0
+    # deexcitations of Li7 not yet included:
+    number_li7_missing = 0
+
+
+    # loop over all entries of the array:
+    for index in range(number_entries):
+
+        # check, if target is C12 (PDG ID = 1000060120):
+        if target_pdg[index] == 1000060120:
+
+            number_target_c12 = number_target_c12 + 1
+
+            # check the PDG ID of the created isotopes:
+            if isotope_pdg[index] == 1000060110:
+                # C11:
+                if deex_id[index] == 0:
+                    # C11 is not excited:
+                    number_c11_notex = number_c11_notex + 1
+
+                else:
+                    # C11 deexcitation:
+                    number_c11_deex = number_c11_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C11* -> p + alpha + Li6:
+                        number_c11_li6_p_alpha = number_c11_li6_p_alpha + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C11* -> alpha + Be7:
+                        number_c11_be7_alpha = number_c11_be7_alpha + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> p + B10:
+                        number_c11_b10_p = number_c11_b10_p + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> n + p + B9:
+                        number_c11_b9_n_p = number_c11_b9_n_p + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> p + d + Be8:
+                        number_c11_be8_p_d = number_c11_be8_p_d + 1
+                    elif num_n == 0 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> 2p + Be9:
+                        number_c11_be9_2p = number_c11_be9_2p + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> d + B9:
+                        number_c11_b9_d = number_c11_b9_d + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C11* -> He3 + Be8:
+                        number_c11_be8_he3 = number_c11_be8_he3 + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C11* -> n + C10:
+                        number_c11_c10_n = number_c11_c10_n + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C11* -> d + alpha + Li5:
+                        number_c11_li5_d_alpha = number_c11_li5_d_alpha + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C11* -> n + p + alpha + Li5:
+                        number_c11_li5_n_p_alpha = number_c11_li5_n_p_alpha + 1
+                    else:
+                        number_c11_missing = number_c11_missing + 1
+                        print("----------C11-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000050110:
+                # B11:
+                if deex_id[index] == 0:
+                    # B11 is not excited:
+                    number_b11_notex = number_b11_notex + 1
+
+                else:
+                    # B11 deexcitation:
+                    number_b11_deex = number_b11_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B11* -> n + alpha + Li6:
+                        number_b11_li6_n_alpha = number_b11_li6_n_alpha + 1
+                    elif num_n == 2 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> 2n + B9:
+                        number_b11_b9_2n = number_b11_b9_2n + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> n + d + Be8:
+                        number_b11_be8_n_d = number_b11_be8_n_d + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> d + Be9:
+                        number_b11_be9_d = number_b11_be9_d + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> p + Be10:
+                        number_b11_be10_p = number_b11_be10_p + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> n + B10:
+                        number_b11_b10_n = number_b11_b10_n + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> n + p + Be9:
+                        number_b11_be9_n_p = number_b11_be9_n_p + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B11* -> alpha + Li7:
+                        number_b11_li7_alpha = number_b11_li7_alpha + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> t + Be8:
+                        number_b11_be8_t = number_b11_be8_t + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B11* -> d + alpha + He5:
+                        number_b11_he5_d_alpha = number_b11_he5_d_alpha + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B11* -> p + alpha + He6:
+                        number_b11_he6_p_alpha = number_b11_he6_p_alpha + 1
+                    elif num_n == 2 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B11* -> 2n + p + Be8:
+                        number_b11_be8_2n_p = number_b11_be8_2n_p + 1
+                    else:
+                        number_b11_missing = number_b11_missing + 1
+                        print("----------B11-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000060100:
+                # C10:
+                if deex_id[index] == 0:
+                    # C10 is not excited:
+                    number_c10_notex = number_c10_notex + 1
+
+                else:
+                    # C10 deexcitation:
+                    number_c10_deex = number_c10_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> p + B9:
+                        number_c10_b9_p = number_c10_b9_p + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> p + d + Be7:
+                        number_c10_be7_p_d = number_c10_be7_p_d + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C10* -> p + He3 + Li6:
+                        number_c10_li6_p_he3 = number_c10_li6_p_he3 + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C10* -> p + d + He3 + He4:
+                        number_c10_he4_p_d_he3 = number_c10_he4_p_d_he3 + 1
+                    elif num_n == 0 and num_p == 2 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> 2p + d + Li6:
+                        number_c10_li6_2p_d = number_c10_li6_2p_d + 1
+                    elif num_n == 0 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> 2p + Be8:
+                        number_c10_be8_2p = number_c10_be8_2p + 1
+                    elif num_n == 1 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> n + 2p + Be7:
+                        number_c10_be7_n_2p = number_c10_be7_n_2p + 1
+                    elif num_n == 1 and num_p == 3 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> n + 3p + Li6:
+                        number_c10_li6_n_3p = number_c10_li6_n_3p + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> n + p + d + Be6:
+                        number_c10_be6_n_p_d = number_c10_be6_n_p_d + 1
+                    elif num_n == 1 and num_p == 2 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> n + 2p + d + Li5:
+                        number_c10_li5_n_2p_d = number_c10_li5_n_2p_d + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C10* -> p + d + alpha + He3:
+                        number_c10_he3_p_d_alpha = number_c10_he3_p_d_alpha + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C10* -> d + He3 + Li5:
+                        number_c10_li5_d_he3 = number_c10_li5_d_he3 + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 2 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> p + 2d + Li5:
+                        number_c10_li5_p_2d = number_c10_li5_p_2d + 1
+                    elif num_n == 1 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C10* -> n + 2p + alpha + He3:
+                        number_c10_he3_n_2p_alpha = number_c10_he3_n_2p_alpha + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # C10* -> n + p + alpha + Li4:
+                        number_c10_li4_n_p_alpha = number_c10_li4_n_p_alpha + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> n + p + B8:
+                        number_c10_b8_n_p = number_c10_b8_n_p + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> d + B8:
+                        number_c10_b8_d = number_c10_b8_d + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # C10* -> p + t + Be6
+                        number_c10_be6_p_t = number_c10_be6_p_t + 1
+                    elif num_n == 1 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C10* -> n + 2p + He3 + He4
+                        number_c10_he4_n_2p_he3 = number_c10_he4_n_2p_he3 + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # C10* -> n + p + He3 + Li5
+                        number_c10_li5_n_p_he3 = number_c10_li5_n_p_he3 + 1
+                    else:
+                        number_c10_missing = number_c10_missing + 1
+                        print("----------C10-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000050100:
+                # B10:
+                if deex_id[index] == 0:
+                    # B10 is not excited:
+                    number_b10_notex = number_b10_notex + 1
+
+                else:
+                    # B10 deexcitation:
+                    number_b10_deex = number_b10_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> p + Be9:
+                        number_b10_be9_p = number_b10_be9_p + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> d + Be8:
+                        number_b10_be8_d = number_b10_be8_d + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> n + B9:
+                        number_b10_b9_n = number_b10_b9_n + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> t + Be7:
+                        number_b10_be7_t = number_b10_be7_t + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> n + p + Be8:
+                        number_b10_be8_n_p = number_b10_be8_n_p + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 1 and num_alpha == 0:
+                        # B10* -> He3 + Li7:
+                        number_b10_li7_he3 = number_b10_li7_he3 + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B10* -> p + alpha + He5:
+                        number_b10_he5_p_alpha = number_b10_he5_p_alpha + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B10* -> alpha + Li6:
+                        number_b10_li6_alpha = number_b10_li6_alpha + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # B10* -> n + alpha + Li5:
+                        number_b10_li5_n_alpha = number_b10_li5_n_alpha + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B10* -> p + d + Li7:
+                        number_b10_li7_p_d = number_b10_li7_p_d + 1
+                    else:
+                        number_b10_missing = number_b10_missing + 1
+                        print("----------B10-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000040100:
+                # Be10:
+                if deex_id[index] == 0:
+                    # Be10 is not excited:
+                    number_be10_notex = number_be10_notex + 1
+
+                else:
+                    # Be10 deexcitation:
+                    number_be10_deex = number_be10_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 2 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 2n + d + Li6:
+                        number_be10_li6_2n_d = number_be10_li6_2n_d + 1
+                    elif num_n == 2 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 2n + p + Li7:
+                        number_be10_li7_2n_p = number_be10_li7_2n_p + 1
+                    elif num_n == 1 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + 2p + He7:
+                        number_be10_he7_n_2p = number_be10_he7_n_2p + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + t + Li6:
+                        number_be10_li6_n_t = number_be10_li6_n_t + 1
+                    elif num_n == 3 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 3n + p + Li6:
+                        number_be10_li6_3n_p = number_be10_li6_3n_p + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 2 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + 2d + He5:
+                        number_be10_he5_n_2d = number_be10_he5_n_2d + 1
+                    elif num_n == 2 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 2n + Be8:
+                        number_be10_be8_2n = number_be10_be8_2n + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # Be10* -> n + alpha + He5:
+                        number_be10_he5_n_alpha = number_be10_he5_n_alpha + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # Be10* -> n + d + alpha + tritium:
+                        number_be10_t_n_d_alpha = number_be10_t_n_d_alpha + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + p + Li8:
+                        number_be10_li8_n_p = number_be10_li8_n_p + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 1 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + d + t + He4:
+                        number_be10_he4_n_d_t = number_be10_he4_n_d_t + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + p + t + He5:
+                        number_be10_he5_n_p_t = number_be10_he5_n_p_t + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + d + Li7:
+                        number_be10_li7_n_d = number_be10_li7_n_d + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # Be10* -> n + p + alpha + H4:
+                        number_be10_h4_n_p_alpha = number_be10_h4_n_p_alpha + 1
+                    elif num_n == 2 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 2n + p + d + He5:
+                        number_be10_he5_2n_p_d = number_be10_he5_2n_p_d + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + Be9:
+                        number_be10_be9_n = number_be10_be9_n + 1
+                    elif num_n == 1 and num_p == 1 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> n + p + d + He6:
+                        number_be10_he6_n_p_d = number_be10_he6_n_p_d + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> d + t + He5:
+                        number_be10_he5_d_t = number_be10_he5_d_t + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # Be10* -> d + alpha + H4:
+                        number_be10_h4_d_alpha = number_be10_h4_d_alpha + 1
+                    elif num_n == 2 and num_p == 1 and num_d == 0 and num_t == 1 and num_he3 == 0 and num_alpha == 0:
+                        # Be10* -> 2n + p + t + He4:
+                        number_be10_he4_2n_p_t = number_be10_he4_2n_p_t + 1
+                    else:
+                        number_be10_missing = number_be10_missing + 1
+                        print("----------Be10-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000060090:
+                # C9:
+                if deex_id[index] == 0:
+                    # C9 is not excited:
+                    number_c9_notex = number_c9_notex + 1
+
+                else:
+                    # C9 deexcitation:
+                    number_c9_deex = number_c9_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # C9* -> 2p + Be7:
+                        number_c9_be7_2p = number_c9_be7_2p + 1
+                    else:
+                        number_c9_missing = number_c9_missing + 1
+                        print("----------C9-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000050090:
+                # B9:
+                if deex_id[index] == 0:
+                    # B9 is not excited:
+                    number_b9_notex = number_b9_notex + 1
+
+                else:
+                    # B9 deexcitation:
+                    number_b9_deex = number_b9_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B9* -> p + Be8:
+                        number_b9_be8_p = number_b9_be8_p + 1
+                    else:
+                        number_b9_missing = number_b9_missing + 1
+                        print("----------B9-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000040090:
+                # Be9:
+                if deex_id[index] == 0:
+                    # Be9 is not excited:
+                    number_be9_notex = number_be9_notex + 1
+
+                else:
+                    # Be9 deexcitation:
+                    number_be9_deex = number_be9_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be9* -> p + Li8:
+                        number_be9_li8_p = number_be9_li8_p + 1
+                    else:
+                        number_be9_missing = number_be9_missing + 1
+                        print("----------Be9-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000030090:
+                # Li9:
+                if deex_id[index] == 0:
+                    # Li9 is not excited:
+                    number_li9_notex = number_li9_notex + 1
+
+                else:
+                    # Li9 deexcitation:
+                    number_li9_deex = number_li9_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 1:
+                        # Li9* -> n + alpha + H4:
+                        number_li9_h4_n_alpha = number_li9_h4_n_alpha + 1
+                    elif num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Li9* -> d + He7:
+                        number_li9_he7_d = number_li9_he7_d + 1
+                    elif num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Li9* -> n + Li8:
+                        number_li9_li8_n = number_li9_li8_n + 1
+                    else:
+                        number_li9_missing = number_li9_missing + 1
+                        print("----------Li9-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000050080:
+                # B8:
+                if deex_id[index] == 0:
+                    # B8 is not excited:
+                    number_b8_notex = number_b8_notex + 1
+
+                else:
+                    # B8 deexcitation:
+                    number_b8_deex = number_b8_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 2 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # B8* -> 2p + Li6:
+                        number_b8_li6_2p = number_b8_li6_2p + 1
+                    else:
+                        number_b8_missing = number_b8_missing + 1
+                        print("----------B8-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000030080:
+                # Li8:
+                if deex_id[index] == 0:
+                    # Li8 is not excited:
+                    number_li8_notex = number_li8_notex + 1
+
+                else:
+                    # Li8 deexcitation:
+                    number_li8_deex = number_li8_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Li8* -> n + Li7:
+                        number_li8_li7_n = number_li8_li7_n + 1
+                    elif num_n == 2 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Li8* -> 2n + Li6:
+                        number_li8_li6_2n = number_li8_li6_2n + 1
+                    else:
+                        number_li8_missing = number_li8_missing + 1
+                        print("----------Li8-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000040070:
+                # Be7:
+                if deex_id[index] == 0:
+                    # Be7 is not excited:
+                    number_be7_notex = number_be7_notex + 1
+
+                else:
+                    # Be7 deexcitation:
+                    number_be7_deex = number_be7_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 0 and num_p == 0 and num_d == 1 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be7* -> d + Li5:
+                        number_be7_li5_d = number_be7_li5_d + 1
+                    elif num_n == 0 and num_p == 1 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Be7* -> p + Li6:
+                        number_be7_li6_p = number_be7_li6_p + 1
+                    else:
+                        number_be7_missing = number_be7_missing + 1
+                        print("----------Be7-------")
+                        print(deex_id[index])
+
+
+            elif isotope_pdg[index] == 1000030070:
+                # Li7:
+                if deex_id[index] == 0:
+                    # Li7 is not excited:
+                    number_li7_notex = number_li7_notex + 1
+
+                else:
+                    # Li7 deexcitation:
+                    number_li7_deex = number_li7_deex + 1
+                    # get number of particles:
+                    num_n, num_p, num_d, num_t, num_he3, num_alpha = get_number_of_particles_of_deexid(deex_id[index])
+
+                    if num_n == 1 and num_p == 0 and num_d == 0 and num_t == 0 and num_he3 == 0 and num_alpha == 0:
+                        # Li7* -> n + Li6:
+                        number_li7_li6_n = number_li7_li6_n + 1
+                    else:
+                        number_li7_missing = number_li7_missing + 1
+                        print("----------Li7-------")
+                        print(deex_id[index])
+
+
+            else:
+                # check if deex_if = 0 for all other isotopes (C8, Be8, He8, B7, He7, H7, Be6, Li6, He6, H6, Li5, He5,
+                # H5, Li4, He4, H4, He3, H3, H2):
+                if deex_id[index] == 0:
+                    number_light_iso = number_light_iso + 1
+                else:
+                    print("WARNING: deex_id = {0:d}, BUT isotope has no deexcitation root file!!")
+
+        else:
+            # other target than C12:
+            number_no_c12 = number_no_c12 + 1
+
+    return number_entries, number_target_c12, number_no_c12, number_light_iso, \
+           number_c11_notex, number_c11_deex, number_c11_li6_p_alpha, number_c11_be7_alpha, number_c11_b10_p, \
+           number_c11_b9_n_p, number_c11_be8_p_d, number_c11_be9_2p, number_c11_b9_d, number_c11_be8_he3, \
+           number_c11_c10_n, number_c11_li5_d_alpha, number_c11_li5_n_p_alpha, number_c11_missing, \
+           number_b11_notex, number_b11_deex, number_b11_li6_n_alpha, number_b11_b9_2n, number_b11_be8_n_d, \
+           number_b11_be9_d, number_b11_be10_p, number_b11_b10_n, number_b11_be9_n_p, number_b11_li7_alpha, \
+           number_b11_be8_t, number_b11_he5_d_alpha, number_b11_he6_p_alpha, number_b11_be8_2n_p, number_b11_missing, \
+           number_c10_notex, number_c10_deex, number_c10_b9_p, number_c10_be7_p_d, number_c10_li6_p_he3, \
+           number_c10_he4_p_d_he3, number_c10_li6_2p_d, number_c10_be8_2p, number_c10_be7_n_2p, number_c10_li6_n_3p, \
+           number_c10_be6_n_p_d, number_c10_li5_n_2p_d, number_c10_he3_p_d_alpha, number_c10_li5_d_he3, \
+           number_c10_li5_p_2d, number_c10_he3_n_2p_alpha, number_c10_li4_n_p_alpha, number_c10_b8_n_p, \
+           number_c10_b8_d, number_c10_be6_p_t, number_c10_he4_n_2p_he3, number_c10_li5_n_p_he3, number_c10_missing, \
+           number_b10_notex, number_b10_deex, number_b10_be9_p, number_b10_be8_d, number_b10_b9_n, number_b10_be7_t, \
+           number_b10_be8_n_p, number_b10_li7_he3, number_b10_he5_p_alpha, number_b10_li6_alpha, \
+           number_b10_li5_n_alpha, number_b10_li7_p_d, number_b10_missing, \
+           number_be10_notex, number_be10_deex, number_be10_li6_2n_d, number_be10_li7_2n_p, number_be10_he7_n_2p, \
+           number_be10_li6_n_t, number_be10_li6_3n_p, number_be10_he5_n_2d, number_be10_be8_2n, \
+           number_be10_he5_n_alpha, number_be10_t_n_d_alpha, number_be10_li8_n_p, number_be10_he4_n_d_t, \
+           number_be10_he5_n_p_t, number_be10_li7_n_d, number_be10_h4_n_p_alpha, number_be10_he5_2n_p_d, \
+           number_be10_be9_n, number_be10_he6_n_p_d, number_be10_he5_d_t, number_be10_h4_d_alpha, \
+           number_be10_he4_2n_p_t, number_be10_missing, \
+           number_c9_notex, number_c9_deex, number_c9_be7_2p, number_c9_missing, \
+           number_b9_notex, number_b9_deex, number_b9_be8_p, number_b9_missing, \
+           number_be9_notex, number_be9_deex, number_be9_li8_p, number_be9_missing, \
+           number_li9_notex, number_li9_deex, number_li9_h4_n_alpha, number_li9_he7_d, number_li9_li8_n, \
+           number_li9_missing, \
+           number_b8_notex, number_b8_deex, number_b8_li6_2p, number_b8_missing, \
+           number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing, \
+           number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing, \
+           number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing
 
 
 def check_high_channelid(channel_id, final_pdg):

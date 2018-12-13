@@ -19,12 +19,8 @@
     (but all targets)
 
     Then the deexcitation of the products from the NC interactions is simulated:
-    The status of the residual nucleus is unknown. Therefor the deexcitation of the residual nucleus is assumed from
-    a simple shell model
-    -> 1/3 of the residual nuclei are excited
-    -> 2/3 of the residual nuclei are NOT excited, but in the ground state
-    (Jie is working on the implementation of a more complicated nuclear model, but it is not implemented in the DSNB-NC
-    generator yet (10.10.2018))
+    The status of the residual nucleus is unknown. Therefore the deexcitation of the residual nucleus is assumed from
+    a advanced shell model (modified DSNB-NC generator -> see info_atmoNC.odt)
 
     The deexitation of the residual nucleus is simulated with the TALYS software and saved in "*deexcitation.root" for
     all nuclei (Li7, Li8, Li9, C9, C10, C11, Be7, Be9, Be10, B8, B9, B10, B11)
@@ -60,14 +56,14 @@ SHOW_PLOT = True
 
 # set the path of the inputs:
 # input_path = "/home/astro/blum/juno/test_output_DSNB_gen/input/"
-input_path = "/home/astro/blum/juno/atmoNC/data_QEL_NC/output_generator/"
+input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_generator/"
 
 # file name of the input file:
-input_name = input_path + "gen_QEL_NC_11330evts_seed1.root"
+input_name = input_path + "gen_NC_onlyC12_250000evts_seed1.root"
 # input_name = input_path + "test_11330events_newVersion_seed11330.root"
 
 # set the path, where the outputs are saved:
-output_path = "/home/astro/blum/juno/atmoNC/data_QEL_NC/output_checkoutNC/"
+output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_checkoutNC/"
 # output_path = "/home/astro/blum/juno/test_output_DSNB_gen/output/"
 
 
@@ -124,7 +120,7 @@ else:
     = NC_background_functions.get_target_ratio(projectile_E, target_PDG, bin_width_incoming)
 
 
-# get the number of events of the different types on NC interaction channels:
+# get the fractions of events of the different types on NC interaction channels:
 (Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus, Frac_C12_B11_p_piminus_piplus,
  Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus, Frac_C12_B11_other,
  Frac_C12_C11_n, Frac_C12_C11_p_piminus, Frac_C12_C11_n_piminus_piplus, Frac_C12_C11_p_2piminus_piplus,
@@ -171,6 +167,40 @@ else:
     = NC_background_functions.get_interaction_channel(NC_inter_ch_ID, isotope_PDG, target_PDG)
 
 
+# get the numbers of events of the different deexcitation channels of the different produced isotopes:
+(number_Entries, number_target_C12, number_no_C12, number_light_Iso,
+ number_c11_notex, number_c11_deex, number_c11_li6_p_alpha, number_c11_be7_alpha, number_c11_b10_p, number_c11_b9_n_p,
+ number_c11_be8_p_d, number_c11_be9_2p, number_c11_b9_d, number_c11_be8_he3, number_c11_c10_n, number_c11_li5_d_alpha,
+ number_c11_li5_n_p_alpha, number_c11_missing,
+ number_b11_notex, number_b11_deex, number_b11_li6_n_alpha, number_b11_b9_2n, number_b11_be8_n_d, number_b11_be9_d,
+ number_b11_be10_p, number_b11_b10_n, number_b11_be9_n_p, number_b11_li7_alpha, number_b11_be8_t,
+ number_b11_he5_d_alpha, number_b11_he6_p_alpha, number_b11_be8_2n_p, number_b11_missing,
+ number_c10_notex, number_c10_deex, number_c10_b9_p, number_c10_be7_p_d, number_c10_li6_p_he3, number_c10_he4_p_d_he3,
+ number_c10_li6_2p_d, number_c10_be8_2p, number_c10_be7_n_2p, number_c10_li6_n_3p, number_c10_be6_n_p_d,
+ number_c10_li5_n_2p_d, number_c10_he3_p_d_alpha, number_c10_li5_d_he3, number_c10_li5_p_2d, number_c10_he3_n_2p_alpha,
+ number_c10_li4_n_p_alpha, number_c10_b8_n_p, number_c10_b8_d, number_c10_be6_p_t, number_c10_he4_n_2p_he3,
+ number_c10_li5_n_p_he3, number_c10_missing,
+ number_b10_notex, number_b10_deex, number_b10_be9_p, number_b10_be8_d, number_b10_b9_n, number_b10_be7_t,
+ number_b10_be8_n_p, number_b10_li7_he3, number_b10_he5_p_alpha, number_b10_li6_alpha, number_b10_li5_n_alpha,
+ number_b10_li7_p_d, number_b10_missing,
+ number_be10_notex, number_be10_deex, number_be10_li6_2n_d, number_be10_li7_2n_p, number_be10_he7_n_2p,
+ number_be10_li6_n_t, number_be10_li6_3n_p, number_be10_he5_n_2d, number_be10_be8_2n, number_be10_he5_n_alpha,
+ number_be10_t_n_d_alpha, number_be10_li8_n_p, number_be10_he4_n_d_t, number_be10_he5_n_p_t, number_be10_li7_n_d,
+ number_be10_h4_n_p_alpha, number_be10_he5_2n_p_d, number_be10_be9_n, number_be10_he6_n_p_d, number_be10_he5_d_t,
+ number_be10_h4_d_alpha, number_be10_he4_2n_p_t, number_be10_missing,
+ number_c9_notex, number_c9_deex, number_c9_be7_2p, number_c9_missing,
+ number_b9_notex, number_b9_deex, number_b9_be8_p, number_b9_missing,
+ number_be9_notex, number_be9_deex, number_be9_li8_p, number_be9_missing,
+ number_li9_notex, number_li9_deex, number_li9_h4_n_alpha, number_li9_he7_d, number_li9_li8_n, number_li9_missing,
+ number_b8_notex, number_b8_deex, number_b8_li6_2p, number_b8_missing,
+ number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing,
+ number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing,
+ number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing) \
+    = NC_background_functions.get_deex_channel(deexcitation_ID, isotope_PDG, target_PDG)
+
+
+
+
 """ Display Output of 'get_neutrino_energy()' in plot: """
 h1 = plt.figure(1, figsize=(15, 8))
 
@@ -204,7 +234,7 @@ plt.xlim(xmin=0)
 plt.ylim(ymin=0)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
 plt.ylabel("events", fontsize=15)
-plt.title("Energy spectrum of atmospheric neutrinos (interacting via QEL NC in the JUNO detector)", fontsize=20)
+plt.title("Energy spectrum of atmospheric neutrinos (interacting via NC on $^{12}C$ in the JUNO detector)", fontsize=20)
 plt.legend(fontsize=12)
 
 if SAVE_FIG:
@@ -217,7 +247,7 @@ if SAVE_TXT:
                          Number_nu_tau_IN, Number_nu_tau_bar_IN, Frac_nu_e_IN, Frac_nu_e_bar_IN, Frac_nu_mu_IN,
                          Frac_nu_mu_bar_IN, Frac_nu_tau_IN, Frac_nu_tau_bar_IN]), fmt='%4.5f',
                header="Information about the ratio of the incoming atmospheric neutrinos that interact with the\n"
-                      "JUNO liquid scintillator via QEL NC interactions\n"
+                      "JUNO liquid scintillator via NC interactions on C12\n"
                       "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
                       "Number of events in the input file,\n"
                       "Number of interactions with nu_e,\n"
@@ -252,7 +282,7 @@ plt.xlim(xmin=0)
 plt.ylim(ymin=0)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
 plt.ylabel("events", fontsize=15)
-plt.title("Neutrino energy spectrum for QEL NC interactions with different targets", fontsize=20)
+plt.title("Neutrino energy spectrum for NC interactions on $^{12}C$", fontsize=20)
 plt.legend(fontsize=12)
 
 if SAVE_FIG:
@@ -265,7 +295,7 @@ if SAVE_TXT:
                          Number_NC_S32, Frac_NC_C12, Frac_ES_proton_target, Frac_NC_N14_target, Frac_NC_O16_target,
                          Frac_ES_electron_target, Frac_NC_S32_target]), fmt='%4.5f',
                header="Information about the number and ratio of the target particles, where neutrinos interact via "
-                      "QEL NC, in the JUNO liquid scintillator\n"
+                      "NC on C12, in the JUNO liquid scintillator\n"
                       "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
                       "Number of events in the input file,\n"
                       "Number of interactions on C12,\n"
@@ -285,7 +315,7 @@ if SAVE_TXT:
 
 """ Save information from get_interaction_channel() into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "QEL_NC_interaction_channels_{0:.0f}evts.txt".format(NumEvent),
+    np.savetxt(output_path + "NC_onlyC12_interaction_channels_{0:.0f}evts.txt".format(NumEvent),
                np.array([Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus,
                          Frac_C12_B11_p_piminus_piplus, Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus,
                          Frac_C12_B11_other,
@@ -337,7 +367,7 @@ if SAVE_TXT:
                          Frac_C12_C12, Frac_C12_NoIso, Frac_C12_NoIso_5p_6n,
                          Frac_no_C12, Frac_ES_proton_chID, Frac_ES_electron_chID, Frac_ES_O16_chID, Frac_ES_N14_chID,
                          Frac_ES_S32_chID, Frac_C12_faulty]), fmt='%4.5f',
-               header="Information about the number of the different QEL NC interaction channels\n"
+               header="Information about the fractions of the different NC interaction channels on C12\n"
                       "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
                       "Fraction of NC channel nu + C12 -> B11 + p,\n"
                       "Fraction of NC channel nu + C12 -> B11 + n + pi_plus,\n"
@@ -481,6 +511,176 @@ if SAVE_TXT:
                       "Fraction of ES channel nu + N14 -> nu + N14 + ...,\n"
                       "Fraction of ES channel nu + S32 -> nu + S32 + ...,\n"
                       "Fraction of faulty interactions (isotopes or particles are missing):"
+               .format(input_name, now))
+
+
+""" Save information from get_deex_channel() into txt file: """
+if SAVE_TXT:
+    np.savetxt(output_path + "deex_channels_NC_onlyC12_from_generator_{0:.0f}evts.txt".format(NumEvent),
+               np.array([number_Entries, number_target_C12, number_no_C12, number_light_Iso,
+                         number_c11_notex, number_c11_deex, number_c11_li6_p_alpha, number_c11_be7_alpha,
+                         number_c11_b10_p, number_c11_b9_n_p, number_c11_be8_p_d, number_c11_be9_2p, number_c11_b9_d,
+                         number_c11_be8_he3, number_c11_c10_n, number_c11_li5_d_alpha, number_c11_li5_n_p_alpha,
+                         number_c11_missing,
+                         number_b11_notex, number_b11_deex, number_b11_li6_n_alpha, number_b11_b9_2n,
+                         number_b11_be8_n_d, number_b11_be9_d, number_b11_be10_p, number_b11_b10_n, number_b11_be9_n_p,
+                         number_b11_li7_alpha, number_b11_be8_t, number_b11_he5_d_alpha, number_b11_he6_p_alpha,
+                         number_b11_be8_2n_p, number_b11_missing,
+                         number_c10_notex, number_c10_deex, number_c10_b9_p, number_c10_be7_p_d, number_c10_li6_p_he3,
+                         number_c10_he4_p_d_he3, number_c10_li6_2p_d, number_c10_be8_2p, number_c10_be7_n_2p,
+                         number_c10_li6_n_3p, number_c10_be6_n_p_d, number_c10_li5_n_2p_d, number_c10_he3_p_d_alpha,
+                         number_c10_li5_d_he3, number_c10_li5_p_2d, number_c10_he3_n_2p_alpha, number_c10_li4_n_p_alpha,
+                         number_c10_b8_n_p, number_c10_b8_d, number_c10_be6_p_t, number_c10_he4_n_2p_he3,
+                         number_c10_li5_n_p_he3, number_c10_missing,
+                         number_b10_notex, number_b10_deex, number_b10_be9_p, number_b10_be8_d, number_b10_b9_n,
+                         number_b10_be7_t, number_b10_be8_n_p, number_b10_li7_he3, number_b10_he5_p_alpha,
+                         number_b10_li6_alpha, number_b10_li5_n_alpha, number_b10_li7_p_d, number_b10_missing,
+                         number_be10_notex, number_be10_deex, number_be10_li6_2n_d, number_be10_li7_2n_p,
+                         number_be10_he7_n_2p, number_be10_li6_n_t, number_be10_li6_3n_p, number_be10_he5_n_2d,
+                         number_be10_be8_2n, number_be10_he5_n_alpha, number_be10_t_n_d_alpha, number_be10_li8_n_p,
+                         number_be10_he4_n_d_t, number_be10_he5_n_p_t, number_be10_li7_n_d, number_be10_h4_n_p_alpha,
+                         number_be10_he5_2n_p_d, number_be10_be9_n, number_be10_he6_n_p_d, number_be10_he5_d_t,
+                         number_be10_h4_d_alpha, number_be10_he4_2n_p_t, number_be10_missing,
+                         number_c9_notex, number_c9_deex, number_c9_be7_2p, number_c9_missing,
+                         number_b9_notex, number_b9_deex, number_b9_be8_p, number_b9_missing,
+                         number_be9_notex, number_be9_deex, number_be9_li8_p, number_be9_missing,
+                         number_li9_notex, number_li9_deex, number_li9_h4_n_alpha, number_li9_he7_d, number_li9_li8_n,
+                         number_li9_missing,
+                         number_b8_notex, number_b8_deex, number_b8_li6_2p, number_b8_missing,
+                         number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing,
+                         number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing,
+                         number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing]), fmt='%4.5f',
+               header="Information about the number of the different deexcitation channels, which occur in the DSNB-NC "
+                      "generator (for NC interactions on C12)\n"
+                      "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
+                      "number of entries in the input file,\n"
+                      "number of events with C12 as target,\n"
+                      "number of events without C12 as target,\n"
+                      "number of events with 'light' isotopes (isotopes, where no TALYS deex. root file exists),\n"
+                      "C11 is not excited,\n"
+                      "C11 is excited and de-excites,\n"
+                      "C11* -> p + alpha + Li6,\n"
+                      "C11* -> alpha + Be7,\n"
+                      "C11* -> p + B10,\n"
+                      "C11* -> n + p + B9,\n"
+                      "C11* -> p + d + Be8,\n"
+                      "C11* -> 2p + Be9,\n"
+                      "C11* -> d + B9,\n"
+                      "C11* -> He3 + Be8,\n"
+                      "C11* -> n + C10,\n"
+                      "C11* -> d + alpha + Li5,\n"
+                      "C11* -> n + p + alpha + Li5,\n"
+                      "deexcitations of C11 not yet included,\n"
+                      "B11 is not excited,\n"
+                      "B11 is excited and de-excites,\n"
+                      "B11* -> n + alpha + Li6,\n"
+                      "B11* -> 2n + B9,\n"
+                      "B11* -> n + d + Be8,\n"
+                      "B11* -> d + Be9,\n"
+                      "B11* -> p + Be10,\n"
+                      "B11* -> n + B10,\n"
+                      "B11* -> n + p + Be9,\n"
+                      "B11* -> alpha + Li7,\n"
+                      "B11* -> t + Be8,\n"
+                      "B11* -> d + alpha + He5,\n"
+                      "B11* -> p + alpha + He6,\n"
+                      "B11* -> 2n + p + Be8,\n"
+                      "deexcitations of B11 not yet included,\n"
+                      "C10 is not excited,\n"
+                      "C10 is excited and de-excites,\n"
+                      "C10* -> p + B9,\n"
+                      "C10* -> p + d + Be7,\n"
+                      "C10* -> p + He3 + Li6,\n"
+                      "C10* -> p + d + He3 + He4,\n"
+                      "C10* -> 2p + d + Li6,\n"
+                      "C10* -> 2p + Be8,\n"
+                      "C10* -> n + 2p + Be7,\n"
+                      "C10* -> n + 3p + Li6,\n"
+                      "C10* -> n + p + d + Be6,\n"
+                      "C10* -> n + 2p + d + Li5,\n"
+                      "C10* -> p + d + alpha + He3,\n"
+                      "C10* -> d + He3 + Li5,\n"
+                      "C10* -> p + 2d + Li5,\n"
+                      "C10* -> n + 2p + alpha + He3,\n"
+                      "C10* -> n + p + alpha + Li4,\n"
+                      "C10* -> n + p + B8,\n"
+                      "C10* -> d + B8,\n"
+                      "C10* -> p + t + Be6,\n"
+                      "C10* -> n + 2p + He3 + He4,\n"
+                      "C10* -> n + p + He3 + Li5,\n"
+                      "deexcitations of C10 not yet included,\n"
+                      "B10 is not excited,\n"
+                      "B10 is excited and de-excites,\n"
+                      "B10* -> p + Be9,\n"
+                      "B10* -> d + Be8,\n"
+                      "B10* -> n + B9,\n"
+                      "B10* -> t + Be7,\n"
+                      "B10* -> n + p + Be8,\n"
+                      "B10* -> He3 + Li7,\n"
+                      "B10* -> p + alpha + He5,\n"
+                      "B10* -> alpha + Li6,\n"
+                      "B10* -> n + alpha + Li5,\n"
+                      "B10* -> p + d + Li7,\n"
+                      "deexcitations of B10 not yet included,\n"
+                      "Be10 is not excited,\n"
+                      "Be10 is excited and de-excites,\n"
+                      "Be10* -> 2n + d + Li6,\n"
+                      "Be10* -> 2n + p + Li7,\n"
+                      "Be10* -> n + 2p + He7,\n"
+                      "Be10* -> n + t + Li6,\n"
+                      "Be10* -> 3n + p + Li6,\n"
+                      "Be10* -> n + 2d + He5,\n"
+                      "Be10* -> 2n + Be8,\n"
+                      "Be10* -> n + alpha + He5,\n"
+                      "Be10* -> n + d + alpha + tritium,\n"
+                      "Be10* -> n + p + Li8,\n"
+                      "Be10* -> n + d + t + He4,\n"
+                      "Be10* -> n + p + t + He5,\n"
+                      "Be10* -> n + d + Li7,\n"
+                      "Be10* -> n + p + alpha + H4,\n"
+                      "Be10* -> 2n + p + d + He5,\n"
+                      "Be10* -> n + Be9,\n"
+                      "Be10* -> n + p + d + He6,\n"
+                      "Be10* -> d + t + He5,\n"
+                      "Be10* -> d + alpha + H4,\n"
+                      "Be10* -> 2n + p + t + He4,\n"
+                      "deexcitations of Be10 not yet included,\n"
+                      "C9 is not excited,\n"
+                      "C9 is excited an de-excites,\n"
+                      "C9* -> 2p + Be7,\n"
+                      "deexcitations of C9 not yet included,\n"
+                      "B9 is not excited,\n"
+                      "B9 is excited and de-excites,\n"
+                      "B9* -> p + Be8,\n"
+                      "deexcitations of B9 not yet included,\n"
+                      "Be9 is not excited,\n"
+                      "Be9 is excite and de-excites,\n"
+                      "Be9* -> p + Li8,\n"
+                      "deexcitations of Be9 not yet included,\n"
+                      "Li9 is not excited,\n"
+                      "Li9 is excited and de-excites,\n"
+                      "Li9* -> n + alpha + H4,\n"
+                      "Li9* -> d + He7,\n"
+                      "Li9* -> n + Li8,\n"
+                      "deexcitations of Li9 not yet included,\n"
+                      "B8 is not excited,\n"
+                      "B8 is excited and de-excites,\n"
+                      "B8* -> 2p + Li6,\n"
+                      "deexcitations of B8 not yet included,\n"
+                      "Li8 is not excited,\n"
+                      "Li8 is excited and de-excites,\n"
+                      "Li8* -> n + Li7,\n"
+                      "Li8* -> 2n + Li6,\n"
+                      "deexcitations of Li8 not yet included,\n"
+                      "Be7 is not excited,\n"
+                      "Be7 is excited and de-excites,\n"
+                      "Be7* -> d + Li5,\n"
+                      "Be7* -> p + Li6,\n"
+                      "deexcitations of Be7 not yet included,\n"
+                      "Li7 is not excited,\n"
+                      "Li7 is excited and de-excites,\n"
+                      "Li7* -> n + Li6,\n"
+                      "deexcitations of Li7 not yet included:"
                .format(input_name, now))
 
 

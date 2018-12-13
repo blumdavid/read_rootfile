@@ -83,7 +83,7 @@ output_path = "/home/astro/blum/juno/atmoNC/"
 
 """ Save information from get_interaction_channel() into txt file: """
 if SAVE_TXT:
-    np.savetxt(output_path + "interaction_channels_qel_NC_{0:d}evts.txt".format(Number_Events),
+    np.savetxt(output_path + "interaction_channels_NC_onlyC12_{0:d}evts.txt".format(Number_Events),
                np.array([Frac_C12_B11_p, Frac_C12_B11_n_piplus, Frac_C12_B11_n_piminus_2piplus,
                          Frac_C12_B11_p_piminus_piplus, Frac_C12_B11_p_2piminus_2piplus, Frac_C12_B11_piplus,
                          Frac_C12_C11_n, Frac_C12_C11_p_piminus, Frac_C12_C11_n_piminus_piplus,

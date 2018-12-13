@@ -22,7 +22,7 @@ input_path = "/home/astro/blum/juno/atmoNC/data_Julia/"
 input_name = input_path + "gntp.101.gst.root"
 
 # set the path, where the outputs are saved:
-output_path = "/home/astro/blum/juno/atmoNC/data_QEL_NC/"
+output_path = "/home/astro/blum/juno/atmoNC/data_NC/"
 
 NC_background_functions.convert_genie_file_for_generator(input_name, output_path)
 
