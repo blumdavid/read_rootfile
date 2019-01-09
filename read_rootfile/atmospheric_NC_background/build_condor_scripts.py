@@ -16,10 +16,11 @@ for index in range(num_scripts):
     filename = path + "script_NC_" + str(index) + ".sh"
 
     outfile = open(filename, 'w')
+    outfile.write("#!/bin/bash\n")
+    outfile.write("\n")
     outfile.write("# script to run JUNO detector simulation (tut_detsim.py) for atmospheric NC background:\n")
     outfile.write("\n")
-    outfile.write("#!/bin/bash\n")
-    outfile.write("export JUNO_OFFLINE_OFF=1\n")
+    outfile.write("# export JUNO_OFFLINE_OFF=1\n")
     outfile.write("# source latest offline software (global variables like "
                   "$TUTORIALROOT=/afs/ihep.ac.cn/soft/juno/JUNO-ALL-SLC6/Pre-Release/J18v2r1-branch/offline/"
                   "Examples/Tutorial are set):\n")

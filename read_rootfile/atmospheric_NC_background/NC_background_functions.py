@@ -70,7 +70,7 @@ class NCData:
 
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
-                            time_cut_min, time_cut_max, distance_cut):
+                            time_cut_min, time_cut_max, distance_cut, time_resolution, number_entries_input):
     """
     function to read the sample_detsim_user.root file and to get visible energy of the prompt signal of
     the IBD-like signals.
@@ -84,6 +84,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     :param time_cut_min: minimal time difference delayed to prompt in ns, normally time_cut_min = 600 ns
     :param time_cut_max: maximal time difference delayed to prompt in ns, normally time_cut_max = 1 ms = 1 000 000 ns
     :param distance_cut: distance cut between prompt and delayed signal in mm, normally distance_cut < 1.5 m = 1500 mm
+    :param time_resolution: time in ns, where two prompt signals can not be separated anymore,
+                            normally time_resolution =
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
 
     :return:
     """
@@ -106,10 +109,27 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
         number_events = 0
         print("ERROR: number of events in the Trees are NOT equal!!")
 
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        number_events = 0
+        print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
+        print("-> Detector Simulation not correct!!")
+
     # preallocate array of visible energy of prompt signal (energy in MeV) (np.array of float):
     e_vis = np.array([])
     # preallocate array, where event ID of the IBD like events is saved (np.array of float):
     evt_id_ibd = np.array([])
+
+    # preallocate number of events, where 2 prompt signal are added to 1 prompt signal:
+    number_2promptadded = 0
+    # preallocate number of events, where there are 3 or more prompt signal to 1 corresponding delayed signal:
+    number_3prompt_1delayed = 0
+    # preallocate number of events, where there are 2 prompt and only 1 corresponding delayed signal:
+    number_check1 = 0
+    # preallocate number of events, where there are 2 possible IBD signals:
+    number_check2 = 0
+    # preallocate number of events, where there are more than 3 prompt and more than 3 corresponding delayed signal:
+    number_check3 = 0
 
     # loop over every event, i.e. every event, in the TTree:
     for event in range(number_events):
@@ -316,6 +336,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             # (energy in MeV):
             array_e_vis = np.array([])
 
+            # preallocate array, where the index of the prompt signal of the IBD-like signal is stored:
+            array_prompt_index = np.array([])
+
             # loop over the possible prompt signals in the event:
             for index in range(len(index_prompt)):
                 # get the index of the prompt signal in the array:
@@ -346,6 +369,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                             # append visible energy of the prompt signal to the array (energy in MeV):
                             array_e_vis = np.append(array_e_vis, e_qdep[index_p])
 
+                            # append index to the array, where index of prompt signal is stored:
+                            array_prompt_index = np.append(array_prompt_index, index_p)
+
                         else:
                             continue
                     else:
@@ -371,7 +397,39 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             elif number_ibd_evts == 0:
                 continue
 
+            elif number_ibd_evts == 2:
+                # 2 possible prompt signal and only 1 corresponding delayed signals:
+                # calculate the time difference between the prompt signals in ns:
+                delta_t_pp = np.absolute(time_exit[int(array_prompt_index[0])] - time_exit[int(array_prompt_index[1])])
+
+                if time_resolution <= delta_t_pp <= time_cut_max:
+                    # this means, one prompt signal lies between the other prompt and the delayed signal and can be
+                    # separated from the other prompt signal. -> NO IBD-like signal -> go to next event:
+                    continue
+
+                elif delta_t_pp < time_resolution:
+                    # this means, that the two prompt signals can not be separated clearly -> treat the two prompt
+                    # signals as one prompt signal with energy = E_prompt1 + E_prompt2:
+
+                    # append evt_id of the IBD like signal to evt_id_ibd array:
+                    evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
+                    # append sum of Qedep of first prompt signal and Qedep of second prompt signal to e_vis array:
+                    e_vis = np.append(e_vis, array_e_vis[0] + array_e_vis[1])
+
+                    # check:
+                    number_2promptadded = number_2promptadded + 1
+                    print(evt_id)
+
+                else:
+                    # this means, one prompt signal is after the delayed signal (should be not possible):
+                    print("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after delayed "
+                          "signal")
+
             else:
+                # TODO-me: How to deal with events where there are 3 or more IBD-like events (but only one delayed sig.)
+                # to estimate the number of such events, increment variable number_2prompt_1delayed:
+                number_3prompt_1delayed = number_3prompt_1delayed + 1
                 print("WARNING: more than 1 IBD-like signal in event {2:d}: n_IBD_like = {0:.0f}, prompt = {1:.0f}"
                       .format(number_ibd_evts, check_prompt, evt_id))
                 print("-----------> not yet included!")
@@ -403,7 +461,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                                                (y_exit[index_p] - y_exit[index_d])**2 +
                                                (z_exit[index_p] - z_exit[index_d])**2)
 
-                        # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
+                        # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm):
                         if distance_p_d < distance_cut:
 
                             # increment number of IBD-like signals in this event:
@@ -501,6 +559,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
 
                 else:
                     # 0 or more than one IBD-like signals for this prompt signal in this event
+                    # (-> neutron multiplicity cut)
                     # -> go to the next prompt signal
                     continue
 
@@ -517,7 +576,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                 evt_id_ibd = np.append(evt_id_ibd, evt_id)
 
                 # get the index of the prompt signal in the event:
-                which_index = np.where(array_delayed_index == 1)[0]
+                which_index = np.where(array_number_ibd == 1)[0]
                 # check if there is just one entry equal to 1 in the array_delayed_index:
                 if len(which_index) == 1:
                     correct_prompt_index = which_index[0]
@@ -528,13 +587,51 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     print("ERROR in line 528")
                     continue
 
+            elif len(array_delayed_index) == 2:
+                # this means, that there are 2 possible IBD-like signals (2 prompt and 2 corresponding delayed signals)
+                # there are 2 possibilities:
+                # 1. the 'two' delayed signals could be the same. Then: 2 prompt signal and 1 corresponding delayed
+                # signal.
+                # 2. two different delayed signals. Therefore 2 possible IBD-like signals.
+                if array_delayed_index[0] == array_delayed_index[1]:
+                    # possibility 1:
+                    # to estimate the number of such events, increment variable number_check1:
+                    number_check1 = number_check1 + 1
+                else:
+                    # possibility 2:
+                    # to estimate the number of such events, increment variable number_check2:
+                    number_check2 = number_check2 + 1
+
+
             else:
-                print("WARNING: More than 1 possible prompt signal to only 1 possible delayed signal: evt ID = {0:d}, "
-                      "array_number_ibd = {1:d}, array_delayed_index = {2:d}"
-                      .format(evt_id, array_number_ibd, array_delayed_index))
+                # TODO-me: How to deal with events where there are 2 or more IBD-like events (but only one delayed sig.)
+                # to estimate the number of such events, increment variable number_check3:
+                number_check3 = number_check3 + 1
+                print("WARNING: More than 1 possible prompt signal to only 1 possible delayed signal: evt ID = {0:d}"
+                      .format(evt_id))
                 print("----------> not yet included!!!!")
 
-    return evt_id_ibd, e_vis
+
+    if number_2promptadded != 0:
+        print("number of events, where 2 prompt signals are added to 1 = {0:d}".format(number_2promptadded))
+
+    if number_3prompt_1delayed != 0:
+        print("number of events, with more than 1 prompt and just 1 delayed signal = {0:d}"
+              .format(number_3prompt_1delayed))
+
+    if number_check1 != 0:
+        print("number of events, with 2 prompt and just 1 delayed signal (prompt>1 AND delayed>1) = {0:d}"
+              .format(number_check1))
+
+    if number_check2 != 0:
+        print("number of events, with 2 possible delayed signals (prompt>1 AND delayed>1) = {0:d}"
+              .format(number_check2))
+
+    if number_check3 != 0:
+        print("number of events, with 3 prompt and 3 or less delayed signal (prompt>1 AND delayed>1) = {0:d}"
+              .format(number_check3))
+
+    return number_events, evt_id_ibd, e_vis
 
 
 def convert_genie_file_for_generator(rootfile_input, path_output):

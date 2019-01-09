@@ -3,8 +3,6 @@
     The original GENIE root file of Julia is read with "read_GENIE_file.py" and the fractions of the interaction
     channels for the different isotopes are saved in file "interaction_channels_qel_NC_201617evts.txt".
 
-    Only events, that are QEL and NC, are stored in the txt file.
-
     This txt file is edited in "interaction_channels_edit.ods" (also the file "interaction_channels_NC_318097evts.txt"
     is edited in this libre office file). The calculated fraction are defined as
     number_of_events/number_of_total_events, where the total events are all NC and QEL events (channels with targets
