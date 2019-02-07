@@ -35,8 +35,10 @@
 import ROOT
 from array import array
 import glob
+import sys
 import numpy as np
 from matplotlib import pyplot as plt
+import xml.etree.ElementTree as ET
 
 """
 class NCData:
@@ -70,7 +72,7 @@ class NCData:
 
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
-                            time_cut_min, time_cut_max, distance_cut, time_resolution):
+                            time_cut_min, time_cut_max, distance_cut, time_resolution, number_entries_input):
     """
     function to read the sample_detsim_user.root file and to get visible energy of the prompt signal of
     the IBD-like signals.
@@ -86,6 +88,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     :param distance_cut: distance cut between prompt and delayed signal in mm, normally distance_cut < 1.5 m = 1500 mm
     :param time_resolution: time in ns, where two prompt signals can not be separated anymore,
                             normally time_resolution =
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
 
     :return:
     """
@@ -105,8 +108,17 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     if number_events_geninfo == number_events_prmtrkdep:
         number_events = number_events_geninfo
     else:
-        number_events = 0
-        print("ERROR: number of events in the Trees are NOT equal!!")
+        # number_events = 0
+        # print("ERROR: number of events in the Trees are NOT equal!!")
+        sys.exit("ERROR: number of events in t Trees are NOT equal!!")
+
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        # number_events = 0
+        # print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
+        # print("-> Detector Simulation not correct!!")
+        sys.exit("ERROR: number of events are not equal to {O:d} -> Detector Simulation not correct!"
+                 .format(number_entries_input))
 
     # preallocate array of visible energy of prompt signal (energy in MeV) (np.array of float):
     e_vis = np.array([])
@@ -217,15 +229,17 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
         if evt_id_prmtrkdep == evt_id_geninfo:
             evt_id = evt_id_geninfo
         else:
-            evt_id = 0
-            print("ERROR: event ID in the Trees are NOT equal!!")
+            # evt_id = 0
+            # print("ERROR: event ID in the Trees are NOT equal!!")
+            sys.exit("ERROR: event ID in the Trees are NOT equal!")
 
         # check number of initial particles of the Trees:
         if n_par_prmtrkdep == n_par_geninfo:
             n_par = n_par_geninfo
         else:
-            n_par = 0
-            print("ERROR: number of initial particles in the Trees are NOT equal!!")
+            # n_par = 0
+            # print("ERROR: number of initial particles in the Trees are NOT equal!!")
+            sys.exit("ERROR: number of initial particles in the Trees are NOT equal!")
 
         # loop over the number of particles to get information about every particle in the event:
         for index in range(n_par):
@@ -378,8 +392,10 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             if number_ibd_evts == 1:
                 # check, if len(array_e_vis) is also equal to 1:
                 if number_ibd_evts != len(array_e_vis):
-                    print("ERROR: Number of IBD-like events different to length of 'array_e_vis' (evt_ID = {0:d})"
-                          .format(evt_id))
+                    # print("ERROR: Number of IBD-like events different to length of 'array_e_vis' (evt_ID = {0:d})"
+                    #       .format(evt_id))
+                    sys.exit("ERROR: Number of IBD-like events different to length of 'array_e_vis' (evt_ID = {0:d})"
+                             .format(evt_id))
 
                 # append evt_id of the IBD like signal to evt_id_ibd array:
                 evt_id_ibd = np.append(evt_id_ibd, evt_id)
@@ -625,6 +641,499 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
               .format(number_check3))
 
     return number_events, evt_id_ibd, e_vis
+
+
+def number_c12_atoms(radius_cut):
+    """
+    function to calculate the number of C12 atoms in the JUNO liquid scintillator for a specific volume of the central
+    detector.
+
+    :param radius_cut: radius, which defines the fiducial volume in the central detector in meter, normally 17m is used
+    as radius of the fiducial volume like in the calculation of the IBD detection efficiency on page 39 of the yellow
+    book (float)
+    :return: number of C12 atoms (float)
+    """
+    # there are 20 ktons LS (which mainly contains LAB) in the central detector with R = 17.7 m.
+    # mass LS in ktons:
+    mass_ls = 20
+    # radius of central detector in meter:
+    radius_cd = 17.7
+    # INFO-me: approximation, that LS consists only of LAB
+    # mass of LS for volume cut with 'radius_cut' in tons:
+    mass_ls_cut = radius_cut**3 / radius_cd**3 * mass_ls * 1000
+
+    # the number of C12 atoms depends on the structure formula of LAB. LAB is C_6 H_5 C_n H_(2n+1), where n = 10, 11,
+    # 12 or 13. Therefore the number of C12 atoms must be calculated for n= 10, 11, 12 and 13.
+
+    " number of C12 in one LAB molecule: "
+    num_c12_lab_n10 = 16
+    num_c12_lab_n11 = 17
+    num_c12_lab_n12 = 18
+    num_c12_lab_n13 = 19
+
+    # atomic mass number u in tons:
+    u_in_tons = 1.6605 * 10**(-30)
+
+    " mass of one LAB molecule in tons "
+    mass_lab_n10 = (num_c12_lab_n10*12 + 26*1) * u_in_tons
+    mass_lab_n11 = (num_c12_lab_n11*12 + 28*1) * u_in_tons
+    mass_lab_n12 = (num_c12_lab_n12*12 + 30*1) * u_in_tons
+    mass_lab_n13 = (num_c12_lab_n13*12 + 32*1) * u_in_tons
+
+    # number of C12 for different n:
+    number_c12_n10 = mass_ls_cut / mass_lab_n10 * num_c12_lab_n10
+    number_c12_n11 = mass_ls_cut / mass_lab_n11 * num_c12_lab_n11
+    number_c12_n12 = mass_ls_cut / mass_lab_n12 * num_c12_lab_n12
+    number_c12_n13 = mass_ls_cut / mass_lab_n13 * num_c12_lab_n13
+
+    # to calculate the number of C12 atoms for this fiducial volume, take the average:
+    number_c12_cut = (number_c12_n10 + number_c12_n11 + number_c12_n12 + number_c12_n13) / 4
+
+    return number_c12_cut
+
+
+def read_xml_xsec(path_file, interval_e):
+    """
+    function to read xml-file, where the cross-sections of GENIE (gxspl-FNALsmall.xml) are save. These cross-section are
+    also used in the GENIE simulation of Julia, where the interactions of neutrinos with C12 are simulated.
+
+    :param path_file: path to the xml-file, where cross-sections are saved (gxspl-FNALsmall_nue.xml,
+                      gxspl-FNALsmall_nuebar.xml, gxspl-FNALsmall_numu.xml, gxspl-FNALsmall_numubar.xml) (string)
+    :param interval_e: energy interval (bin-width) in MeV
+
+    :return: cross_section: sum of cross-section for certain neutrino flavor in cm**2 as function of the energy
+    (array of float)
+    """
+
+    # read xml file:
+    tree = ET.parse(path_file)
+    # get root from xml file, root = genie_xsec_spline_list:
+    root = tree.getroot()
+
+    # preallocate energy-array in MeV:
+    energy = np.arange(0, 10000+interval_e, interval_e)
+    # preallocate cross-section array in cm**2:
+    cross_section = np.zeros(len(energy))
+
+    # loop over root, child = spline
+    for child in root:
+        # get attrib of child (dict):
+        spline = child.attrib
+
+        # get the name attribute from spline-dictionary
+        # (e.g. spline_name = 'genie::AhrensNCELPXSec/Default/nu:14;tgt:1000060120;N:2112;proc:Weak[NC],QES;',
+        # type=string)
+        spline_name = spline.get('name')
+        # print(spline_name)
+
+        # INFO-me: for E=0MeV, set xsec=0cm**2 -> if not, interp sets all values below 10 MeV to value of xsec(10MeV)!
+        # preallocate energy-array for this knot (MeV):
+        e_spline = np.array([0])
+        # preallocate cross-section-array for this knot (in cm**2):
+        xsec_spline = np.array([0])
+
+        # loop over child, subchild = knot, subchild is list with 2 values, first value = E, second value = xsec:
+        for subchild in child:
+            # get the value of E in GeV (string)
+            e = subchild[0].text
+            # convert to float and MeV:
+            e = float(e) * 1000
+
+            # get the value of cross-section in natural units (xsec) (string):
+            xsec = subchild[1].text
+            # convert to float and cm**2 (natural unit: 1/GeV**2 entspricht 3.89391289*10**(-28) cm**2):
+            xsec = float(xsec) * 3.89391289 * 10**(-28)
+
+            # append e to energy array:
+            e_spline = np.append(e_spline, e)
+            # append xsec to cross-section-array:
+            xsec_spline = np.append(xsec_spline, xsec)
+
+        # interpolate the cross-section of this spline to array "energy" to have the same bin-width and energy range for
+        # all cross-section (also same bin-width and energy range like the fluxes):
+        xsec_interp = np.interp(energy, e_spline, xsec_spline)
+
+        # add cross-section to the total cross-section in cm**2:
+        cross_section = cross_section + xsec_interp
+
+    return cross_section
+
+
+def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxplot, plot_evt_rate, show_evt_rate,
+               save_evt_rate):
+    """
+    function to calculate the event rate of the atmospheric NC background in JUNO
+    (equation: dN/dT(E) = A * fluxes * cross_sections):
+
+    - 4*pi: factor to compensate that the flux is given in unit 1/sr
+
+    - A: number of C12 atoms in the fiducial volume of the LS in JUNO, given by function number_c12_atoms(radius_cut)
+
+    - fluxes for nu_e, nu_e_bar, nu_mu and nu_mu_bar:
+        - fluxes of HONDA for JUNO site from 100 MeV to 10 GeV (4*pi: factor to compensate that the flux is given
+        in unit 1/sr)
+        - for energies below 100 MeV: take the shape of the simulation of FLUKA for Super-K location and normalize it
+        to the HONDA flux
+        - the total flux for nu_e, nu_e_bar, nu_mu and nu_mu_bar adding these two fluxes. The flux is then given from
+        0 MeV to 10 GeV (bin-width in energy given by interval_energy)
+
+    - neutrino neutral current interaction cross-sections on C12 (cross-section from GENIE:
+    /home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall.xml, (also used in
+    GENIE simulation)):
+        - use function 'read_xml_xsec()':
+        - cross-section of all 4 flavour: nu_e, nu_e_bar, nu_mu, nu_mu_bar
+        - cross-section from 0 MeV to 10 GeV with a bin-width specified by 'interval_e'
+        - for each flavour: total cross-section is sum of the cross-sections of different production channels
+        (QES: quasi-elastic scattering, DIS: deep inelastic scattering, RES: resonant neutrino scattering,
+        COH: coherent neutrino scattering)
+        - cross-sections of gxspl-FNALsmall.xml are copied to 4 smaller xml-files:
+        gxspl-FNALsmall_nue.xml, gxspl-FNALsmall_nuebar.xml, gxspl-FNALsmall_numu.xml, gxspl-FNALsmall_numubar.xml
+    
+    :param interval_energy: energy interval (bin-width) in MeV (float)
+    :param radius_cut: radius, which defines the fiducial volume in the central detector in meter (normally 17m is used
+    as radius of the fiducial volume like in the calculation of the IBD detection efficiency on page 39 of the yellow
+    book) (float)
+    :param plot_flux: if True, flux is plotted (boolean)
+    :param show_fluxplot: if True, plot of flux is shown (boolean)
+    :param save_fluxplot: if True, plot of flux is saved (boolean)
+    :param plot_evt_rate: if True, event rate is plotted as function of energy (boolean)
+    :param show_evt_rate: if True, plot of event rate is shown (boolean)
+    :param save_evt_rate: if True, plot of event rate is saved (boolean)
+
+    :return: event_rate: event rate of atmospheric NC neutrino interactions in JUNO in events/second (float)
+    """
+
+    """ calculate the neutrino fluxes for all 4 flavours: """
+
+    """ Results of the FLUKA simulation (from the paper of Battistoni2005 'The atmospheric neutrino fluxes below 
+    100 MeV: The FLUKA results'): """
+    # Neutrino energy in MeV from table 3 from paper 1-s2.0-S0927650505000526-main (np.array of float):
+    energy_fluka = np.array([0, 13, 15, 17, 19, 21, 24, 27, 30, 33, 38, 42, 47, 53, 60, 67, 75, 84, 94, 106, 119, 133,
+                             150, 168, 188, 211, 237, 266, 299, 335, 376, 422, 473, 531, 596, 668, 750, 841, 944])
+
+    # differential flux from FLUKA in energy for no oscillation for electron-neutrinos for solar average at the site
+    # of Super-Kamiokande, in (MeV**(-1) * cm**(-2) * s**(-1)) (np.array of float).
+    # Assumption: for energy = 0 MeV, the flux is also 0!
+    flux_nue_fluka = 10 ** (-4) * np.array([0, 69.6, 74.6, 79.7, 87.4, 94.2, 101., 103., 109., 108., 107., 101., 88.5,
+                                            69.6, 64.4, 59.3, 54.3, 49.7, 45.1, 40.6, 35.8, 31.7, 27.3, 23.9, 20.4,
+                                            17.0, 14.5, 12.0, 9.96, 8.11, 6.62, 5.27, 4.23, 3.37, 2.66, 2.09, 1.62,
+                                            1.24, 0.950])
+
+    # differential flux from FLUKA in energy for no oscillation for electron-antineutrinos for solar average at the site
+    # of Super-Kamiokande, in (MeV**(-1) * cm**(-2) * s**(-1)) (np.array of float).
+    # Assumption: for energy = 0 MeV, the flux is also 0!
+    flux_nuebar_fluka = 10 ** (-4) * np.array([0, 63.7, 69.7, 79.5, 84.2, 89.4, 95.0, 99.3, 103., 104., 101., 96.1,
+                                               83.5, 65.9, 60.0, 56.4, 51.4, 46.3, 43.0, 37.2, 32.9, 28.8, 24.9, 21.3,
+                                               18.3, 15.4, 12.9, 10.6, 8.80, 7.13, 5.75, 4.60, 3.68, 2.88, 2.28,
+                                               1.87, 1.37, 1.06, 0.800])
+
+    # differential flux from FLUKA in energy for no oscillation for muon-neutrinos for solar average at the site
+    # of Super-Kamiokande, in (MeV**(-1) * cm**(-2) * s**(-1)) (np.array of float).
+    # Assumption: for energy = 0 MeV, the flux is also 0!
+    flux_numu_fluka = 10 ** (-4) * np.array([0, 114., 124., 138., 146., 155., 159., 164., 181., 174., 179., 178., 176.,
+                                             153., 131., 123., 114., 107., 96.3, 84.2, 72.7, 63.5, 55.2, 47.7, 41.2,
+                                             34.4, 28.4, 23.6, 19.6, 15.8, 12.8, 10.3, 8.20, 6.49, 5.15, 3.98, 3.13,
+                                             2.41, 1.82])
+
+    # differential flux from FLUKA in energy for no oscillation for muon-antineutrinos for solar average at the site of
+    # Super-K, in (MeV**(-1) * cm**(-2) * s**(-1)) (np.array of float).
+    # Assumption: for energy = 0 MeV, the flux is also 0!
+    flux_numubar_fluka = 10 ** (-4) * np.array([0, 116., 128., 136., 150., 158., 162., 170., 196., 177., 182., 183.,
+                                                181., 155., 132., 123., 112., 101., 92.1, 82.2, 72.5, 64.0, 55.6,
+                                                47.6, 40.8, 34.1, 28.6, 23.5, 19.3, 15.7, 12.6, 10.2, 8.15, 6.48,
+                                                5.02, 3.94, 3.03, 2.33, 1.79])
+
+    """ Results of the HONDA simulation (based on the paper of Honda2015: 'Atmospheric neutrino flux calculation using
+    the NRLMSISE-00 atmospheric model'), (for solar maximum (HONDA_juno-ally-01-01-solmax.d)): """
+    # Neutrino energy in MeV from the table from file HONDA_juno-ally-01-01-solmax.d (np.array of float):
+    energy_honda = 10 ** 3 * np.array([1.0000E-01, 1.1220E-01, 1.2589E-01, 1.4125E-01, 1.5849E-01, 1.7783E-01,
+                                       1.9953E-01, 2.2387E-01, 2.5119E-01, 2.8184E-01, 3.1623E-01, 3.5481E-01,
+                                       3.9811E-01, 4.4668E-01, 5.0119E-01, 5.6234E-01, 6.3096E-01, 7.0795E-01,
+                                       7.9433E-01, 8.9125E-01, 1.0000E+00, 1.1220E+00, 1.2589E+00, 1.4125E+00,
+                                       1.5849E+00, 1.7783E+00, 1.9953E+00, 2.2387E+00, 2.5119E+00, 2.8184E+00,
+                                       3.1623E+00, 3.5481E+00, 3.9811E+00, 4.4668E+00, 5.0119E+00, 5.6234E+00,
+                                       6.3096E+00, 7.0795E+00, 7.9433E+00, 8.9125E+00, 1.0000E+01])
+
+    # all-direction averaged flux for no oscillation for electron-neutrinos for solar maximum at the site of JUNO
+    # (WITHOUT mountain over the detector), in (MeV**(-1) * cm**(-2) * s**(-1) * sr**(-1)) (np.array of float):
+    flux_nue_max_honda = 10 ** (-7) * np.array([2.7743E+03, 2.4562E+03, 2.1530E+03, 1.8723E+03, 1.6181E+03, 1.3882E+03,
+                                                1.1819E+03, 9.9837E+02, 8.3703E+02, 6.9614E+02, 5.7337E+02, 4.6903E+02,
+                                                3.8128E+02, 3.0772E+02, 2.4680E+02, 1.9673E+02, 1.5600E+02, 1.2295E+02,
+                                                9.6275E+01, 7.4975E+01, 5.8069E+01, 4.4733E+01, 3.4262E+01, 2.6103E+01,
+                                                1.9770E+01, 1.4881E+01, 1.1137E+01, 8.2775E+00, 6.1088E+00, 4.4822E+00,
+                                                3.2629E+00, 2.3653E+00, 1.7104E+00, 1.2266E+00, 8.7045E-01, 6.1557E-01,
+                                                4.3368E-01, 3.0448E-01, 2.1286E-01, 1.4843E-01, 1.0281E-01])
+
+    # all-direction averaged flux for no oscillation for electron-antineutrinos for solar maximum at the site of JUNO
+    # (WITHOUT mountain over the detector), in (MeV**(-1) * cm**(-2) * s**(-1) * sr**(-1)) (np.array of float):
+    flux_nuebar_max_honda = 10 ** (-7) * np.array([2.7733E+03, 2.4332E+03, 2.1124E+03, 1.8187E+03, 1.5545E+03,
+                                                   1.3190E+03, 1.1105E+03, 9.2820E+02, 7.7040E+02, 6.3403E+02,
+                                                   5.1790E+02, 4.1997E+02, 3.3811E+02, 2.7054E+02, 2.1539E+02,
+                                                   1.7049E+02, 1.3418E+02, 1.0499E+02, 8.1651E+01, 6.3166E+01,
+                                                   4.8654E+01, 3.7230E+01, 2.8329E+01, 2.1428E+01, 1.6121E+01,
+                                                   1.2064E+01, 8.9697E+00, 6.6258E+00, 4.8598E+00, 3.5435E+00,
+                                                   2.5685E+00, 1.8478E+00, 1.3252E+00, 9.4491E-01, 6.6836E-01,
+                                                   4.7226E-01, 3.3159E-01, 2.3192E-01, 1.6107E-01, 1.1131E-01,
+                                                   7.7823E-02])
+
+    # all-direction averaged flux for no oscillation for muon-neutrinos for solar maximum at the site of JUNO
+    # (WITHOUT mountain over the detector), in (MeV**(-1) * cm**(-2) * s**(-1) * sr^(-1)) (np.array of float):
+    flux_numu_max_honda = 10 ** (-7) * np.array([5.7913E+03, 5.0884E+03, 4.4520E+03, 3.8714E+03, 3.3388E+03, 2.8520E+03,
+                                                 2.4128E+03, 2.0226E+03, 1.6807E+03, 1.3858E+03, 1.1351E+03, 9.2472E+02,
+                                                 7.4912E+02, 6.0324E+02, 4.8323E+02, 3.8514E+02, 3.0543E+02, 2.4122E+02,
+                                                 1.8959E+02, 1.4845E+02, 1.1579E+02, 8.9940E+01, 6.9618E+01, 5.3647E+01,
+                                                 4.1114E+01, 3.1343E+01, 2.3751E+01, 1.7914E+01, 1.3453E+01, 1.0049E+01,
+                                                 7.4735E+00, 5.5296E+00, 4.0719E+00, 2.9889E+00, 2.1817E+00, 1.5909E+00,
+                                                 1.1558E+00, 8.3657E-01, 6.0575E-01, 4.3508E-01, 3.1237E-01])
+
+
+    # all-direction averaged flux for no oscillation for muon-antineutrinos for solar maximum at the site of JUNO
+    # (WITHOUT mountain over the detector), in (MeV**(-1) * cm**(-2) * s**(-1) * sr^(-1)) (np.array of float):
+    flux_numubar_max_honda = 10 ** (-7) * np.array([5.8966E+03, 5.1676E+03, 4.5104E+03, 3.9127E+03, 3.3665E+03,
+                                                    2.8701E+03, 2.4238E+03, 2.0277E+03, 1.6821E+03, 1.3857E+03,
+                                                    1.1333E+03, 9.2144E+02, 7.4476E+02, 5.9875E+02, 4.7865E+02,
+                                                    3.8024E+02, 3.0060E+02, 2.3645E+02, 1.8519E+02, 1.4444E+02,
+                                                    1.1204E+02, 8.6529E+01, 6.6529E+01, 5.0910E+01, 3.8731E+01,
+                                                    2.9299E+01, 2.2048E+01, 1.6504E+01, 1.2291E+01, 9.1084E+00,
+                                                    6.7266E+00, 4.9403E+00, 3.6136E+00, 2.6356E+00, 1.9115E+00,
+                                                    1.3828E+00, 9.9752E-01, 7.1482E-01, 5.1189E-01, 3.6743E-01,
+                                                    2.6256E-01])
+
+    """ to compensate unit 1/sr from HONDA fluxes, multiply fluxes with 4*pi: """
+    flux_nue_max_honda = flux_nue_max_honda * 4*np.pi
+    flux_nuebar_max_honda = flux_nuebar_max_honda * 4*np.pi
+    flux_numu_max_honda = flux_numu_max_honda * 4*np.pi
+    flux_numubar_max_honda = flux_numubar_max_honda * 4*np.pi
+
+    """ Extrapolate the HONDA flux to the energies of the FLUKA simulation from 0 MeV to 100 MeV: """
+    """ Assumption:
+        1. the shape of the FLUKA flux as function of energy do NOT depend on the location
+            -> the shape of the flux at Super-K can also be used at JUNO site
+
+        2. the absolute value of the FLUKA flux at Super-K should be normalized to the location of JUNO
+            ->  therefore get the normalization factor by comparing the HONDA flux and the FLUKA flux in the energy 
+                range from 100 MeV to 10 GeV        
+    """
+    # define the energy range from 0 MeV to 10000 MeV, corresponding to flux_nue_juno (array of float):
+    energy_neutrino = np.arange(0, 10000 + interval_energy, interval_energy)
+
+    # define the energy-array, in which the normalization will be calculated (neutrino energy in MeV)
+    # (np.array of float):
+    energy_norm = np.arange(min(energy_honda), max(energy_fluka) + 0.1, 0.1)
+
+    """ For electron neutrinos: """
+    # Interpolate the flux of FLUKA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_nue_fluka_interpolated = np.interp(energy_norm, energy_fluka, flux_nue_fluka)
+
+    # Interpolate the flux of HONDA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_nue_honda_interpolated = np.interp(energy_norm, energy_honda, flux_nue_max_honda)
+
+    # Calculate the integral of the FLUKA flux in the energy range given by energy_norm (float):
+    integral_nue_fluka = np.trapz(flux_nue_fluka_interpolated, energy_norm)
+
+    # Calculate the integral of the HONDA flux in the energy range given by energy_norm (float):
+    integral_nue_honda = np.trapz(flux_nue_honda_interpolated, energy_norm)
+
+    # Interpolate the part of the FLUKA flux in the energy range from 0 MeV to 99.9 MeV, in 1/(MeV*s*cm**2)
+    # (np.array of float):
+    flux_nue_fluka_interesting = np.interp(np.arange(0, 100, interval_energy), energy_fluka, flux_nue_fluka)
+
+    # Normalize flux_nue_fluka_interesting at Super-K to the electron-neutrino flux at JUNO,
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_nue_fluka_norm = flux_nue_fluka_interesting * integral_nue_honda / integral_nue_fluka
+
+    # interpolate flux_nue_max_honda in the energy range from 100 to 10000 MeV, in 1/(MeV*s*cm^2) (np.array of float):
+    flux_nue_honda_interp = np.interp(np.arange(100, 10000+interval_energy, interval_energy), energy_honda,
+                                      flux_nue_max_honda)
+
+    # combine the normalized flux of FLUKA with the flux of HONDA (from 0 MeV to 100 MeV: FLUKA, above 100 MeV: Honda)
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_nue_juno = np.append(flux_nue_fluka_norm, flux_nue_honda_interp)
+
+    """ For electron antineutrinos: """
+    # Interpolate the flux of FLUKA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_nuebar_fluka_interpolated = np.interp(energy_norm, energy_fluka, flux_nuebar_fluka)
+
+    # Interpolate the flux of HONDA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_nuebar_honda_interpolated = np.interp(energy_norm, energy_honda, flux_nuebar_max_honda)
+
+    # Calculate the integral of the FLUKA flux in the energy range given by energy_norm (float):
+    integral_nuebar_fluka = np.trapz(flux_nuebar_fluka_interpolated, energy_norm)
+
+    # Calculate the integral of the HONDA flux in the energy range given by energy_norm (float):
+    integral_nuebar_honda = np.trapz(flux_nuebar_honda_interpolated, energy_norm)
+
+    # Interpolate the part of the FLUKA flux in the energy range from 0 MeV to 99.9 MeV, in 1/(MeV*s*cm**2)
+    # (np.array of float):
+    flux_nuebar_fluka_interesting = np.interp(np.arange(0, 100, interval_energy), energy_fluka, flux_nuebar_fluka)
+
+    # Normalize flux_nuebar_fluka_interesting at Super-K to the electron-antineutrino flux at JUNO,
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_nuebar_fluka_norm = flux_nuebar_fluka_interesting * integral_nuebar_honda / integral_nuebar_fluka
+
+    # interpolate flux_nuebar_max_honda in the energy range from 100 to 10000 MeV, in 1/(MeV*s*cm^2)
+    # (np.array of float):
+    flux_nuebar_honda_interp = np.interp(np.arange(100, 10000+interval_energy, interval_energy), energy_honda,
+                                         flux_nuebar_max_honda)
+
+    # combine the normalized flux of FLUKA with the flux of HONDA (from 0 MeV to 100 MeV: FLUKA, above 100 MeV: Honda)
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_nuebar_juno = np.append(flux_nuebar_fluka_norm, flux_nuebar_honda_interp)
+
+    """ For muon neutrinos: """
+    # Interpolate the flux of FLUKA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_numu_fluka_interpolated = np.interp(energy_norm, energy_fluka, flux_numu_fluka)
+
+    # Interpolate the flux of HONDA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_numu_honda_interpolated = np.interp(energy_norm, energy_honda, flux_numu_max_honda)
+
+    # Calculate the integral of the FLUKA flux in the energy range given by energy_norm (float):
+    integral_numu_fluka = np.trapz(flux_numu_fluka_interpolated, energy_norm)
+
+    # Calculate the integral of the HONDA flux in the energy range given by energy_norm (float):
+    integral_numu_honda = np.trapz(flux_numu_honda_interpolated, energy_norm)
+
+    # Interpolate the part of the FLUKA flux in the energy range from 0 MeV to 99.9 MeV, in 1/(MeV*s*cm**2)
+    # (np.array of float):
+    flux_numu_fluka_interesting = np.interp(np.arange(0, 100, interval_energy), energy_fluka, flux_numu_fluka)
+
+    # Normalize flux_numu_fluka_interesting at Super-K to the muon-neutrino flux at JUNO,
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_numu_fluka_norm = flux_numu_fluka_interesting * integral_numu_honda / integral_numu_fluka
+
+    # interpolate flux_numu_max_honda in the energy range from 100 to 10000 MeV, in 1/(MeV*s*cm^2)
+    # (np.array of float):
+    flux_numu_honda_interp = np.interp(np.arange(100, 10000+interval_energy, interval_energy), energy_honda,
+                                       flux_numu_max_honda)
+
+    # combine the normalized flux of FLUKA with the flux of HONDA (from 0 MeV to 100 MeV: FLUKA, above 100 MeV: Honda)
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_numu_juno = np.append(flux_numu_fluka_norm, flux_numu_honda_interp)
+
+    """ For muon antineutrinos: """
+    # Interpolate the flux of FLUKA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_numubar_fluka_interpolated = np.interp(energy_norm, energy_fluka, flux_numubar_fluka)
+
+    # Interpolate the flux of HONDA to get the differential flux in the energy range from 100 MeV to 950 MeV,
+    # in 1/(MeV * cm**2 * s) (np.array of float):
+    flux_numubar_honda_interpolated = np.interp(energy_norm, energy_honda, flux_numubar_max_honda)
+
+    # Calculate the integral of the FLUKA flux in the energy range given by energy_norm (float):
+    integral_numubar_fluka = np.trapz(flux_numubar_fluka_interpolated, energy_norm)
+
+    # Calculate the integral of the HONDA flux in the energy range given by energy_norm (float):
+    integral_numubar_honda = np.trapz(flux_numubar_honda_interpolated, energy_norm)
+
+    # Interpolate the part of the FLUKA flux in the energy range from 0 MeV to 99.9 MeV, in 1/(MeV*s*cm**2)
+    # (np.array of float):
+    flux_numubar_fluka_interesting = np.interp(np.arange(0, 100, interval_energy), energy_fluka, flux_numubar_fluka)
+
+    # Normalize flux_numubar_fluka_interesting at Super-K to the muon-antineutrino flux at JUNO,
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_numubar_fluka_norm = flux_numubar_fluka_interesting * integral_numubar_honda / integral_numubar_fluka
+
+    # interpolate flux_numubar_max_honda in the energy range from 100 to 10000 MeV, in 1/(MeV*s*cm^2)
+    # (np.array of float):
+    flux_numubar_honda_interp = np.interp(np.arange(100, 10000+interval_energy, interval_energy), energy_honda,
+                                          flux_numubar_max_honda)
+
+    # combine the normalized flux of FLUKA with the flux of HONDA (from 0 MeV to 100 MeV: FLUKA, above 100 MeV: Honda)
+    # in 1/(MeV * s * cm**2) (np.array of float):
+    flux_numubar_juno = np.append(flux_numubar_fluka_norm, flux_numubar_honda_interp)
+
+    if plot_flux:
+        h1 = plt.figure(1, figsize=(15, 8))
+        plt.semilogy(energy_neutrino, flux_nue_juno, "r--", label="$\\nu_e$")
+        plt.semilogy(energy_neutrino, flux_nuebar_juno, "g--", label="$\\bar{\\nu}_e$")
+        plt.semilogy(energy_neutrino, flux_numu_juno, "b--", label="$\\nu_\\mu$")
+        plt.semilogy(energy_neutrino, flux_numubar_juno, "m--", label="$\\bar{\\nu}_\\mu$")
+        plt.semilogy(energy_neutrino, flux_nue_juno + flux_nuebar_juno + flux_numu_juno + flux_numubar_juno, "k",
+                     label="total flux")
+        plt.xlabel("Neutrino energy $E_{\\nu}$ in MeV")
+        plt.ylabel("Neutrino flux in (MeV $\\cdot$ s $\\cdot$ cm$^2$)$^{(-1)}$")
+        plt.title("Neutrino fluxes at JUNO site")
+        plt.xlim(xmin=0.0, xmax=10000.0)
+        plt.ylim(ymin=1E-8)
+        plt.legend()
+        plt.grid()
+
+        if show_fluxplot:
+            plt.show()
+
+        if save_fluxplot:
+            plt.savefig("/home/astro/blum/juno/atmoNC/data_NC/output_detsim/neutrino_flux.png")
+            plt.close(h1)
+
+
+    """ Calculate the interaction cross-sections of neutrinos with C12 for each neutrino flavour: """
+    # for electron-neutrino:
+    # define path, where cross-sections are saved (string):
+    path_xsec_nue = \
+        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_nue.xml"
+    # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
+    xsec_nue = read_xml_xsec(path_xsec_nue, interval_energy)
+
+    # for electron-antineutrino:
+    # define path, where cross-sections are saved (string):
+    path_xsec_nuebar = \
+        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_nuebar.xml"
+    # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
+    xsec_nuebar = read_xml_xsec(path_xsec_nuebar, interval_energy)
+
+    # for muon-neutrino:
+    # define path, where cross-sections are saved (string):
+    path_xsec_numu = \
+        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_numu.xml"
+    # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
+    xsec_numu = read_xml_xsec(path_xsec_numu, interval_energy)
+
+    # for muon-antineutrino:
+    # define path, where cross-sections are saved (string):
+    path_xsec_numubar = \
+        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_numubar.xml"
+    # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
+    xsec_numubar = read_xml_xsec(path_xsec_numubar, interval_energy)
+
+
+    """ Calculate the number of C12 atoms in the LS for fiducial volume with radius = radius_cut: """
+    # number of C12 atoms in fiducial volume (float):
+    number_c12 = number_c12_atoms(radius_cut)
+
+    """ Event rate of atmospheric NC neutrino interactions in JUNO as function of energy: """
+    # event rate as function of energy in events/(MeV * s) (array of float) (equ. 1 in AtmNeuBkgStudies_DocDB3884.pdf):
+    evt_rate_per_energy = number_c12 * (flux_nue_juno * xsec_nue + flux_nuebar_juno * xsec_nuebar +
+                                        flux_numu_juno * xsec_numu + flux_numubar_juno * xsec_numubar)
+
+    if plot_evt_rate:
+        h2 = plt.figure(2, figsize=(15, 8))
+        plt.plot(energy_neutrino, evt_rate_per_energy, "b")
+        plt.xlabel("Neutrino energy $E_{\\nu}$ in MeV")
+        plt.ylabel("Event rate in evts/(MeV $\\cdot$ s)")
+        plt.title("Event rate of atmospheric NC neutrino interaction in JUNO detector")
+        plt.xlim(xmin=0.0, xmax=10000.0)
+        plt.ylim(ymin=0.0)
+        plt.grid()
+
+        if show_evt_rate:
+            plt.show()
+
+        if save_evt_rate:
+            plt.savefig("/home/astro/blum/juno/atmoNC/data_NC/output_detsim/event_rate.png")
+            plt.close(h2)
+
+
+    """ Event rate of atmospheric NC neutrino interactions in JUNO: """
+    # integrate evt_rate_per_energy over the energy to get the total event rate in events/s (float):
+    event_rate = np.trapz(evt_rate_per_energy, energy_neutrino)
+
+    return event_rate
 
 
 def convert_genie_file_for_generator(rootfile_input, path_output):
@@ -2995,7 +3504,7 @@ def get_target_ratio(projectile_energy, target_pdg, bin_width):
     events_electron, bins1 = np.histogram(energy_nu_electron, energy_range)
     events_s32, bins1 = np.histogram(energy_nu_s32, energy_range)
 
-    # TODO: the event rate and exposure time is NOT included yet!!!
+    # TODO-me: the event rate and exposure time is NOT included yet!!!
 
     return energy_range, events_c12, events_proton, events_n14, events_o16, events_electron, events_s32, \
            n_c12, n_proton, n_n14, n_o16, n_electron, n_s32, \
