@@ -40,36 +40,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 import xml.etree.ElementTree as ET
 
-"""
-class NCData:
-    def __init__(self):  # this method creates the class object.
-        # event ID (starts from 0):
-        self.eventID = 0
-        # PDG ID of the projectile (i.e. which neutrino is interacting):
-        self.projectilePDG = 0
-        # energy of the incoming neutrino in GeV:
-        self.projectileEnergy = 0
-        # PDG ID of the target particle (either C12 or proton):
-        self.targetPDG = 0
-        # Channel ID of the NC interaction, represents which particles are produced via the NC interaction:
-        self.NCinteration_ch_ID = 0
-        # Channel ID of the deexcitation, represents which particles are produced via the deexication of the produced
-        # excited isotope:
-        self.deexcitation_ID = 0
-        # PDG ID of the isotope after the NC interaction, BUT before the deexcitation:
-        self.isotopePDG = 0
-        # number of final particles after NC interactions and deexcitation:
-        self.Nparticles = 0
-        # PDG ID of the final particles. It is an array of length "Nparticles":
-        self.finalPDG = 0
-        # momentum in x-direction of the final particles. It is an array of length "Nparticles":
-        self.finalPx = 0
-        # momentum in y-direction of the final particles. It is an array of length "Nparticles":
-        self.finalPy = 0
-        # momentum in z-direction of the final particles. It is an array of length "Nparticles":
-        self.finalPz = 0
-"""
-
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
                             time_cut_min, time_cut_max, distance_cut, time_resolution, number_entries_input):
@@ -125,8 +95,12 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     # preallocate array, where event ID of the IBD like events is saved (np.array of float):
     evt_id_ibd = np.array([])
 
+    # preallocate number of events, where there are 2 prompt, but only one possible delayed signal:
+    number_2prompt = 0
+    # preallocate number of events, where 2 prompt signals are not added to 1 prompt signal:
+    number_2prompt_notadded = 0
     # preallocate number of events, where 2 prompt signal are added to 1 prompt signal:
-    number_2promptadded = 0
+    number_2prompt_added = 0
     # preallocate number of events, where there are 3 or more prompt signal to 1 corresponding delayed signal:
     number_3prompt_1delayed = 0
     # preallocate number of events, where there are 2 prompt and only 1 corresponding delayed signal:
@@ -136,7 +110,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     # preallocate number of events, where there are more than 3 prompt and more than 3 corresponding delayed signal:
     number_check3 = 0
 
-    # loop over every event, i.e. every event, in the TTree:
+    # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
         """ preallocate arrays: """
@@ -370,7 +344,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                         # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
                         if distance_p_d < distance_cut:
 
-                            # increment number of IBD-lie signals in this event:
+                            # increment number of IBD-like signals in this event:
                             number_ibd_evts = number_ibd_evts + 1
 
                             # append visible energy of the prompt signal to the array (energy in MeV):
@@ -409,11 +383,18 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             elif number_ibd_evts == 2:
                 # 2 possible prompt signal and only 1 corresponding delayed signals:
                 # calculate the time difference between the prompt signals in ns:
+                # TODO-me: How is time_exit defined exactly?
                 delta_t_pp = np.absolute(time_exit[int(array_prompt_index[0])] - time_exit[int(array_prompt_index[1])])
+
+                # check:
+                number_2prompt = number_2prompt + 1
 
                 if time_resolution <= delta_t_pp <= time_cut_max:
                     # this means, one prompt signal lies between the other prompt and the delayed signal and can be
                     # separated from the other prompt signal. -> NO IBD-like signal -> go to next event:
+
+                    # check:
+                    number_2prompt_notadded = number_2prompt_notadded + 1
                     continue
 
                 elif delta_t_pp < time_resolution:
@@ -427,17 +408,19 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     e_vis = np.append(e_vis, array_e_vis[0] + array_e_vis[1])
 
                     # check:
-                    number_2promptadded = number_2promptadded + 1
-                    print(evt_id)
+                    number_2prompt_added = number_2prompt_added + 1
+                    # print(evt_id)
 
                 else:
                     # this means, one prompt signal is after the delayed signal (should be not possible):
-                    print("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after delayed "
-                          "signal")
+                    # print("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after delayed "
+                    #       "signal")
+                    sys.exit("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after "
+                             "delayed signal")
 
             else:
                 # TODO-me: How to deal with events where there are 3 or more IBD-like events (but only one delayed sig.)
-                # to estimate the number of such events, increment variable number_2prompt_1delayed:
+                # to estimate the number of such events, increment variable number_3prompt_1delayed:
                 number_3prompt_1delayed = number_3prompt_1delayed + 1
                 print("WARNING: more than 1 IBD-like signal in event {2:d}: n_IBD_like = {0:.0f}, prompt = {1:.0f}"
                       .format(number_ibd_evts, check_prompt, evt_id))
@@ -608,9 +591,11 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     number_check1 = number_check1 + 1
                 else:
                     # possibility 2:
+                    # INFO-me: by analyzing detsim files user_atmoNC_0.root to user_atmoNC_499.root (50000 evts) in
+                    # INFO-me: '/local/scratch1/pipc51/astro/blum/detsim_output_data', there are 0 events like this
+                    # INFO-me: -> number_check2 = 0 for all 50000 events!!!
                     # to estimate the number of such events, increment variable number_check2:
                     number_check2 = number_check2 + 1
-
 
             else:
                 # TODO-me: How to deal with events where there are 2 or more IBD-like events (but only one delayed sig.)
@@ -621,8 +606,8 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                 print("----------> not yet included!!!!")
 
 
-    if number_2promptadded != 0:
-        print("number of events, where 2 prompt signals are added to 1 = {0:d}".format(number_2promptadded))
+    if number_2prompt_added != 0:
+        print("number of events, where 2 prompt signals are added to 1 = {0:d}".format(number_2prompt_added))
 
     if number_3prompt_1delayed != 0:
         print("number of events, with more than 1 prompt and just 1 delayed signal = {0:d}"
@@ -640,7 +625,230 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
         print("number of events, with 3 prompt and 3 or less delayed signal (prompt>1 AND delayed>1) = {0:d}"
               .format(number_check3))
 
-    return number_events, evt_id_ibd, e_vis
+    return number_events, evt_id_ibd, e_vis, number_2prompt, number_2prompt_notadded, number_2prompt_added, \
+           number_3prompt_1delayed, number_check1, number_check2, number_check3
+
+
+def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
+                                 number_entries_input):
+    """
+    function to read the sample_detsim_user.root file and do a preselelection of possible IBD-like signals
+
+    :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
+    :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
+    :param e_prompt_min: minimal prompt energy from energy cut in MeV, normally e_prompt_min = 10 MeV
+    :param e_prompt_max: maximal prompt energy from energy cut in MeV, normally e_prompt_max = 105 MeV
+    :param e_delayed_min: minimal delayed energy from energy cut in MeV, normally e_delayed_min = 1.9 MeV
+    :param e_delayed_max: maximal delayed energy from energy cut in MeV, normally e_delayed_max = 2.5 MeV
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
+
+    :return:
+    """
+    # load the ROOT file:
+    rfile = ROOT.TFile(rootfile_input)
+    # get the "evt"-TTree from the TFile:
+    rtree_evt = rfile.Get("evt")
+    # get the "geninfo"-TTree from the TFile:
+    rtree_geninfo = rfile.Get("geninfo")
+    # get the "prmtrkdep"-TTree from the TFile:
+    rtree_prmtrkdep = rfile.Get("prmtrkdep")
+
+    # get the number of events in the geninfo Tree:
+    number_events_geninfo = rtree_geninfo.GetEntries()
+    # get the number of events in the prmtrkdep Tree:
+    number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
+    if number_events_geninfo == number_events_prmtrkdep:
+        number_events = number_events_geninfo
+    else:
+        # number_events = 0
+        # print("ERROR: number of events in the Trees are NOT equal!!")
+        sys.exit("ERROR: number of events in t Trees are NOT equal!!")
+
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        # number_events = 0
+        # print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
+        # print("-> Detector Simulation not correct!!")
+        sys.exit("ERROR: number of events are not equal to {O:d} -> Detector Simulation not correct!"
+                 .format(number_entries_input))
+
+    # preallocate array, where event ID of events are saved, that pass the preselection (np.array of float):
+    evt_id_preselected = np.array([])
+
+    # preallocate number of events, that pass the preselection (volume cut and (prompt energy cut or delayed energy
+    # cut)):
+    number_preselected = 0
+    # preallocate number of events, which are rejected by preselection criteria:
+    number_rejected = 0
+
+    # loop over every event, i.e. every entry, in the TTree:
+    for event in range(number_events):
+
+        """ preallocate arrays: """
+        # PDG ID of initial particles of geninfo tree of each particle in the event:
+        pdgid_init_geninfo = np.array([])
+        # initial position in x-direction in millimeter of each particle in the event:
+        x_init = np.array([])
+        # initial position in y-direction in millimeter of each particle in the event:
+        y_init = np.array([])
+        # initial position in z-direction in millimeter of each particle in the event:
+        z_init = np.array([])
+        # initial time in nanoseconds of each particle in the event:
+        time_init = np.array([])
+        # exit or stopping position in x-direction in millimeter of each particle in the event:
+        x_exit = np.array([])
+        # exit or stopping position in y-direction in millimeter of each particle in the event:
+        y_exit = np.array([])
+        # exit or stopping position in z-direction in millimeter of each particle in the event:
+        z_exit = np.array([])
+        # exit or stopping time in nanoseconds of each particle in the event:
+        time_exit = np.array([])
+        # deposited energy of each particle in the event in MeV:
+        e_dep = np.array([])
+        # visible energy (quenched deposited energy) of each particle in the event in MeV:
+        e_qdep = np.array([])
+
+        # PDG ID of each particle in the event:
+        pdgid = np.array([])
+
+        """ first read the "geninfo" Tree"""
+        # get the current event in the TTree:
+        rtree_geninfo.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get the value of the number of initial particles:
+        n_par_geninfo = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # loop over the number of particles to get information about every particle in the event:
+        for index in range(n_par_geninfo):
+
+            # get the value of the initial PDG ID:
+            init_pdgid_geninfo = int(rtree_geninfo.GetBranch('InitPDGID').GetLeaf('InitPDGID').GetValue(index))
+            pdgid_init_geninfo = np.append(pdgid_init_geninfo, init_pdgid_geninfo)
+
+            # get initial x position:
+            init_x = rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index)
+            x_init = np.append(x_init, init_x)
+
+            # get initial y position:
+            init_y = rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index)
+            y_init = np.append(y_init, init_y)
+
+            # get initial z position:
+            init_z = rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index)
+            z_init = np.append(z_init, init_z)
+
+            # get initial time:
+            init_time = rtree_geninfo.GetBranch('InitTime').GetLeaf('InitTime').GetValue(index)
+            time_init = np.append(time_init, init_time)
+
+            # get exit/stopping x-position:
+            exit_x = rtree_geninfo.GetBranch('ExitX').GetLeaf('ExitX').GetValue(index)
+            x_exit = np.append(x_exit, exit_x)
+
+            # get exit/stopping y-position:
+            exit_y = rtree_geninfo.GetBranch('ExitY').GetLeaf('ExitY').GetValue(index)
+            y_exit = np.append(y_exit, exit_y)
+
+            # get exit/stopping z-position:
+            exit_z = rtree_geninfo.GetBranch('ExitZ').GetLeaf('ExitZ').GetValue(index)
+            z_exit = np.append(z_exit, exit_z)
+
+            # get the exit/stopping time:
+            exit_time = rtree_geninfo.GetBranch('ExitT').GetLeaf('ExitT').GetValue(index)
+            time_exit = np.append(time_exit, exit_time)
+
+        """ then read the "prmtrkdep" Tree"""
+        # get the current event in the TTree:
+        rtree_prmtrkdep.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_prmtrkdep = int(rtree_prmtrkdep.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get the value of the number of initial particles:
+        n_par_prmtrkdep = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # check event ID of the Trees:
+        if evt_id_prmtrkdep == evt_id_geninfo:
+            evt_id = evt_id_geninfo
+        else:
+            # evt_id = 0
+            # print("ERROR: event ID in the Trees are NOT equal!!")
+            sys.exit("ERROR: event ID in the Trees are NOT equal!")
+
+        # check number of initial particles of the Trees:
+        if n_par_prmtrkdep == n_par_geninfo:
+            n_par = n_par_geninfo
+        else:
+            # n_par = 0
+            # print("ERROR: number of initial particles in the Trees are NOT equal!!")
+            sys.exit("ERROR: number of initial particles in the Trees are NOT equal!")
+
+        # loop over the number of particles to get information about every particle in the event:
+        for index in range(n_par):
+
+            # get the value of the PDG ID:
+            pdgid_prmtrkdep = int(rtree_prmtrkdep.GetBranch('PDGID').GetLeaf('PDGID').GetValue(index))
+            # check PDG ID of the Trees:
+            if pdgid_prmtrkdep == pdgid_init_geninfo[index]:
+                pdgid = np.append(pdgid, pdgid_prmtrkdep)
+            else:
+                pdgid = np.append(pdgid, 0)
+                print("ERROR: PDG ID in the Trees are NOT equal!!")
+
+            # get deposited energy:
+            dep_e = rtree_prmtrkdep.GetBranch('edep').GetLeaf('edep').GetValue(index)
+            e_dep = np.append(e_dep, dep_e)
+
+            # get visible energy:
+            qdep_e = rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index)
+            e_qdep = np.append(e_qdep, qdep_e)
+
+
+        """ Does the event mimic an IBD signal? """
+        # preallocate flag (array of boolean):
+        is_prompt_signal = np.array([])
+        is_delayed_signal = np.array([])
+
+        # set flags:
+        for index in range(n_par):
+            # calculate the distance of the particle to the center of the event:
+            r_init = np.sqrt(x_init[index]**2 + y_init[index]**2 + z_init[index]**2)
+            r_exit = np.sqrt(x_exit[index]**2 + y_exit[index]**2 + z_exit[index]**2)
+
+            # set is_prompt_signal flag (criteria: 10 MeV <= edep <= 105 MeV AND r_init < 17m AND r_exit < 17m):
+            if e_prompt_min <= e_dep[index] <= e_prompt_max and r_init < r_cut and r_exit < r_cut:
+                is_prompt_signal = np.append(is_prompt_signal, True)
+            else:
+                is_prompt_signal = np.append(is_prompt_signal, False)
+
+            # set is_delayed_signal flag (criteria: 1.9 MeV <= edep <= 2.5 MeV AND r_init < 17m AND r_exit < 17m):
+            if e_delayed_min <= e_dep[index] <= e_delayed_max and r_init < r_cut and r_exit < r_cut:
+                is_delayed_signal = np.append(is_delayed_signal, True)
+            else:
+                is_delayed_signal = np.append(is_delayed_signal, False)
+
+        # check if there are prompt and delayed signals in the event
+        check_prompt = np.count_nonzero(is_prompt_signal)
+        check_delayed = np.count_nonzero(is_delayed_signal)
+        if check_prompt == 0 or check_delayed == 0:
+            # no prompt signal OR no delayed signal in the event -> go to the next event
+
+            # increment number_rejected:
+            number_rejected = number_rejected + 1
+
+            continue
+        else:
+            # there are at least 1 possible prompt and 1 possible delayed signal in the event:
+
+            # increment number_preselected:
+            number_preselected = number_preselected + 1
+            # add evt_id to array:
+            evt_id_preselected = np.append(evt_id_preselected, evt_id)
+
+    return number_events, evt_id_preselected, number_preselected, number_rejected
 
 
 def number_c12_atoms(radius_cut):

@@ -67,11 +67,11 @@ time_cut_max = 1000000
 Distance_cut = 1500
 # time in ns, where two prompt signals cannot be separated anymore (very conservative limit 1000 ns = 1 microsecond):
 # TODO-me: what is the time resolution where you can separate 2 prompt signals?
-time_resolution = 10
+time_resolution = 50
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
-stop_number = 499
+stop_number = 9
 # number of entries in the input files:
 Number_entries_input = 100
 # set the path of the inputs:
@@ -92,6 +92,14 @@ PLOT_EVT_RATE = True
 SHOW_EVT_RATE = False
 SAVE_EVT_RATE = True
 
+""" parameters to check 'read_sample_detsim_user()': """
+number_2prompt = 0
+number_2prompt_notadded = 0
+number_2prompt_added = 0
+number_3prompt_1delayed = 0
+number_check1 = 0
+number_check2 = 0
+number_check3 = 0
 
 """ Spectrum of IBD-like atmospheric NC neutrino background events: """
 # preallocate array, where the visible energy in MeV is stored:
@@ -111,11 +119,21 @@ for index in range(start_number, stop_number+1):
 
 
     # get the visible energy of the prompt signal from events that mimic IBD signals (E_vis in MeV) (np.array):
-    num_evts, evt_ID_IBD, E_vis = NC_background_functions.read_sample_detsim_user(input_name, R_cut_mm, E_prompt_min,
-                                                                                  E_prompt_max, E_delayed_min,
-                                                                                  E_delayed_max, time_cut_min,
-                                                                                  time_cut_max, Distance_cut,
-                                                                                  time_resolution, Number_entries_input)
+    (num_evts, evt_ID_IBD, E_vis, num_2prompt, num_2prompt_notadded, num_2prompt_added, num_3prompt_1delayed,
+     num_check1, num_check2, num_check3) \
+        = NC_background_functions.read_sample_detsim_user(input_name, R_cut_mm, E_prompt_min, E_prompt_max,
+                                                          E_delayed_min, E_delayed_max, time_cut_min, time_cut_max,
+                                                          Distance_cut, time_resolution, Number_entries_input)
+
+    # check numbers:
+    number_2prompt = number_2prompt + num_2prompt
+    number_2prompt_notadded = number_2prompt_notadded + num_2prompt_notadded
+    number_2prompt_added = number_2prompt_added + num_2prompt_added
+    number_3prompt_1delayed = number_3prompt_1delayed + num_3prompt_1delayed
+    number_check1 = number_check1 + num_check1
+    number_check2 = number_check2 + num_check2
+    number_check3 = number_check3 + num_check3
+
 
     # add number_evts to number_events:
     number_events = number_events + num_evts
@@ -132,6 +150,15 @@ for index in range(start_number, stop_number+1):
     print(E_vis)
     print(num_evts)
     print(num_IBD)
+
+print("number_2prompt = {0:d}\n".format(number_2prompt))
+print("number_2prompt_notadded = {0:d}\n".format(number_2prompt_notadded))
+print("number_2prompt_added = {0:d}\n".format(number_2prompt_added))
+print("number_3prompt_1delayed = {0:d}\n".format(number_3prompt_1delayed))
+print("number_check1 = {0:d}\n".format(number_check1))
+print("number_check2 = {0:d}\n".format(number_check2))
+print("number_check3 = {0:d}\n".format(number_check3))
+
 
 # number of simulated events:
 print("Total number of simulated events = {0:d}".format(number_events))
