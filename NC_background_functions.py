@@ -34,11 +34,144 @@
 
 import ROOT
 from array import array
-import glob
 import sys
 import numpy as np
 from matplotlib import pyplot as plt
 import xml.etree.ElementTree as ET
+
+
+def read_gamma_delayed_signal(rootfile_input, number_entries_input):
+    """
+    function to read user_gamma_..._.root files from detsim simulation to convert gamma energy of possible delayed
+    signal (from neutron capture) from MeV to number of PE
+
+    :param rootfile_input: input root file from tut_detsim.py: e.g. user_gamma_2_2_MeV_0.root (string)
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 10
+
+    :return:
+
+    """
+    # load ROOT file:
+    rfile = ROOT.TFile(rootfile_input)
+    # get the "evt"-TTree from the TFile:
+    rtree_evt = rfile.Get("evt")
+    # get the number of events in the geninfo Tree:
+    number_events_evt = rtree_evt.GetEntries()
+
+    # get the "geninfo"-TTree from the TFile:
+    rtree_geninfo = rfile.Get("geninfo")
+    # get the number of events in the geninfo Tree:
+    number_events_geninfo = rtree_geninfo.GetEntries()
+
+    # check if number of events are equal in both trees:
+    if number_events_geninfo == number_events_evt:
+        number_events = number_events_geninfo
+    else:
+        sys.exit("ERROR: number of events in t Trees are NOT equal!!")
+
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
+                 .format(number_entries_input))
+
+    # preallocate array, where number of PE per event (e.g. per gamma) is saved (np.array of int):
+    number_pe = np.array([])
+
+    # preallocate array. where initial x position per event is saved (in mm):
+    init_xpos = np.array([])
+    # preallocate array. where initial y position per event is saved (in mm):
+    init_ypos = np.array([])
+    # preallocate array. where initial z position per event is saved (in mm):
+    init_zpos = np.array([])
+    # preallocate array. where initial momentum per event is saved (in MeV):
+    init_momentum = np.array([])
+
+    # loop over every event, i.e. every entry, in the TTree:
+    for event in range(number_events):
+
+        """ first read 'evt' tree: """
+        # get the current event in the TTree:
+        rtree_evt.GetEntry(event)
+
+        # get event ID of evt-tree:
+        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of photons of this event:
+        n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
+
+        """ preallocate variables: """
+        # number of pe in event:
+        number_pe_event = 0
+        # hittime of photons in event in ns:
+        hittime_event = np.array([])
+
+        # loop over every photon in the event:
+        for index in range(n_photons):
+
+            # get PMT ID, where photon is absorbed:
+            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
+
+            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
+            if pmt_id < 25000:
+                # get nPE for this photon:
+                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
+                # check, if photon produces only 1 PE:
+                if n_pe != 1:
+                    print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+
+                # add n_pe to number_pe_event:
+                number_pe_event = number_pe_event + n_pe
+
+                # get hittime of this photon:
+                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
+                # append hit_time to hittime_event:
+                hittime_event = np.append(hittime_event, hit_time)
+
+            else:
+                continue
+
+        # append number of PE of this event to number_pe array:
+        number_pe = np.append(number_pe, number_pe_event)
+
+        """ read 'geninfo' tree to check spatial distribution and initial energy of gammas: """
+        # get the current event in the TTree:
+        rtree_geninfo.GetEntry(event)
+
+        # get event ID of evt-tree:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of particles of this event:
+        n_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+        # check, that only 1 particles per event:
+        if n_particles == 1:
+            # get initial x position in mm:
+            x_init = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue())
+            # append to array:
+            init_xpos = np.append(init_xpos, x_init)
+            # get initial y position in mm:
+            y_init = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue())
+            # append to array:
+            init_ypos = np.append(init_ypos, y_init)
+            # get initial z position in mm:
+            z_init = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue())
+            # append to array:
+            init_zpos = np.append(init_zpos, z_init)
+
+            # get initial momenta in x, y, z in MeV:
+            px_init = float(rtree_geninfo.GetBranch('InitPX').GetLeaf('InitPX').GetValue())
+            py_init = float(rtree_geninfo.GetBranch('InitPY').GetLeaf('InitPY').GetValue())
+            pz_init = float(rtree_geninfo.GetBranch('InitPZ').GetLeaf('InitPZ').GetValue())
+
+            # total initial momentum in MeV:
+            momentum = np.sqrt(px_init**2 + py_init**2 + pz_init**2)
+            # append momentum to array:
+            init_momentum = np.append(init_momentum, momentum)
+
+        else:
+            print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
+
+
+    return number_pe, hittime_event, init_xpos, init_ypos, init_zpos, init_momentum
 
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
@@ -65,7 +198,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     # load the ROOT file:
     rfile = ROOT.TFile(rootfile_input)
     # get the "evt"-TTree from the TFile:
-    rtree_evt = rfile.Get("evt")
+    # rtree_evt = rfile.Get("evt")
     # get the "geninfo"-TTree from the TFile:
     rtree_geninfo = rfile.Get("geninfo")
     # get the "prmtrkdep"-TTree from the TFile:
@@ -87,7 +220,7 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
         # number_events = 0
         # print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
         # print("-> Detector Simulation not correct!!")
-        sys.exit("ERROR: number of events are not equal to {O:d} -> Detector Simulation not correct!"
+        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
                  .format(number_entries_input))
 
     # preallocate array of visible energy of prompt signal (energy in MeV) (np.array of float):
@@ -95,20 +228,48 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     # preallocate array, where event ID of the IBD like events is saved (np.array of float):
     evt_id_ibd = np.array([])
 
-    # preallocate number of events, where there are 2 prompt, but only one possible delayed signal:
-    number_2prompt = 0
-    # preallocate number of events, where 2 prompt signals are not added to 1 prompt signal:
-    number_2prompt_notadded = 0
-    # preallocate number of events, where 2 prompt signal are added to 1 prompt signal:
-    number_2prompt_added = 0
-    # preallocate number of events, where there are 3 or more prompt signal to 1 corresponding delayed signal:
-    number_3prompt_1delayed = 0
+    # preallocate number of events, where there is 1 possible prompt and 1 possible delayed (case0):
+    number_case0 = 0
+    # preallocate number of events, where there is 1 possible prompt and 1 possible delayed (case0), which make a
+    # IBD-like signal:
+    number_case0_1ibdlike = 0
+
+    # preallocate number of events in case1:
+    number_case1 = 0
+    # preallocate number of events, where there are more than 1 possible prompt and 1 possible delayed (case1),
+    # but only possible 1 IBD-like signal:
+    number_case1_1posibdlike = 0
+    # preallocate number of events, where there are more than 1 possible prompt and 1 possible delayed (case1),
+    # but 2 possible IBD-like signals:
+    number_case1_2posibdlike = 0
+    # preallocate number of events in case 1 with 2 possible IBD-like signals, which are NOT added to e_vis:
+    number_case1_2posibdlike_notadded = 0
+    # preallocate number of events in case 1 with 2 possible IBD-like signals, which are added to e_vis:
+    number_case1_2posibdlike_added = 0
+    # preallocate number of events in case 1 with 3 or more possible IBD-like events:
+    number_case1_moreposibdlike = 0
+
+    # preallocate number of events, where there is 1 possible prompt but more than 1 possible delayed (case2):
+    number_case2 = 0
+    # preallocate number of events in case2 with 1 possible IBD-like signal:
+    number_case2_1posibdlike = 0
+
+    # preallocate number of events, where there is more than 1 possible prompt and more than 1 possible delayed (case3):
+    number_case3 = 0
+    # preallocate number of events in case3 with 0 possible IBD-like signals:
+    number_case3_noibdlike = 0
+    # preallocate number of events in case 3 with 1 possible IBD-like signal:
+    number_case3_1ibdlike = 0
+    # preallocate number of events in case3 with 2 possible IBD-like signals:
+    number_case3_2ibdlike = 0
+    # preallocate number of events in case3 with more than 2 possible IBD-like signals:
+    number_case3_moreibdlike = 0
+
     # preallocate number of events, where there are 2 prompt and only 1 corresponding delayed signal:
     number_check1 = 0
     # preallocate number of events, where there are 2 possible IBD signals:
     number_check2 = 0
-    # preallocate number of events, where there are more than 3 prompt and more than 3 corresponding delayed signal:
-    number_check3 = 0
+
 
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
@@ -272,10 +433,13 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
 
 
         if len(index_prompt) == 1 and len(index_delayed) == 1:
-            """ 1 possible prompt AND 1 possible delayed signal: """
+            """ 1 possible prompt AND 1 possible delayed signal (case0): """
             # only one prompt and one delayed signal. Get first entry of the array:
             index_p = index_prompt[0]
             index_d = index_delayed[0]
+
+            # increment number_case0:
+            number_case0 = number_case0 + 1
 
             # check if initial time of possible prompt and delayed signals in the event is 0:
             if time_init[index_p] == 0 and time_init[index_d] == 0:
@@ -294,6 +458,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     # prompt - delayed distance cut: R_prompt_delayed < 1.5 m (1.5 m = 1500 mm)
                     if distance_p_d < distance_cut:
 
+                        # increment number_case0_1ibdlike:
+                        number_case0_1ibdlike = number_case0_1ibdlike + 1
+
                         # append evt_id of the IBD like signal to evt_id_ibd array:
                         evt_id_ibd = np.append(evt_id_ibd, evt_id)
 
@@ -309,9 +476,12 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
 
 
         elif len(index_prompt) > 1 and len(index_delayed) == 1:
-            """ more than 1 possible prompt signals, BUT only 1 possible delayed signal: """
+            """ more than 1 possible prompt signals, BUT only 1 possible delayed signal (case1): """
             # preallocate value that represents the number of IBD-like signals in this event:
             number_ibd_evts = 0
+
+            # check:
+            number_case1 = number_case1 + 1
 
             # preallocate array, where the visible energy of the prompt signals of the IBD-like signal is stored
             # (energy in MeV):
@@ -371,6 +541,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     sys.exit("ERROR: Number of IBD-like events different to length of 'array_e_vis' (evt_ID = {0:d})"
                              .format(evt_id))
 
+                # check:
+                number_case1_1posibdlike = number_case1_1posibdlike + 1
+
                 # append evt_id of the IBD like signal to evt_id_ibd array:
                 evt_id_ibd = np.append(evt_id_ibd, evt_id)
 
@@ -387,14 +560,14 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                 delta_t_pp = np.absolute(time_exit[int(array_prompt_index[0])] - time_exit[int(array_prompt_index[1])])
 
                 # check:
-                number_2prompt = number_2prompt + 1
+                number_case1_2posibdlike = number_case1_2posibdlike + 1
 
                 if time_resolution <= delta_t_pp <= time_cut_max:
                     # this means, one prompt signal lies between the other prompt and the delayed signal and can be
                     # separated from the other prompt signal. -> NO IBD-like signal -> go to next event:
 
                     # check:
-                    number_2prompt_notadded = number_2prompt_notadded + 1
+                    number_case1_2posibdlike_notadded = number_case1_2posibdlike_notadded + 1
                     continue
 
                 elif delta_t_pp < time_resolution:
@@ -408,29 +581,32 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     e_vis = np.append(e_vis, array_e_vis[0] + array_e_vis[1])
 
                     # check:
-                    number_2prompt_added = number_2prompt_added + 1
+                    number_case1_2posibdlike_added = number_case1_2posibdlike_added + 1
                     # print(evt_id)
 
                 else:
                     # this means, one prompt signal is after the delayed signal (should be not possible):
-                    # print("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after delayed "
-                    #       "signal")
+                    # print("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt
+                    # after delayed signal")
                     sys.exit("WARNING in len(index_prompt) > 1 and len(index_delayed) == 1 ------ 1 prompt after "
                              "delayed signal")
 
             else:
                 # TODO-me: How to deal with events where there are 3 or more IBD-like events (but only one delayed sig.)
-                # to estimate the number of such events, increment variable number_3prompt_1delayed:
-                number_3prompt_1delayed = number_3prompt_1delayed + 1
+                # to estimate the number of such events, increment variable number_case1_moreposibdlike:
+                number_case1_moreposibdlike = number_case1_moreposibdlike + 1
                 print("WARNING: more than 1 IBD-like signal in event {2:d}: n_IBD_like = {0:.0f}, prompt = {1:.0f}"
                       .format(number_ibd_evts, check_prompt, evt_id))
                 print("-----------> not yet included!")
 
 
         elif len(index_prompt) == 1 and len(index_delayed) > 1:
-            """ 1 possible prompt signal, BUT more than 1 possible delayed signals"""
+            """ 1 possible prompt signal, BUT more than 1 possible delayed signals (case2): """
             # preallocate value that represents the number of IBD-like signals in this event:
             number_ibd_evts = 0
+
+            # check:
+            number_case2 = number_case2 + 1
 
             # loop over the possible delayed signals in the event:
             for index in range(len(index_delayed)):
@@ -470,6 +646,10 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             # if there is no or more than 1 IBD-like signal in the event, go to next event (neutron multiplicity cut!).
             # If there is only one IBD-like event, store the visible energy.
             if number_ibd_evts == 1:
+
+                # check:
+                number_case2_1posibdlike = number_case2_1posibdlike + 1
+
                 # append evt_id of the IBD like signal to evt_id_ibd array:
                 evt_id_ibd = np.append(evt_id_ibd, evt_id)
 
@@ -490,6 +670,9 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             # preallocate array, where the indices of the event of the "real" delayed signals (which correspond to
             # this prompt signal) are stored:
             array_delayed_index = np.array([])
+
+            # check:
+            number_case3 = number_case3 + 1
 
             # loop over possible prompt signals in this event:
             for index1 in range(len(index_prompt)):
@@ -557,24 +740,33 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
 
             # check array_number_ibd and array_delayed_index:
             if len(array_delayed_index) == 0:
-                # this means, that there is no IBD-like signal in this event (either 0 or more than 1 delayed signal)
+                # this means, that there is no IBD-like signal in this event (either 0 or more than 1 delayed signal to
+                # 1 prompt signal)
+
+                # check:
+                number_case3_noibdlike = number_case3_noibdlike + 1
                 continue
 
             elif len(array_delayed_index) == 1:
                 # this means, that there is 1 prompt signal and 1 corresponding delayed signal
                 # -> therefore 1 IBD-like signal:
 
-                # append evt_id of the IBD like signal to evt_id_ibd array:
-                evt_id_ibd = np.append(evt_id_ibd, evt_id)
-
                 # get the index of the prompt signal in the event:
                 which_index = np.where(array_number_ibd == 1)[0]
                 # check if there is just one entry equal to 1 in the array_delayed_index:
                 if len(which_index) == 1:
+
+                    # append evt_id of the IBD like signal to evt_id_ibd array:
+                    evt_id_ibd = np.append(evt_id_ibd, evt_id)
+
                     correct_prompt_index = which_index[0]
 
                     # append Qedep of this prompt signal to the e_vis array:
                     e_vis = np.append(e_vis, e_qdep[index_prompt[correct_prompt_index]])
+
+                    # check:
+                    number_case3_1ibdlike = number_case3_1ibdlike + 1
+
                 else:
                     print("ERROR in line 528")
                     continue
@@ -582,6 +774,10 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             elif len(array_delayed_index) == 2:
                 # this means, that there are 2 possible IBD-like signals (2 prompt and 2 corresponding delayed signals)
                 # there are 2 possibilities:
+
+                # check:
+                number_case3_2ibdlike = number_case3_2ibdlike + 1
+
                 # 1. the 'two' delayed signals could be the same. Then: 2 prompt signal and 1 corresponding delayed
                 # signal.
                 # 2. two different delayed signals. Therefore 2 possible IBD-like signals.
@@ -591,48 +787,32 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
                     number_check1 = number_check1 + 1
                 else:
                     # possibility 2:
-                    # INFO-me: by analyzing detsim files user_atmoNC_0.root to user_atmoNC_499.root (50000 evts) in
+                    # INFO-me: by analyzing detsim files user_atmoNC_0.root to user_atmoNC_599.root (60000 evts) in
                     # INFO-me: '/local/scratch1/pipc51/astro/blum/detsim_output_data', there are 0 events like this
-                    # INFO-me: -> number_check2 = 0 for all 50000 events!!!
+                    # INFO-me: -> number_check2 = 0 for all 60000 events!!!
                     # to estimate the number of such events, increment variable number_check2:
                     number_check2 = number_check2 + 1
 
             else:
                 # TODO-me: How to deal with events where there are 2 or more IBD-like events (but only one delayed sig.)
-                # to estimate the number of such events, increment variable number_check3:
-                number_check3 = number_check3 + 1
+                # to estimate the number of such events, increment variable number_case3_moreibdlike:
+                number_case3_moreibdlike = number_case3_moreibdlike + 1
                 print("WARNING: More than 1 possible prompt signal to only 1 possible delayed signal: evt ID = {0:d}"
                       .format(evt_id))
                 print("----------> not yet included!!!!")
 
-
-    if number_2prompt_added != 0:
-        print("number of events, where 2 prompt signals are added to 1 = {0:d}".format(number_2prompt_added))
-
-    if number_3prompt_1delayed != 0:
-        print("number of events, with more than 1 prompt and just 1 delayed signal = {0:d}"
-              .format(number_3prompt_1delayed))
-
-    if number_check1 != 0:
-        print("number of events, with 2 prompt and just 1 delayed signal (prompt>1 AND delayed>1) = {0:d}"
-              .format(number_check1))
-
-    if number_check2 != 0:
-        print("number of events, with 2 possible delayed signals (prompt>1 AND delayed>1) = {0:d}"
-              .format(number_check2))
-
-    if number_check3 != 0:
-        print("number of events, with 3 prompt and 3 or less delayed signal (prompt>1 AND delayed>1) = {0:d}"
-              .format(number_check3))
-
-    return number_events, evt_id_ibd, e_vis, number_2prompt, number_2prompt_notadded, number_2prompt_added, \
-           number_3prompt_1delayed, number_check1, number_check2, number_check3
+    return (number_events, evt_id_ibd, e_vis, number_case0, number_case0_1ibdlike, number_case1,
+            number_case1_1posibdlike, number_case1_2posibdlike, number_case1_2posibdlike_added,
+            number_case1_2posibdlike_notadded, number_case1_moreposibdlike, number_case2, number_case2_1posibdlike,
+            number_case3, number_case3_noibdlike, number_case3_1ibdlike, number_case3_2ibdlike, number_check1,
+            number_check2, number_case3_moreibdlike)
 
 
 def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
+                                 time_cut_max,
                                  number_entries_input):
     """
-    function to read the sample_detsim_user.root file and do a preselelection of possible IBD-like signals
+    function to read the sample_detsim_user.root file and do a preselection of possible IBD-like signals
 
     :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
     :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
@@ -640,6 +820,7 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
     :param e_prompt_max: maximal prompt energy from energy cut in MeV, normally e_prompt_max = 105 MeV
     :param e_delayed_min: minimal delayed energy from energy cut in MeV, normally e_delayed_min = 1.9 MeV
     :param e_delayed_max: maximal delayed energy from energy cut in MeV, normally e_delayed_max = 2.5 MeV
+    :param time_cut_max: maximal time difference delayed to prompt in ns, normally time_cut_max = 1 ms = 1 000 000 ns
     :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
 
     :return:
@@ -647,7 +828,7 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
     # load the ROOT file:
     rfile = ROOT.TFile(rootfile_input)
     # get the "evt"-TTree from the TFile:
-    rtree_evt = rfile.Get("evt")
+    # rtree_evt = rfile.Get("evt")
     # get the "geninfo"-TTree from the TFile:
     rtree_geninfo = rfile.Get("geninfo")
     # get the "prmtrkdep"-TTree from the TFile:
@@ -669,7 +850,7 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
         # number_events = 0
         # print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
         # print("-> Detector Simulation not correct!!")
-        sys.exit("ERROR: number of events are not equal to {O:d} -> Detector Simulation not correct!"
+        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
                  .format(number_entries_input))
 
     # preallocate array, where event ID of events are saved, that pass the preselection (np.array of float):
@@ -847,6 +1028,47 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
             number_preselected = number_preselected + 1
             # add evt_id to array:
             evt_id_preselected = np.append(evt_id_preselected, evt_id)
+
+
+            # check initial position of particles:
+            check_initial_position = False
+            # Info-me: initial position is exactly the same of particles in 1 event:
+            if check_initial_position:
+                print("---------------------------")
+                print("evt_id = {0:d}".format(evt_id))
+                print("x_init = {0}".format(x_init))
+                print("y_init = {0}".format(y_init))
+                print("z_init = {0}\n".format(z_init))
+
+            # check PDG ID of particles:
+            check_pdgid = True
+            if check_pdgid:
+                print("-----------------------------")
+                print("evt_id = {0:d}".format(evt_id))
+                print("pdgid = {0}\n".format(pdgid))
+
+
+            # display energy and exit time information:
+            plot_energy_time = False
+            if plot_energy_time:
+                print("---------------------------------------")
+                print("evt_id = {0:d}".format(evt_id))
+                print("time_exit in ns = {0}".format(time_exit))
+                print("deposit energy in MeV = {0}\n".format(e_dep))
+
+                # fig, ax = plt.plot()
+                plt.plot(time_exit, e_dep, "rx")
+                plt.fill_between(range(0, time_cut_max+1000, 1), e_prompt_min, e_prompt_max, color="b", alpha=0.2,
+                                 label="E_prompt cut")
+                plt.fill_between(range(0, time_cut_max+1000, 1), e_delayed_min, e_delayed_max, color="g", alpha=0.2,
+                                 label="E_delayed cut")
+                plt.xlim(xmin=-1000)
+                plt.ylim(ymin=0)
+                plt.xlabel("exit time of MC truth in ns")
+                plt.ylabel("deposit energy of MC truth in MeV")
+                plt.title("edep of event = {0:d} in file {1}.root".format(evt_id, rootfile_input))
+
+                plt.show()
 
     return number_events, evt_id_preselected, number_preselected, number_rejected
 
@@ -3021,48 +3243,48 @@ def get_channels_from_original_genie_file(rootfile_input):
     frac_es_s32 = float(number_es_s32) / float(number_events) * 100
 
 
-    return number_events, \
-           frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus, \
-           frac_c12_b11_p_2piminus_2piplus, frac_c12_b11_piplus, \
-           frac_c12_c11_n, frac_c12_c11_p_piminus, frac_c12_c11_n_piminus_piplus, frac_c12_c11_p_2piminus_piplus, \
-           frac_c12_c11_p_3piminus_2piplus, frac_c12_c11_n_2piminus_2piplus, \
-           frac_c12_b10_p_n, frac_c12_b10_2p_piminus, frac_c12_b10_p_n_piminus_piplus, frac_c12_b10_2n_piplus, \
-           frac_c12_b10_2n_piminus_2piplus, frac_c12_b10_2p_2piminus_piplus, frac_c12_b10_2p_3piminus_2piplus, \
-           frac_c12_b10_p_n_2piminus_2piplus, \
-           frac_c12_c10_2n, frac_c12_c10_p_n_piminus, frac_c12_c10_p_n_2piminus_piplus, frac_c12_c10_2n_piminus_piplus,\
-           frac_c12_c10_2p_2piminus, \
-           frac_c12_be10_2p, frac_c12_be10_p_n_piplus, frac_c12_be10_p_n_piminus_2piplus, \
-           frac_c12_be10_2p_piminus_piplus, frac_c12_be10_2n_2piplus, frac_c12_be10_p_n_2piminus_3piplus, \
-           frac_c12_be10_2p_2piminus_2piplus, frac_c12_be10_2p_3piminus_3piplus, \
-           frac_c12_b9_p_2n, frac_c12_b9_p_2n_piminus_piplus, frac_c12_b9_2p_n_3piminus_2piplus, \
-           frac_c12_b9_2p_n_piminus, frac_c12_b9_3n_piplus, frac_c12_b9_p_2n_2piminus_2piplus, \
-           frac_c12_b9_2p_n_2piminus_piplus, \
-           frac_c12_be9_2p_n, frac_c12_be9_p_2n_piplus, frac_c12_be9_3p_piminus, frac_c12_be9_p_2n_piminus_2piplus, \
-           frac_c12_be9_2p_n_piminus_piplus, frac_c12_be9_2p_n_3piminus_3piplus, frac_c12_be9_2p_n_2piminus_2piplus, \
-           frac_c12_be9_3n_2piplus, frac_c12_be9_3p_2piminus_piplus, \
-           frac_c12_be8_2p_2n, frac_c12_be8_3p_n_piminus, frac_c12_be8_p_3n_piplus, \
-           frac_c12_be8_2p_2n_2piminus_2piplus, frac_c12_be8_4n_2piplus, frac_c12_be8_2p_2n_piminus_piplus, \
-           frac_c12_be8_3p_n_2piminus_piplus, frac_c12_be8_4p_2piminus, \
-           frac_c12_c9_p_2n_piminus, frac_c12_c9_3n, frac_c12_c9_2p_n_2piminus, frac_c12_c9_3n_2piminus_2piplus, \
-           frac_c12_be7_2p_3n, frac_c12_be7_p_4n_piplus, frac_c12_be7_2p_3n_2piminus_2piplus, \
-           frac_c12_be7_3p_2n_piminus, frac_c12_be7_4p_n_2piminus, frac_c12_be7_3p_2n_2piminus_piplus, \
-           frac_c12_li6_3p_3n, frac_c12_li6_2p_4n_piplus, frac_c12_li6_5p_n_2piminus, \
-           frac_c12_li6_2p_4n_piminus_2piplus, frac_c12_li6_4p_2n_piminus, frac_c12_li6_3p_3n_piminus_piplus, \
-           frac_c12_li8_3p_n, frac_c12_li8_4p_piminus, frac_c12_li8_4p_2piminus_piplus, frac_c12_li8_2p_2n_piplus, \
-           frac_c12_li8_3p_n_piminus_piplus, \
-           frac_c12_li7_2p_3n_piplus, frac_c12_li7_4p_n_piminus, frac_c12_li7_3p_2n, frac_c12_li7_3p_2n_piminus_piplus,\
-           frac_c12_li7_4p_n_2piminus_piplus, frac_c12_li7_2p_3n_piminus_2piplus, \
-           frac_c12_b8_p_3n, frac_c12_b8_p_3n_piminus_piplus, frac_c12_b8_2p_2n_2piminus_piplus, \
-           frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus, \
-           frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus, \
-           frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus, \
-           frac_c12_c8_4n, frac_c12_he8_4p, frac_c12_b7_p_4n, frac_c12_he7_4p_n, frac_c12_h7_5p, frac_c12_be6_2p_4n, \
-           frac_c12_li5_3p_4n, frac_c12_li4_3p_5n, \
-           frac_c12_he6_4p_2n, frac_c12_he5_4p_3n, frac_c12_he4_4p_4n, frac_c12_he3_4p_5n, frac_c12_h6_5p_n, \
-           frac_c12_h5_5p_2n, frac_c12_h4_5p_3n, frac_c12_h3_5p_4n, \
-           frac_c12_h2_5p_5n, frac_c12_c12,\
-           frac_c12_noiso, \
-           frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_missing
+    return (number_events,
+            frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus,
+            frac_c12_b11_p_2piminus_2piplus, frac_c12_b11_piplus,
+            frac_c12_c11_n, frac_c12_c11_p_piminus, frac_c12_c11_n_piminus_piplus, frac_c12_c11_p_2piminus_piplus,
+            frac_c12_c11_p_3piminus_2piplus, frac_c12_c11_n_2piminus_2piplus,
+            frac_c12_b10_p_n, frac_c12_b10_2p_piminus, frac_c12_b10_p_n_piminus_piplus, frac_c12_b10_2n_piplus,
+            frac_c12_b10_2n_piminus_2piplus, frac_c12_b10_2p_2piminus_piplus, frac_c12_b10_2p_3piminus_2piplus,
+            frac_c12_b10_p_n_2piminus_2piplus,
+            frac_c12_c10_2n, frac_c12_c10_p_n_piminus, frac_c12_c10_p_n_2piminus_piplus, frac_c12_c10_2n_piminus_piplus,
+            frac_c12_c10_2p_2piminus,
+            frac_c12_be10_2p, frac_c12_be10_p_n_piplus, frac_c12_be10_p_n_piminus_2piplus,
+            frac_c12_be10_2p_piminus_piplus, frac_c12_be10_2n_2piplus, frac_c12_be10_p_n_2piminus_3piplus,
+            frac_c12_be10_2p_2piminus_2piplus, frac_c12_be10_2p_3piminus_3piplus,
+            frac_c12_b9_p_2n, frac_c12_b9_p_2n_piminus_piplus, frac_c12_b9_2p_n_3piminus_2piplus,
+            frac_c12_b9_2p_n_piminus, frac_c12_b9_3n_piplus, frac_c12_b9_p_2n_2piminus_2piplus,
+            frac_c12_b9_2p_n_2piminus_piplus,
+            frac_c12_be9_2p_n, frac_c12_be9_p_2n_piplus, frac_c12_be9_3p_piminus, frac_c12_be9_p_2n_piminus_2piplus,
+            frac_c12_be9_2p_n_piminus_piplus, frac_c12_be9_2p_n_3piminus_3piplus, frac_c12_be9_2p_n_2piminus_2piplus,
+            frac_c12_be9_3n_2piplus, frac_c12_be9_3p_2piminus_piplus,
+            frac_c12_be8_2p_2n, frac_c12_be8_3p_n_piminus, frac_c12_be8_p_3n_piplus,
+            frac_c12_be8_2p_2n_2piminus_2piplus, frac_c12_be8_4n_2piplus, frac_c12_be8_2p_2n_piminus_piplus,
+            frac_c12_be8_3p_n_2piminus_piplus, frac_c12_be8_4p_2piminus,
+            frac_c12_c9_p_2n_piminus, frac_c12_c9_3n, frac_c12_c9_2p_n_2piminus, frac_c12_c9_3n_2piminus_2piplus,
+            frac_c12_be7_2p_3n, frac_c12_be7_p_4n_piplus, frac_c12_be7_2p_3n_2piminus_2piplus,
+            frac_c12_be7_3p_2n_piminus, frac_c12_be7_4p_n_2piminus, frac_c12_be7_3p_2n_2piminus_piplus,
+            frac_c12_li6_3p_3n, frac_c12_li6_2p_4n_piplus, frac_c12_li6_5p_n_2piminus,
+            frac_c12_li6_2p_4n_piminus_2piplus, frac_c12_li6_4p_2n_piminus, frac_c12_li6_3p_3n_piminus_piplus,
+            frac_c12_li8_3p_n, frac_c12_li8_4p_piminus, frac_c12_li8_4p_2piminus_piplus, frac_c12_li8_2p_2n_piplus,
+            frac_c12_li8_3p_n_piminus_piplus,
+            frac_c12_li7_2p_3n_piplus, frac_c12_li7_4p_n_piminus, frac_c12_li7_3p_2n, frac_c12_li7_3p_2n_piminus_piplus,
+            frac_c12_li7_4p_n_2piminus_piplus, frac_c12_li7_2p_3n_piminus_2piplus,
+            frac_c12_b8_p_3n, frac_c12_b8_p_3n_piminus_piplus, frac_c12_b8_2p_2n_2piminus_piplus,
+            frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus,
+            frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus,
+            frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus,
+            frac_c12_c8_4n, frac_c12_he8_4p, frac_c12_b7_p_4n, frac_c12_he7_4p_n, frac_c12_h7_5p, frac_c12_be6_2p_4n,
+            frac_c12_li5_3p_4n, frac_c12_li4_3p_5n,
+            frac_c12_he6_4p_2n, frac_c12_he5_4p_3n, frac_c12_he4_4p_4n, frac_c12_he3_4p_5n, frac_c12_h6_5p_n,
+            frac_c12_h5_5p_2n, frac_c12_h4_5p_3n, frac_c12_h3_5p_4n,
+            frac_c12_h2_5p_5n, frac_c12_c12,
+            frac_c12_noiso,
+            frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_missing)
 
 
 def get_mass_from_pdg(pdg):
@@ -3461,8 +3683,8 @@ def read_nc_data(rootfile):
         # append the np.array to the list:
         final_pz.append(f_py_array)
 
-    return event_id, projectile_pdg, projectile_energy, target_pdg, nc_interaction_ch_id, deexcitation_id, \
-           isotope_pdg, n_particles, final_pdg, final_px, final_py, final_pz
+    return (event_id, projectile_pdg, projectile_energy, target_pdg, nc_interaction_ch_id, deexcitation_id,
+            isotope_pdg, n_particles, final_pdg, final_px, final_py, final_pz)
 
 
 def get_neutrino_energy(projectile_pdg, projectile_energy, bin_width, event_rate, time):
@@ -3595,11 +3817,11 @@ def get_neutrino_energy(projectile_pdg, projectile_energy, bin_width, event_rate
     number_nu_tau_incoming = np.sum(event_nu_tau_incoming)
     number_nu_tau_bar_incoming = np.sum(event_nu_tau_bar_incoming)
 
-    return energy_range, event_nu_e_incoming, event_nu_e_bar_incoming, event_nu_mu_incoming, event_nu_mu_bar_incoming, \
-           event_nu_tau_incoming, event_nu_tau_bar_incoming, number_nu_e_incoming, number_nu_e_bar_incoming, \
-           number_nu_mu_incoming, number_nu_mu_bar_incoming, number_nu_tau_incoming, number_nu_tau_bar_incoming, \
-           fraction_nu_e, fraction_nu_e_bar, fraction_nu_mu, fraction_nu_mu_bar, fraction_nu_tau, \
-           fraction_nu_tau_bar
+    return (energy_range, event_nu_e_incoming, event_nu_e_bar_incoming, event_nu_mu_incoming, event_nu_mu_bar_incoming,
+            event_nu_tau_incoming, event_nu_tau_bar_incoming, number_nu_e_incoming, number_nu_e_bar_incoming,
+            number_nu_mu_incoming, number_nu_mu_bar_incoming, number_nu_tau_incoming, number_nu_tau_bar_incoming,
+            fraction_nu_e, fraction_nu_e_bar, fraction_nu_mu, fraction_nu_mu_bar, fraction_nu_tau,
+            fraction_nu_tau_bar)
 
 
 def get_target_ratio(projectile_energy, target_pdg, bin_width):
@@ -3714,9 +3936,9 @@ def get_target_ratio(projectile_energy, target_pdg, bin_width):
 
     # TODO-me: the event rate and exposure time is NOT included yet!!!
 
-    return energy_range, events_c12, events_proton, events_n14, events_o16, events_electron, events_s32, \
-           n_c12, n_proton, n_n14, n_o16, n_electron, n_s32, \
-           fraction_c12, fraction_proton, fraction_n14, fraction_o16, fraction_electron, fraction_s32
+    return (energy_range, events_c12, events_proton, events_n14, events_o16, events_electron, events_s32,
+            n_c12, n_proton, n_n14, n_o16, n_electron, n_s32,
+            fraction_c12, fraction_proton, fraction_n14, fraction_o16, fraction_electron, fraction_s32)
 
 
 def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
@@ -5046,51 +5268,51 @@ def get_interaction_channel(channel_id, isotope_pdg, target_pdg):
     frac_es_s32 = float(number_es_s32) / float(number_entries) * 100
 
 
-    return frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus, \
-           frac_c12_b11_p_2piminus_2piplus, frac_c12_b11_piplus, frac_c12_b11_other, \
-           frac_c12_c11_n, frac_c12_c11_p_piminus, frac_c12_c11_n_piminus_piplus, frac_c12_c11_p_2piminus_piplus, \
-           frac_c12_c11_p_3piminus_2piplus, frac_c12_c11_n_2piminus_2piplus, frac_c12_c11_other, \
-           frac_c12_b10_p_n, frac_c12_b10_2p_piminus, frac_c12_b10_p_n_piminus_piplus, frac_c12_b10_2n_piplus, \
-           frac_c12_b10_2n_piminus_2piplus, frac_c12_b10_2p_2piminus_piplus, frac_c12_b10_2p_3piminus_2piplus, \
-           frac_c12_b10_p_n_2piminus_2piplus, frac_c12_b10_other, \
-           frac_c12_c10_2n, frac_c12_c10_p_n_piminus, frac_c12_c10_p_n_2piminus_piplus, frac_c12_c10_2n_piminus_piplus,\
-           frac_c12_c10_2p_2piminus, frac_c12_c10_other, \
-           frac_c12_be10_2p, frac_c12_be10_p_n_piplus, frac_c12_be10_p_n_piminus_2piplus, \
-           frac_c12_be10_2p_piminus_piplus, frac_c12_be10_2n_2piplus, frac_c12_be10_p_n_2piminus_3piplus, \
-           frac_c12_be10_2p_2piminus_2piplus, frac_c12_be10_2p_3piminus_3piplus, frac_c12_be10_other, \
-           frac_c12_b9_p_2n, frac_c12_b9_p_2n_piminus_piplus, frac_c12_b9_2p_n_3piminus_2piplus, \
-           frac_c12_b9_2p_n_piminus, frac_c12_b9_3n_piplus, frac_c12_b9_p_2n_2piminus_2piplus, \
-           frac_c12_b9_2p_n_2piminus_piplus, frac_c12_b9_other, \
-           frac_c12_be9_2p_n, frac_c12_be9_p_2n_piplus, frac_c12_be9_3p_piminus, frac_c12_be9_p_2n_piminus_2piplus, \
-           frac_c12_be9_2p_n_piminus_piplus, frac_c12_be9_2p_n_3piminus_3piplus, frac_c12_be9_2p_n_2piminus_2piplus, \
-           frac_c12_be9_3n_2piplus, frac_c12_be9_3p_2piminus_piplus, frac_c12_be9_other, \
-           frac_c12_be8_2p_2n, frac_c12_be8_3p_n_piminus, frac_c12_be8_p_3n_piplus, \
-           frac_c12_be8_2p_2n_2piminus_2piplus, frac_c12_be8_4n_2piplus, frac_c12_be8_2p_2n_piminus_piplus, \
-           frac_c12_be8_3p_n_2piminus_piplus, frac_c12_be8_4p_2piminus, frac_c12_be8_other, \
-           frac_c12_c9_p_2n_piminus, frac_c12_c9_3n, frac_c12_c9_2p_n_2piminus, frac_c12_c9_3n_2piminus_2piplus, \
-           frac_c12_c9_other, \
-           frac_c12_be7_2p_3n, frac_c12_be7_p_4n_piplus, frac_c12_be7_2p_3n_2piminus_2piplus, \
-           frac_c12_be7_3p_2n_piminus, frac_c12_be7_4p_n_2piminus, frac_c12_be7_3p_2n_2piminus_piplus, \
-           frac_c12_be7_other, \
-           frac_c12_li6_3p_3n, frac_c12_li6_2p_4n_piplus, frac_c12_li6_5p_n_2piminus, \
-           frac_c12_li6_2p_4n_piminus_2piplus, frac_c12_li6_4p_2n_piminus, frac_c12_li6_3p_3n_piminus_piplus, \
-           frac_c12_li6_other, \
-           frac_c12_li8_3p_n, frac_c12_li8_4p_piminus, frac_c12_li8_4p_2piminus_piplus, frac_c12_li8_2p_2n_piplus, \
-           frac_c12_li8_3p_n_piminus_piplus, frac_c12_li8_other, \
-           frac_c12_li7_2p_3n_piplus, frac_c12_li7_4p_n_piminus, frac_c12_li7_3p_2n, frac_c12_li7_3p_2n_piminus_piplus,\
-           frac_c12_li7_4p_n_2piminus_piplus, frac_c12_li7_2p_3n_piminus_2piplus, frac_c12_li7_other, \
-           frac_c12_b8_p_3n, frac_c12_b8_p_3n_piminus_piplus, frac_c12_b8_2p_2n_2piminus_piplus, \
-           frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus, frac_c12_b8_other, \
-           frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus, \
-           frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus, frac_c12_li9_other, \
-           frac_c12_c8_4n, frac_c12_c8_4n_other, frac_c12_he8_4p, frac_c12_he8_4p_other, \
-           frac_c12_b7_p_4n, frac_c12_b7_p_4n_other, frac_c12_he7_4p_n, frac_c12_he7_4p_n_other, \
-           frac_c12_h7_5p, frac_c12_h7_5p_other, frac_c12_be6_2p_4n, frac_c12_be6_2p_4n_other, \
-           frac_c12_he6_4p_2n, frac_c12_he6_4p_2n_other, frac_c12_h6_5p_n, frac_c12_h6_5p_n_other, \
-           frac_c12_mass11u, frac_c12_mass10u, frac_c12_mass9u, frac_c12_mass8u, frac_c12_mass7u, frac_c12_mass6u, \
-           frac_c12_mass5orless, \
-           frac_c12_c12, frac_c12_noiso, frac_c12_noiso_5p_6n, \
-           frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_faulty
+    return (frac_c12_b11_p, frac_c12_b11_n_piplus, frac_c12_b11_n_piminus_2piplus, frac_c12_b11_p_piminus_piplus,
+            frac_c12_b11_p_2piminus_2piplus, frac_c12_b11_piplus, frac_c12_b11_other,
+            frac_c12_c11_n, frac_c12_c11_p_piminus, frac_c12_c11_n_piminus_piplus, frac_c12_c11_p_2piminus_piplus,
+            frac_c12_c11_p_3piminus_2piplus, frac_c12_c11_n_2piminus_2piplus, frac_c12_c11_other,
+            frac_c12_b10_p_n, frac_c12_b10_2p_piminus, frac_c12_b10_p_n_piminus_piplus, frac_c12_b10_2n_piplus,
+            frac_c12_b10_2n_piminus_2piplus, frac_c12_b10_2p_2piminus_piplus, frac_c12_b10_2p_3piminus_2piplus,
+            frac_c12_b10_p_n_2piminus_2piplus, frac_c12_b10_other,
+            frac_c12_c10_2n, frac_c12_c10_p_n_piminus, frac_c12_c10_p_n_2piminus_piplus, frac_c12_c10_2n_piminus_piplus,
+            frac_c12_c10_2p_2piminus, frac_c12_c10_other,
+            frac_c12_be10_2p, frac_c12_be10_p_n_piplus, frac_c12_be10_p_n_piminus_2piplus,
+            frac_c12_be10_2p_piminus_piplus, frac_c12_be10_2n_2piplus, frac_c12_be10_p_n_2piminus_3piplus,
+            frac_c12_be10_2p_2piminus_2piplus, frac_c12_be10_2p_3piminus_3piplus, frac_c12_be10_other,
+            frac_c12_b9_p_2n, frac_c12_b9_p_2n_piminus_piplus, frac_c12_b9_2p_n_3piminus_2piplus,
+            frac_c12_b9_2p_n_piminus, frac_c12_b9_3n_piplus, frac_c12_b9_p_2n_2piminus_2piplus,
+            frac_c12_b9_2p_n_2piminus_piplus, frac_c12_b9_other,
+            frac_c12_be9_2p_n, frac_c12_be9_p_2n_piplus, frac_c12_be9_3p_piminus, frac_c12_be9_p_2n_piminus_2piplus,
+            frac_c12_be9_2p_n_piminus_piplus, frac_c12_be9_2p_n_3piminus_3piplus, frac_c12_be9_2p_n_2piminus_2piplus,
+            frac_c12_be9_3n_2piplus, frac_c12_be9_3p_2piminus_piplus, frac_c12_be9_other,
+            frac_c12_be8_2p_2n, frac_c12_be8_3p_n_piminus, frac_c12_be8_p_3n_piplus,
+            frac_c12_be8_2p_2n_2piminus_2piplus, frac_c12_be8_4n_2piplus, frac_c12_be8_2p_2n_piminus_piplus,
+            frac_c12_be8_3p_n_2piminus_piplus, frac_c12_be8_4p_2piminus, frac_c12_be8_other,
+            frac_c12_c9_p_2n_piminus, frac_c12_c9_3n, frac_c12_c9_2p_n_2piminus, frac_c12_c9_3n_2piminus_2piplus,
+            frac_c12_c9_other,
+            frac_c12_be7_2p_3n, frac_c12_be7_p_4n_piplus, frac_c12_be7_2p_3n_2piminus_2piplus,
+            frac_c12_be7_3p_2n_piminus, frac_c12_be7_4p_n_2piminus, frac_c12_be7_3p_2n_2piminus_piplus,
+            frac_c12_be7_other,
+            frac_c12_li6_3p_3n, frac_c12_li6_2p_4n_piplus, frac_c12_li6_5p_n_2piminus,
+            frac_c12_li6_2p_4n_piminus_2piplus, frac_c12_li6_4p_2n_piminus, frac_c12_li6_3p_3n_piminus_piplus,
+            frac_c12_li6_other,
+            frac_c12_li8_3p_n, frac_c12_li8_4p_piminus, frac_c12_li8_4p_2piminus_piplus, frac_c12_li8_2p_2n_piplus,
+            frac_c12_li8_3p_n_piminus_piplus, frac_c12_li8_other,
+            frac_c12_li7_2p_3n_piplus, frac_c12_li7_4p_n_piminus, frac_c12_li7_3p_2n, frac_c12_li7_3p_2n_piminus_piplus,
+            frac_c12_li7_4p_n_2piminus_piplus, frac_c12_li7_2p_3n_piminus_2piplus, frac_c12_li7_other,
+            frac_c12_b8_p_3n, frac_c12_b8_p_3n_piminus_piplus, frac_c12_b8_2p_2n_2piminus_piplus,
+            frac_c12_b8_2p_2n_piminus, frac_c12_b8_4n_piplus, frac_c12_b8_other,
+            frac_c12_li9_2p_n_piplus, frac_c12_li9_3p, frac_c12_li9_3p_piminus_piplus,
+            frac_c12_li9_2p_n_piminus_2piplus, frac_c12_li9_p_2n_piminus_3piplus, frac_c12_li9_other,
+            frac_c12_c8_4n, frac_c12_c8_4n_other, frac_c12_he8_4p, frac_c12_he8_4p_other,
+            frac_c12_b7_p_4n, frac_c12_b7_p_4n_other, frac_c12_he7_4p_n, frac_c12_he7_4p_n_other,
+            frac_c12_h7_5p, frac_c12_h7_5p_other, frac_c12_be6_2p_4n, frac_c12_be6_2p_4n_other,
+            frac_c12_he6_4p_2n, frac_c12_he6_4p_2n_other, frac_c12_h6_5p_n, frac_c12_h6_5p_n_other,
+            frac_c12_mass11u, frac_c12_mass10u, frac_c12_mass9u, frac_c12_mass8u, frac_c12_mass7u, frac_c12_mass6u,
+            frac_c12_mass5orless,
+            frac_c12_c12, frac_c12_noiso, frac_c12_noiso_5p_6n,
+            frac_no_c12, frac_es_p, frac_es_e, frac_es_o16, frac_es_n14, frac_es_s32, frac_c12_faulty)
 
 
 def get_deex_channel(deex_id, isotope_pdg, target_pdg):
@@ -5904,36 +6126,36 @@ def get_deex_channel(deex_id, isotope_pdg, target_pdg):
             # other target than C12:
             number_no_c12 = number_no_c12 + 1
 
-    return number_entries, number_target_c12, number_no_c12, number_light_iso, \
-           number_c11_notex, number_c11_deex, number_c11_li6_p_alpha, number_c11_be7_alpha, number_c11_b10_p, \
-           number_c11_b9_n_p, number_c11_be8_p_d, number_c11_be9_2p, number_c11_b9_d, number_c11_be8_he3, \
-           number_c11_c10_n, number_c11_li5_d_alpha, number_c11_li5_n_p_alpha, number_c11_missing, \
-           number_b11_notex, number_b11_deex, number_b11_li6_n_alpha, number_b11_b9_2n, number_b11_be8_n_d, \
-           number_b11_be9_d, number_b11_be10_p, number_b11_b10_n, number_b11_be9_n_p, number_b11_li7_alpha, \
-           number_b11_be8_t, number_b11_he5_d_alpha, number_b11_he6_p_alpha, number_b11_be8_2n_p, number_b11_missing, \
-           number_c10_notex, number_c10_deex, number_c10_b9_p, number_c10_be7_p_d, number_c10_li6_p_he3, \
-           number_c10_he4_p_d_he3, number_c10_li6_2p_d, number_c10_be8_2p, number_c10_be7_n_2p, number_c10_li6_n_3p, \
-           number_c10_be6_n_p_d, number_c10_li5_n_2p_d, number_c10_he3_p_d_alpha, number_c10_li5_d_he3, \
-           number_c10_li5_p_2d, number_c10_he3_n_2p_alpha, number_c10_li4_n_p_alpha, number_c10_b8_n_p, \
-           number_c10_b8_d, number_c10_be6_p_t, number_c10_he4_n_2p_he3, number_c10_li5_n_p_he3, number_c10_missing, \
-           number_b10_notex, number_b10_deex, number_b10_be9_p, number_b10_be8_d, number_b10_b9_n, number_b10_be7_t, \
-           number_b10_be8_n_p, number_b10_li7_he3, number_b10_he5_p_alpha, number_b10_li6_alpha, \
-           number_b10_li5_n_alpha, number_b10_li7_p_d, number_b10_missing, \
-           number_be10_notex, number_be10_deex, number_be10_li6_2n_d, number_be10_li7_2n_p, number_be10_he7_n_2p, \
-           number_be10_li6_n_t, number_be10_li6_3n_p, number_be10_he5_n_2d, number_be10_be8_2n, \
-           number_be10_he5_n_alpha, number_be10_t_n_d_alpha, number_be10_li8_n_p, number_be10_he4_n_d_t, \
-           number_be10_he5_n_p_t, number_be10_li7_n_d, number_be10_h4_n_p_alpha, number_be10_he5_2n_p_d, \
-           number_be10_be9_n, number_be10_he6_n_p_d, number_be10_he5_d_t, number_be10_h4_d_alpha, \
-           number_be10_he4_2n_p_t, number_be10_missing, \
-           number_c9_notex, number_c9_deex, number_c9_be7_2p, number_c9_missing, \
-           number_b9_notex, number_b9_deex, number_b9_be8_p, number_b9_missing, \
-           number_be9_notex, number_be9_deex, number_be9_li8_p, number_be9_missing, \
-           number_li9_notex, number_li9_deex, number_li9_h4_n_alpha, number_li9_he7_d, number_li9_li8_n, \
-           number_li9_missing, \
-           number_b8_notex, number_b8_deex, number_b8_li6_2p, number_b8_missing, \
-           number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing, \
-           number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing, \
-           number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing
+    return (number_entries, number_target_c12, number_no_c12, number_light_iso,
+            number_c11_notex, number_c11_deex, number_c11_li6_p_alpha, number_c11_be7_alpha, number_c11_b10_p,
+            number_c11_b9_n_p, number_c11_be8_p_d, number_c11_be9_2p, number_c11_b9_d, number_c11_be8_he3,
+            number_c11_c10_n, number_c11_li5_d_alpha, number_c11_li5_n_p_alpha, number_c11_missing,
+            number_b11_notex, number_b11_deex, number_b11_li6_n_alpha, number_b11_b9_2n, number_b11_be8_n_d,
+            number_b11_be9_d, number_b11_be10_p, number_b11_b10_n, number_b11_be9_n_p, number_b11_li7_alpha,
+            number_b11_be8_t, number_b11_he5_d_alpha, number_b11_he6_p_alpha, number_b11_be8_2n_p, number_b11_missing,
+            number_c10_notex, number_c10_deex, number_c10_b9_p, number_c10_be7_p_d, number_c10_li6_p_he3,
+            number_c10_he4_p_d_he3, number_c10_li6_2p_d, number_c10_be8_2p, number_c10_be7_n_2p, number_c10_li6_n_3p,
+            number_c10_be6_n_p_d, number_c10_li5_n_2p_d, number_c10_he3_p_d_alpha, number_c10_li5_d_he3,
+            number_c10_li5_p_2d, number_c10_he3_n_2p_alpha, number_c10_li4_n_p_alpha, number_c10_b8_n_p,
+            number_c10_b8_d, number_c10_be6_p_t, number_c10_he4_n_2p_he3, number_c10_li5_n_p_he3, number_c10_missing,
+            number_b10_notex, number_b10_deex, number_b10_be9_p, number_b10_be8_d, number_b10_b9_n, number_b10_be7_t,
+            number_b10_be8_n_p, number_b10_li7_he3, number_b10_he5_p_alpha, number_b10_li6_alpha,
+            number_b10_li5_n_alpha, number_b10_li7_p_d, number_b10_missing,
+            number_be10_notex, number_be10_deex, number_be10_li6_2n_d, number_be10_li7_2n_p, number_be10_he7_n_2p,
+            number_be10_li6_n_t, number_be10_li6_3n_p, number_be10_he5_n_2d, number_be10_be8_2n,
+            number_be10_he5_n_alpha, number_be10_t_n_d_alpha, number_be10_li8_n_p, number_be10_he4_n_d_t,
+            number_be10_he5_n_p_t, number_be10_li7_n_d, number_be10_h4_n_p_alpha, number_be10_he5_2n_p_d,
+            number_be10_be9_n, number_be10_he6_n_p_d, number_be10_he5_d_t, number_be10_h4_d_alpha,
+            number_be10_he4_2n_p_t, number_be10_missing,
+            number_c9_notex, number_c9_deex, number_c9_be7_2p, number_c9_missing,
+            number_b9_notex, number_b9_deex, number_b9_be8_p, number_b9_missing,
+            number_be9_notex, number_be9_deex, number_be9_li8_p, number_be9_missing,
+            number_li9_notex, number_li9_deex, number_li9_h4_n_alpha, number_li9_he7_d, number_li9_li8_n,
+            number_li9_missing,
+            number_b8_notex, number_b8_deex, number_b8_li6_2p, number_b8_missing,
+            number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing,
+            number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing,
+            number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing)
 
 
 def check_high_channelid(channel_id, final_pdg):

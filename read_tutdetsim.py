@@ -67,11 +67,11 @@ time_cut_max = 1000000
 Distance_cut = 1500
 # time in ns, where two prompt signals cannot be separated anymore (very conservative limit 1000 ns = 1 microsecond):
 # TODO-me: what is the time resolution where you can separate 2 prompt signals?
-time_resolution = 50
+time_resolution = 20
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
-stop_number = 9
+stop_number = 599
 # number of entries in the input files:
 Number_entries_input = 100
 # set the path of the inputs:
@@ -86,20 +86,30 @@ interval_energy = 0.1
 R_cut_meter = R_cut_mm / 1000
 # set booleans, that define, which plots are shown or saved (boolean):
 PLOT_FLUX = True
-SHOW_FLUXPLOT = False
-SAVE_FLUXPLOT = True
+SHOW_FLUXPLOT = True
+SAVE_FLUXPLOT = False
 PLOT_EVT_RATE = True
-SHOW_EVT_RATE = False
-SAVE_EVT_RATE = True
+SHOW_EVT_RATE = True
+SAVE_EVT_RATE = False
 
 """ parameters to check 'read_sample_detsim_user()': """
-number_2prompt = 0
-number_2prompt_notadded = 0
-number_2prompt_added = 0
-number_3prompt_1delayed = 0
-number_check1 = 0
-number_check2 = 0
-number_check3 = 0
+Number_case0 = 0
+Number_case0_1ibdlike = 0
+Number_case1 = 0
+Number_case1_1posibdlike = 0
+Number_case1_2posibdlike = 0
+Number_case1_2posibdlike_added = 0
+Number_case1_2posibdlike_notadded = 0
+Number_case1_moreposibdlike = 0
+Number_case2 = 0
+Number_case2_1posibdlike = 0
+Number_case3 = 0
+Number_case3_noibdlike = 0
+Number_case3_1ibdlike = 0
+Number_case3_2ibdlike = 0
+Number_check1 = 0
+Number_check2 = 0
+Number_case3_moreibdlike = 0
 
 """ Spectrum of IBD-like atmospheric NC neutrino background events: """
 # preallocate array, where the visible energy in MeV is stored:
@@ -119,21 +129,32 @@ for index in range(start_number, stop_number+1):
 
 
     # get the visible energy of the prompt signal from events that mimic IBD signals (E_vis in MeV) (np.array):
-    (num_evts, evt_ID_IBD, E_vis, num_2prompt, num_2prompt_notadded, num_2prompt_added, num_3prompt_1delayed,
-     num_check1, num_check2, num_check3) \
+    (num_evts, evt_ID_IBD, E_vis, number_case0, number_case0_1ibdlike, number_case1, number_case1_1posibdlike,
+     number_case1_2posibdlike, number_case1_2posibdlike_added, number_case1_2posibdlike_notadded,
+     number_case1_moreposibdlike, number_case2, number_case2_1posibdlike, number_case3, number_case3_noibdlike,
+     number_case3_1ibdlike, number_case3_2ibdlike, number_check1, number_check2, number_case3_moreibdlike) \
         = NC_background_functions.read_sample_detsim_user(input_name, R_cut_mm, E_prompt_min, E_prompt_max,
                                                           E_delayed_min, E_delayed_max, time_cut_min, time_cut_max,
                                                           Distance_cut, time_resolution, Number_entries_input)
 
     # check numbers:
-    number_2prompt = number_2prompt + num_2prompt
-    number_2prompt_notadded = number_2prompt_notadded + num_2prompt_notadded
-    number_2prompt_added = number_2prompt_added + num_2prompt_added
-    number_3prompt_1delayed = number_3prompt_1delayed + num_3prompt_1delayed
-    number_check1 = number_check1 + num_check1
-    number_check2 = number_check2 + num_check2
-    number_check3 = number_check3 + num_check3
-
+    Number_case0 = Number_case0 + number_case0
+    Number_case0_1ibdlike = Number_case0_1ibdlike + number_case0_1ibdlike
+    Number_case1 = Number_case1 + number_case1
+    Number_case1_1posibdlike = Number_case1_1posibdlike + number_case1_1posibdlike
+    Number_case1_2posibdlike = Number_case1_2posibdlike + number_case1_2posibdlike
+    Number_case1_2posibdlike_added = Number_case1_2posibdlike_added + number_case1_2posibdlike_added
+    Number_case1_2posibdlike_notadded = Number_case1_2posibdlike_notadded + number_case1_2posibdlike_notadded
+    Number_case1_moreposibdlike = Number_case1_moreposibdlike + number_case1_moreposibdlike
+    Number_case2 = Number_case2 + number_case2
+    Number_case2_1posibdlike = Number_case2_1posibdlike + number_case2_1posibdlike
+    Number_case3 = Number_case3 + number_case3
+    Number_case3_noibdlike = Number_case3_noibdlike + number_case3_noibdlike
+    Number_case3_1ibdlike = Number_case3_1ibdlike + number_case3_1ibdlike
+    Number_case3_2ibdlike = Number_case3_2ibdlike + number_case3_2ibdlike
+    Number_check1 = Number_check1 + number_check1
+    Number_check2 = Number_check2 + number_check2
+    Number_case3_moreibdlike = Number_case3_moreibdlike + number_case3_moreibdlike
 
     # add number_evts to number_events:
     number_events = number_events + num_evts
@@ -151,14 +172,23 @@ for index in range(start_number, stop_number+1):
     print(num_evts)
     print(num_IBD)
 
-print("number_2prompt = {0:d}\n".format(number_2prompt))
-print("number_2prompt_notadded = {0:d}\n".format(number_2prompt_notadded))
-print("number_2prompt_added = {0:d}\n".format(number_2prompt_added))
-print("number_3prompt_1delayed = {0:d}\n".format(number_3prompt_1delayed))
-print("number_check1 = {0:d}\n".format(number_check1))
-print("number_check2 = {0:d}\n".format(number_check2))
-print("number_check3 = {0:d}\n".format(number_check3))
-
+print("Number_case0 = {0:d}\n".format(Number_case0))
+print("Number_case0_1ibdlike = {0:d} -> saved\n".format(Number_case0_1ibdlike))
+print("Number_case1 = {0:d}\n".format(Number_case1))
+print("Number_case1_1posibdlike = {0:d} -> saved\n".format(Number_case1_1posibdlike))
+print("Number_case1_2posibdlike = {0:d}\n".format(Number_case1_2posibdlike))
+print("Number_case1_2posibdlike_added = {0:d} -> saved\n".format(Number_case1_2posibdlike_added))
+print("Number_case1_2posibdlike_notadded = {0:d} -> not saved\n".format(Number_case1_2posibdlike_notadded))
+print("Number_case1_moreposibdlike = {0:d} -> not yet saved\n".format(Number_case1_moreposibdlike))
+print("Number_case2 = {0:d}\n".format(Number_case2))
+print("Number_case2_1posibdlike = {0:d} -> saved\n".format(Number_case2_1posibdlike))
+print("Number_case3 = {0:d}\n".format(Number_case3))
+print("Number_case3_noibdlike = {0:d} -> not saved\n".format(Number_case3_noibdlike))
+print("Number_case3_1ibdlike = {0:d} -> saved\n".format(Number_case3_1ibdlike))
+print("Number_case3_2ibdlike = {0:d} -> not yet saved\n".format(Number_case3_2ibdlike))
+print("Number_check1 = {0:d}\n".format(Number_check1))
+print("Number_check2 = {0:d}\n".format(Number_check2))
+print("Number_case3_moreibdlike = {0:d} -> not yet saved\n".format(Number_case3_moreibdlike))
 
 # number of simulated events:
 print("Total number of simulated events = {0:d}".format(number_events))

@@ -34,10 +34,13 @@ E_prompt_max = 105.0
 # delayed energy cut in MeV:
 E_delayed_min = 1.9
 E_delayed_max = 2.5
+# time cut between prompt and delayed signal in ns:
+time_cut_min = 600
+time_cut_max = 1000000
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
-stop_number = 9
+stop_number = 699
 # number of entries in the input files:
 Number_entries_input = 100
 # set the path of the inputs:
@@ -64,7 +67,8 @@ for index in range(start_number, stop_number+1):
     # preselection of detsim events:
     num_events, evt_id_preselected, num_preselected, num_rejected = \
         NC_background_functions.preselect_sample_detsim_user(input_name, R_cut_mm, E_prompt_min, E_prompt_max,
-                                                             E_delayed_min, E_delayed_max, Number_entries_input)
+                                                             E_delayed_min, E_delayed_max, time_cut_max,
+                                                             Number_entries_input)
 
     # add numbers to parameters:
     number_events = number_events + num_events
@@ -75,7 +79,8 @@ for index in range(start_number, stop_number+1):
     print("event ID of preselected events:")
     print(evt_id_preselected)
 
-print("\nresults from user_atmoNC_{0:d}.root to user_atmoNC_{1:d}.root".format(start_number, stop_number))
+print("\n-----------------------------------------------------------")
+print("results from user_atmoNC_{0:d}.root to user_atmoNC_{1:d}.root".format(start_number, stop_number))
 print("number of total events = {0:d}".format(number_events))
 print("number of preselected events = {0:d}".format(number_preselected))
 print("number of rejected events = {0:d}".format(number_rejected))
