@@ -23,6 +23,9 @@
         6. Muon veto criteria (83% efficiency by yellow book): -> Do I have to consider this??????????????
 
 
+    IMPORTANT: the cuts are made with the parameters from 'geninfo' and 'prmtrkdep' tree of user-output!!!
+
+
 """
 
 # import ROOT
@@ -71,7 +74,7 @@ time_resolution = 20
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
-stop_number = 599
+stop_number = 99
 # number of entries in the input files:
 Number_entries_input = 100
 # set the path of the inputs:
@@ -126,7 +129,6 @@ for index in range(start_number, stop_number+1):
     input_name = input_path + "user_atmoNC_{0:d}.root".format(index)
     print("------------------------------------------------------------------------------------")
     print(input_name)
-
 
     # get the visible energy of the prompt signal from events that mimic IBD signals (E_vis in MeV) (np.array):
     (num_evts, evt_ID_IBD, E_vis, number_case0, number_case0_1ibdlike, number_case1, number_case1_1posibdlike,

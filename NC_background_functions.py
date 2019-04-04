@@ -40,6 +40,375 @@ from matplotlib import pyplot as plt
 import xml.etree.ElementTree as ET
 
 
+def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hittime, threshold, threshold2,
+                      binwidth_hittime, min_pe_delayed, max_pe_delayed, number_entries_input, save_hittime):
+    """
+    function to read the user_atmoNC_.root file and check, if there are events with no neutron, but with a delayed
+    signal.
+
+    :param input_path: path to input root files from tut_detsim.py: user_atmoNC_{}.root
+    :param number_file: number of the input root file: e.g. 2 -> user_atmoNC_2.root
+    :param output_path: path, where plots of hittime should be saved
+    :param min_hittime: minimum hittime in ns of a possible delayed signal
+    :param max_hittime: maximum hittime in ns of a possible delayed signal
+    :param threshold: threshold of number of PEs per bin for possible delayed signal
+    :param threshold2: threshold2 of number of PEs per bin (signal peak is summed as long as nPE is above threshold2)
+    :param binwidth_hittime: bin-width of the hittime histograms in ns
+    :param min_pe_delayed: minimum number of PE for delayed energy cut (values from check_delayed_energy.py)
+    :param max_pe_delayed: maximum number of PE for delayed energy cut (values from check_delayed_energy.py)
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
+    :param save_hittime: boolean variable, if True the hittime-histogram is saved
+    :return:
+    """
+
+    # load the ROOT file:
+    rfile = ROOT.TFile(input_path + "user_atmoNC_{0:d}.root".format(number_file))
+    # get the "evt"-TTree from the TFile:
+    rtree_evt = rfile.Get("evt")
+    # get the "geninfo"-TTree from the TFile:
+    rtree_geninfo = rfile.Get("geninfo")
+    # get the "prmtrkdep"-TTree from the TFile:
+    rtree_prmtrkdep = rfile.Get("prmtrkdep")
+
+    # get the number of events in the 'evt' Tree:
+    number_events_evt = rtree_evt.GetEntries()
+    # get the number of events in the geninfo Tree:
+    number_events_geninfo = rtree_geninfo.GetEntries()
+    # get the number of events in the prmtrkdep Tree:
+    number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
+    if number_events_geninfo == number_events_prmtrkdep and number_events_geninfo == number_events_evt:
+        number_events = number_events_geninfo
+    else:
+        sys.exit("ERROR: number of events in Trees are NOT equal!!")
+
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
+                 .format(number_entries_input))
+
+    # preallocate variables:
+    # number of events with at least one neutron:
+    number_neutron = 0
+    # number of events with no neutron:
+    number_no_neutron = 0
+    # number of events with no neutron and no delayed signal:
+    number_no_delayed = 0
+    # number of events with no neutron, but with delayed signal:
+    number_delayed = 0
+    # number of possible delayed signal (delayed signal but not correct number of PE):
+    number_possible_delayed = 0
+    # number of possible second delayed signal (another possible delayed signal after first signal)
+    # (only hittime is checked):
+    number_possible_second_delayed = 0
+
+    # loop over every event, i.e. every entry, in the TTree:
+    # for event in range(47, 48, 1):
+    for event in range(number_events):
+
+        print("analyze event {0:d}".format(event))
+
+        """ first read the 'geninfo' Tree: """
+        # get the current event in the Tree:
+        rtree_geninfo.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of particles in the event:
+        n_par_geninfo = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # check if there is at least 1 particle in the Tree:
+        if n_par_geninfo == 0:
+            number_no_neutron = number_no_neutron + 1
+            number_no_delayed = number_no_delayed + 1
+            # no particle in the event -> go to next event
+            continue
+
+        # preallocate arrays for PDG ID and ExitT:
+        pdg_geninfo = np.array([])
+        exit_time = np.array([])
+
+        # set neutron flag:
+        neutron_in_event = False
+
+        # loop over number of particles in the event:
+        for index1 in range(n_par_geninfo):
+            # get PDG ID of the initial particles:
+            pdgid_geninfo = int(rtree_geninfo.GetBranch('InitPDGID').GetLeaf('InitPDGID').GetValue(index1))
+
+            # check if neutron:
+            if pdgid_geninfo == 2112:
+                # set neutron flag (boolean):
+                neutron_in_event = True
+                # close for loop over number of particles:
+                break
+
+            # append PDG ID:
+            pdg_geninfo = np.append(pdg_geninfo, pdgid_geninfo)
+            # get exit time in ns:
+            exit_t = float(rtree_geninfo.GetBranch('ExitT').GetLeaf('ExitT').GetValue(index1))
+            # append exit time:
+            exit_time = np.append(exit_time, exit_t)
+
+        if neutron_in_event:
+            # increment number_neutron:
+            number_neutron = number_neutron + 1
+            # go to next event:
+            continue
+        else:
+            # increment number_no_neutron:
+            number_no_neutron = number_no_neutron + 1
+
+        """ read prmtrkdep tree: """
+        # get the current event in the Tree:
+        rtree_prmtrkdep.GetEntry(event)
+
+        # get evt ID of tree:
+        evt_id_prm = int(rtree_prmtrkdep.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of particles in the event:
+        n_par_prm = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        if n_par_prm == n_par_geninfo:
+            n_par = n_par_prm
+        else:
+            sys.exit("Number of particles in 'geninfo' NOT equal to number of particles in 'prmtrkdep'")
+
+        # preallocate arrays for edep and Qedep:
+        edep_arr = np.array([])
+        qedep_arr = np.array([])
+
+        # loop over number of particles:
+        for index2 in range(n_par):
+            # get edep in MeV:
+            edep = float(rtree_prmtrkdep.GetBranch('edep').GetLeaf('edep').GetValue(index2))
+            # get Qedep in MeV:
+            qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index2))
+
+            # append edep and qedep to arrays:
+            edep_arr = np.append(edep_arr, edep)
+            qedep_arr = np.append(qedep_arr, qedep)
+
+        """ read the "evt" Tree"""
+        # get the current event in the TTree:
+        rtree_evt.GetEntry(event)
+
+        # get the value of the event ID:
+        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        if evt_id_evt == evt_id_geninfo and evt_id_evt == evt_id_prm:
+            evt_id = evt_id_evt
+        else:
+            sys.exit("Event ID's of the three trees are NOT equal for 1 event!")
+
+        # get number of photons of this event:
+        n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
+        print("number of photons = {0:d}".format(n_photons))
+
+        # check, if n_photons = 0:
+        if n_photons == 0:
+            number_no_neutron = number_no_neutron + 1
+            number_no_delayed = number_no_delayed + 1
+            # no photons in event -> go to next event
+            continue
+
+        # preallocate variables:
+        # number of pe in event:
+        number_pe_event = 0
+
+        # preallocate histogram, where hittimes are saved:
+        # set bin-edges of hittime histogram in ns:
+        bins_hittime = np.arange(0, max_hittime+2*binwidth_hittime, binwidth_hittime)
+        # preallocate empty array to build default hittime-histogram:
+        hittime_array = np.array([])
+        # build default hittime histogram:
+        npe_per_hittime, bin_edges_hittime = np.histogram(hittime_array, bins_hittime)
+
+        # loop over every photon in the event:
+        for index3 in range(n_photons):
+
+            # get PMT ID, where photon is absorbed:
+            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index3))
+
+            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
+            if pmt_id < 25000:
+                # get nPE for this photon:
+                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index3))
+                # check, if photon produces only 1 PE:
+                if n_pe != 1:
+                    print("{1:d} PE for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+
+                # add n_pe to number_pe_event:
+                number_pe_event = number_pe_event + n_pe
+
+                # get hittime of this photon:
+                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index3))
+
+                # add hittime to default hittime histogram (build histogram with value 'hit_time' and bins_hittime;
+                # take the values of the 'new' histogram and add them to default hittime histogram):
+                npe_per_hittime += np.histogram(hit_time, bins_hittime)[0]
+
+            else:
+                continue
+
+        """ check hittime histogram of the event: """
+        # set possible delayed flag:
+        possible_delayed_signal = False
+        # set delayed flag:
+        delayed_signal = False
+        # set possible second delayed flag:
+        possible_second_delayed = False
+
+        # get index, where bin_edges_hittime = min_hittime, (min_hittime - 0) / binwidth_hittime,
+        # e.g. (2000 - 0) / 5 = 400, bin_edges_hittime[400] = 2000.
+        index_min_hittime = int(min_hittime / binwidth_hittime)
+
+        # calculate nPE as function of hittime only for the delayed time window (from min_hittime to max_hittime):
+        npe_per_hittime_window = npe_per_hittime[index_min_hittime:-1]
+        # bin edges of hittime histogram only fro the delayed time window:
+        bins_hittime_window = bin_edges_hittime[index_min_hittime:-1]
+
+        # loop over values of the histogram bins of delayed window:
+        for index4 in range(len(npe_per_hittime_window)):
+            # check if number of PE in this bin is above the threshold:
+            if npe_per_hittime_window[index4] > threshold:
+                # possible delayed signal (signal in delayed window):
+
+                # calculate number of PEs in this signal peak:
+                # preallocate sum of PE per bin in the signal peak:
+                sum_pe_peak = 0
+
+                # add nPE of bins_hittime_window[index4] to sum_pe_peak:
+                sum_pe_peak = sum_pe_peak + npe_per_hittime_window[index4]
+
+                # check previous bins:
+                for num in range(1, 100, 1):
+                    # check if value in previous bins_hittime_window[index4 - num] is above threshold2:
+                    if npe_per_hittime_window[index4 - num] > threshold2:
+                        # add nPE of this bin to sum_pe_peak:
+                        sum_pe_peak = sum_pe_peak + npe_per_hittime_window[index4 - num]
+
+                    else:
+                        # hittime, when signal peak begins, in ns:
+                        begin_peak = bins_hittime_window[index4 - num]
+
+                        break
+
+                # check following bins:
+                for num in range(1, 1000, 1):
+                    # check if value in following bins_hittime_window[index4 + num] is above threshold2:
+                    if npe_per_hittime_window[index4 + num] > threshold2:
+                        # add nPE of this bin to sum_pe_peak:
+                        sum_pe_peak = sum_pe_peak + npe_per_hittime_window[index4 + num]
+
+                    else:
+                        # hittime, when signal peak ends, in ns:
+                        end_peak = bins_hittime_window[index4 + num]
+
+                        # get index, where npe_hittime is below threshold2:
+                        index_after_peak1 = index4 + num
+                        break
+
+                # first peak is analyzed:
+                # check, if number of PE in this signal peak agree with delayed energy cut:
+                if min_pe_delayed < sum_pe_peak < max_pe_delayed:
+                    # PE of signal peak agree with delayed energy cut
+                    # set delayed flag:
+                    delayed_signal = True
+                else:
+                    # PE of signal peak do NOT agree with delayed energy cut:
+                    # set possible delayed flag:
+                    possible_delayed_signal = True
+
+                # after analyzing the first peak, break out of for-loop (possible second delayed signal will be checked
+                # below)
+                break
+            else:
+                # go to next bin:
+                continue
+
+        # When there is a delayed or possible delayed signal in the first peak, check if there is also a second
+        # possible peak in the event:
+        if delayed_signal or possible_delayed_signal:
+            # check if there is a possible second delayed signal
+
+            # loop over values of histogram bins of delayed time window to get possible second peak:
+            for index5 in range(index_after_peak1, len(npe_per_hittime_window), 1):
+                # check if number of PE in this bin is above the threshold:
+                if npe_per_hittime_window[index5] > threshold:
+                    # possible second delayed signal:
+
+                    # set possible second delayed signal flag:
+                    possible_second_delayed = True
+
+                    # possible second delayed signal after delayed or possible delayed signal
+                    # (only time window is checked)
+                    number_possible_second_delayed = number_possible_second_delayed + 1
+                    break
+
+                else:
+                    # go to next bin:
+                    continue
+
+        # increment numbers:
+        if delayed_signal:
+            # 1 delayed signal (agree with time window and delayed energy cut)
+            number_delayed = number_delayed + 1
+
+            # plot hittime_event in histogram:
+            if save_hittime:
+                h1 = plt.figure(1, figsize=(15, 8))
+                # plot histogram:
+                plt.plot(bin_edges_hittime[0:-1], npe_per_hittime, drawstyle='steps',
+                         label='Event Info:\nInitPDGID = {0}\nExitT = {1} ns\nedep = {2} MeV\nQedep = {3} MeV\n'
+                               'Analysis:\nnPE in pulse = {4}\nstart hittime pulse = {5} ns\n'
+                               'end hittime pulse = {6} ns'.format(pdg_geninfo, exit_time, edep_arr, qedep_arr,
+                                                                   sum_pe_peak, begin_peak, end_peak))
+
+                plt.xlabel("hit-time in ns", fontsize=13)
+                # INFO-me: ylabel is only equal to number of PE, if nPE == 1 for all photons (1 PE each photon)
+                plt.ylabel("number of PE per bin (bin-width = {0:=.1f} ns)".format(binwidth_hittime), fontsize=13)
+                plt.title("hittime on 20inch PMTs for atmoNC events with delayed signal and without neutron\n"
+                          "(agree with time and delayed energy cut)",
+                          fontsize=18)
+                plt.legend()
+                plt.grid()
+                plt.savefig(output_path + "delSig_hittime_atmoNC_{0:d}_evt{1:d}.png".format(number_file, evt_id))
+                plt.close()
+
+        elif possible_delayed_signal:
+            # 1 possible delayed signal (agree with time window, but NOT with delayed energy cut)
+            number_possible_delayed = number_possible_delayed + 1
+
+            # plot hittime_event in histogram:
+            if save_hittime:
+                h1 = plt.figure(1, figsize=(15, 8))
+                # plot histogram:
+                plt.plot(bin_edges_hittime[0:-1], npe_per_hittime, drawstyle='steps',
+                         label='Event Info:\nInitPDGID = {0}\nExitT = {1} ns\nedep = {2} MeV\nQedep = {3} MeV\n'
+                               'Analysis:\nnPE in pulse = {4}\nstart hittime pulse = {5} ns\n'
+                               'end hittime pulse = {6} ns'
+                         .format(pdg_geninfo, exit_time, edep_arr, qedep_arr, sum_pe_peak, begin_peak, end_peak))
+
+                plt.xlabel("hit-time in ns", fontsize=13)
+                # INFO-me: ylabel is only equal to number of PE, if nPE == 1 for all photons (1 PE each photon)
+                plt.ylabel("number of PE per bin (bin-width = {0:=.1f} ns)".format(binwidth_hittime), fontsize=13)
+                plt.title("hittime on 20inch PMTs for atmoNC events with delayed signal and without neutron\n"
+                          "(agree with time cut but not with delayed energy cut)",
+                          fontsize=18)
+                plt.legend()
+                plt.grid()
+                plt.savefig(output_path + "posDelSig_hittime_atmoNC_{0:d}_evt{1:d}.png".format(number_file, evt_id))
+                plt.close()
+
+        else:
+            # no delayed and no possible delayed -> increment number_no_delayed:
+            number_no_delayed = number_no_delayed + 1
+
+    return number_events, number_neutron, number_no_neutron, number_no_delayed, number_delayed, \
+           number_possible_delayed, number_possible_second_delayed
+
+
 def read_gamma_delayed_signal(rootfile_input, number_entries_input):
     """
     function to read user_gamma_..._.root files from detsim simulation to convert gamma energy of possible delayed
@@ -170,7 +539,6 @@ def read_gamma_delayed_signal(rootfile_input, number_entries_input):
         else:
             print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
 
-
     return number_pe, hittime_event, init_xpos, init_ypos, init_zpos, init_momentum
 
 
@@ -179,6 +547,8 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     """
     function to read the sample_detsim_user.root file and to get visible energy of the prompt signal of
     the IBD-like signals.
+
+    IMPORTANT: the cuts are made with the parameters from 'geninfo' and 'prmtrkdep' tree of user-output!!!
 
     :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
     :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
@@ -269,7 +639,6 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
     number_check1 = 0
     # preallocate number of events, where there are 2 possible IBD signals:
     number_check2 = 0
-
 
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
@@ -987,7 +1356,6 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
             qdep_e = rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index)
             e_qdep = np.append(e_qdep, qdep_e)
 
-
         """ Does the event mimic an IBD signal? """
         # preallocate flag (array of boolean):
         is_prompt_signal = np.array([])
@@ -1028,7 +1396,6 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_m
             number_preselected = number_preselected + 1
             # add evt_id to array:
             evt_id_preselected = np.append(evt_id_preselected, evt_id)
-
 
             # check initial position of particles:
             check_initial_position = False
