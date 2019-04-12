@@ -1956,7 +1956,7 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
     # Info-me: "gst;13" is a copy of meta data of "gst;14", "gst;14" contains correct data and is read
 
     # set new ROOT file:
-    rfile_output = ROOT.TFile(path_output + "genie_data.root", "recreate")
+    rfile_output = ROOT.TFile(path_output + "genie_data_NC.root", "recreate")
     # set new ROOT Tree:
     rtree_output = ROOT.TTree("particleT", "particle Tree")
 
@@ -2032,7 +2032,6 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
     rtree_output.Branch('energy', energy, 'energy[Npars]/D')
     rtree_output.Branch('mass', mass, 'mass[Npars]/D')
 
-
     """ Read the data from the TTree: """
     # loop over every entry, i.e. every event, in the TTree:
     for event in range(number_entries):
@@ -2056,7 +2055,10 @@ def convert_genie_file_for_generator(rootfile_input, path_output):
         # if qel == 1 and nc == 1:
 
         # read only NC events and interactions on C12:
-        if nc == 1 and tgt == 1000060120:
+        # if nc == 1 and tgt == 1000060120:
+
+        # read only NC, but all targets:
+        if nc == 1:
 
             # set the event number:
             event_number[0] = event
@@ -6523,6 +6525,297 @@ def get_deex_channel(deex_id, isotope_pdg, target_pdg):
             number_li8_notex, number_li8_deex, number_li8_li7_n, number_li8_li6_2n, number_li8_missing,
             number_be7_notex, number_be7_deex, number_be7_li5_d, number_be7_li6_p, number_be7_missing,
             number_li7_notex, number_li7_deex, number_li7_li6_n, number_li7_missing)
+
+
+def get_residual_isotopes_before_deex(projectile_energy, isotope_pdg, target_pdg, bin_width):
+    """
+    function to get the number of events as function of the energy of the incoming neutrino for the different produced
+    residual isotopes (isotopes after NC interaction, but BEFORE deexcitation)
+
+    :param projectile_energy: energy of the projectile, i.e. of the incoming neutrinos, in GeV (array of float)
+    :param isotope_pdg: PDG ID of the isotope, that is created via the NC interaction (before deexcitation)
+    (array of float)
+    :param target_pdg: PDG ID of the target particle (array of float)
+    :param bin_width: bin width of the array, which represents the energy of incoming neutrinos in GeV (float)
+    :return:
+    """
+    # get the number of entries of the array (integer):
+    number_entries = len(projectile_energy)
+
+    # preallocate arrays, where projectile energy for the different isotopes is saved and number of events corresponding
+    # to this isotope:
+    # C12:
+    energy_c12 = np.array([])
+    number_c12 = 0
+    # C11:
+    energy_c11 = np.array([])
+    number_c11 = 0
+    # B11:
+    energy_b11 = np.array([])
+    number_b11 = 0
+    # C10:
+    energy_c10 = np.array([])
+    number_c10 = 0
+    # B10:
+    energy_b10 = np.array([])
+    number_b10 = 0
+    # Be10:
+    energy_be10 = np.array([])
+    number_be10 = 0
+    # C9:
+    energy_c9 = np.array([])
+    number_c9 = 0
+    # B9:
+    energy_b9 = np.array([])
+    number_b9 = 0
+    # Be9:
+    energy_be9 = np.array([])
+    number_be9 = 0
+    # Li9:
+    energy_li9 = np.array([])
+    number_li9 = 0
+    # C8:
+    energy_c8 = np.array([])
+    number_c8 = 0
+    # B8:
+    energy_b8 = np.array([])
+    number_b8 = 0
+    # Be8:
+    energy_be8 = np.array([])
+    number_be8 = 0
+    # Li8:
+    energy_li8 = np.array([])
+    number_li8 = 0
+    # He8:
+    energy_he8 = np.array([])
+    number_he8 = 0
+    # B7:
+    energy_b7 = np.array([])
+    number_b7 = 0
+    # Be7:
+    energy_be7 = np.array([])
+    number_be7 = 0
+    # Li7:
+    energy_li7 = np.array([])
+    number_li7 = 0
+    # He7:
+    energy_he7 = np.array([])
+    number_he7 = 0
+    # H7:
+    energy_h7 = np.array([])
+    number_h7 = 0
+    # Be6:
+    energy_be6 = np.array([])
+    number_be6 = 0
+    # Li6:
+    energy_li6 = np.array([])
+    number_li6 = 0
+    # He6:
+    energy_he6 = np.array([])
+    number_he6 = 0
+    # H6:
+    energy_h6 = np.array([])
+    number_h6 = 0
+    # Rest (isotopes not yet included into channel ID):
+    number_rest = 0
+
+    # loop over all entries (e.g. events):
+    for index in range(number_entries):
+        # check if target is C12 (1000060120):
+        if target_pdg[index] == 1000060120:
+            # check the isotope PDG:
+            if isotope_pdg[index] == 1000060120:
+                # C12:
+                energy = projectile_energy[index]
+                energy_c12 = np.append(energy_c12, energy)
+                number_c12 += 1
+            elif isotope_pdg[index] == 1000060110:
+                # C11:
+                energy = projectile_energy[index]
+                energy_c11 = np.append(energy_c11, energy)
+                number_c11 += 1
+            elif isotope_pdg[index] == 1000050110:
+                # B11:
+                energy = projectile_energy[index]
+                energy_b11 = np.append(energy_b11, energy)
+                number_b11 += 1
+            elif isotope_pdg[index] == 1000060100:
+                # C10:
+                energy = projectile_energy[index]
+                energy_c10 = np.append(energy_c10, energy)
+                number_c10 += 1
+            elif isotope_pdg[index] == 1000050100:
+                # B10:
+                energy = projectile_energy[index]
+                energy_b10 = np.append(energy_b10, energy)
+                number_b10 += 1
+            elif isotope_pdg[index] == 1000040100:
+                # Be10:
+                energy = projectile_energy[index]
+                energy_be10 = np.append(energy_be10, energy)
+                number_be10 += 1
+            elif isotope_pdg[index] == 1000060090:
+                # C9:
+                energy = projectile_energy[index]
+                energy_c9 = np.append(energy_c9, energy)
+                number_c9 += 1
+            elif isotope_pdg[index] == 1000050090:
+                # B9:
+                energy = projectile_energy[index]
+                energy_b9 = np.append(energy_b9, energy)
+                number_b9 += 1
+            elif isotope_pdg[index] == 1000040090:
+                # Be9:
+                energy = projectile_energy[index]
+                energy_be9 = np.append(energy_be9, energy)
+                number_be9 += 1
+            elif isotope_pdg[index] == 1000030090:
+                # Li9:
+                energy = projectile_energy[index]
+                energy_li9 = np.append(energy_li9, energy)
+                number_li9 += 1
+            elif isotope_pdg[index] == 1000060080:
+                # C8:
+                energy = projectile_energy[index]
+                energy_c8 = np.append(energy_c8, energy)
+                number_c8 += 1
+            elif isotope_pdg[index] == 1000050080:
+                # B8:
+                energy = projectile_energy[index]
+                energy_b8 = np.append(energy_b8, energy)
+                number_b8 += 1
+            elif isotope_pdg[index] == 1000040080:
+                # Be8:
+                energy = projectile_energy[index]
+                energy_be8 = np.append(energy_be8, energy)
+                number_be8 += 1
+            elif isotope_pdg[index] == 1000030080:
+                # Li8:
+                energy = projectile_energy[index]
+                energy_li8 = np.append(energy_li8, energy)
+                number_li8 += 1
+            elif isotope_pdg[index] == 1000020080:
+                # He8:
+                energy = projectile_energy[index]
+                energy_he8 = np.append(energy_he8, energy)
+                number_he8 += 1
+            elif isotope_pdg[index] == 1000050070:
+                # B7:
+                energy = projectile_energy[index]
+                energy_b7 = np.append(energy_b7, energy)
+                number_b7 += 1
+            elif isotope_pdg[index] == 1000040070:
+                # Be7:
+                energy = projectile_energy[index]
+                energy_be7 = np.append(energy_be7, energy)
+                number_be7 += 1
+            elif isotope_pdg[index] == 1000030070:
+                # Li7:
+                energy = projectile_energy[index]
+                energy_li7 = np.append(energy_li7, energy)
+                number_li7 += 1
+            elif isotope_pdg[index] == 1000020070:
+                # He7:
+                energy = projectile_energy[index]
+                energy_he7 = np.append(energy_he7, energy)
+                number_he7 += 1
+            elif isotope_pdg[index] == 1000010070:
+                # H7:
+                energy = projectile_energy[index]
+                energy_h7 = np.append(energy_h7, energy)
+                number_h7 += 1
+            elif isotope_pdg[index] == 1000040060:
+                # Be6:
+                energy = projectile_energy[index]
+                energy_be6 = np.append(energy_be6, energy)
+                number_be6 += 1
+            elif isotope_pdg[index] == 1000030060:
+                # Li6:
+                energy = projectile_energy[index]
+                energy_li6 = np.append(energy_li6, energy)
+                number_li6 += 1
+            elif isotope_pdg[index] == 1000020060:
+                # He6:
+                energy = projectile_energy[index]
+                energy_he6 = np.append(energy_he6, energy)
+                number_he6 += 1
+            elif isotope_pdg[index] == 1000010060:
+                # H6:
+                energy = projectile_energy[index]
+                energy_h6 = np.append(energy_h6, energy)
+                number_h6 += 1
+            else:
+                # isotopes not yet included into channel ID:
+                number_rest += 1
+
+        else:
+            print("-----WARNING: other target particle than C12!")
+
+    """ get fraction of events for the different residual isotopes BEFORE de-exciation (IN PERCENT): """
+    # fraction of NC interaction events with residual isotopes in % (float):
+    fraction_c12 = float(number_c12)/float(number_entries)*100
+    fraction_c11 = float(number_c11)/float(number_entries)*100
+    fraction_b11 = float(number_b11)/float(number_entries)*100
+    fraction_c10 = float(number_c10)/float(number_entries)*100
+    fraction_b10 = float(number_b10)/float(number_entries)*100
+    fraction_be10 = float(number_be10)/float(number_entries)*100
+    fraction_c9 = float(number_c9)/float(number_entries)*100
+    fraction_b9 = float(number_b9)/float(number_entries)*100
+    fraction_be9 = float(number_be9)/float(number_entries)*100
+    fraction_li9 = float(number_li9)/float(number_entries)*100
+    fraction_c8 = float(number_c8)/float(number_entries)*100
+    fraction_b8 = float(number_b8)/float(number_entries)*100
+    fraction_be8 = float(number_be8)/float(number_entries)*100
+    fraction_li8 = float(number_li8)/float(number_entries)*100
+    fraction_he8 = float(number_he8)/float(number_entries)*100
+    fraction_b7 = float(number_b7)/float(number_entries)*100
+    fraction_be7 = float(number_be7)/float(number_entries)*100
+    fraction_li7 = float(number_li7)/float(number_entries)*100
+    fraction_he7 = float(number_he7)/float(number_entries)*100
+    fraction_h7 = float(number_h7)/float(number_entries)*100
+    fraction_be6 = float(number_be6)/float(number_entries)*100
+    fraction_li6 = float(number_li6)/float(number_entries)*100
+    fraction_he6 = float(number_he6)/float(number_entries)*100
+    fraction_h6 = float(number_h6)/float(number_entries)*100
+    fraction_rest = float(number_rest)/float(number_entries)*100
+
+    """ create histograms with the energy arrays from above to get the number of events per bin: """
+    energy_range = np.arange(0, np.max(projectile_energy)+2, bin_width)
+    events_c12, bins1 = np.histogram(energy_c12, energy_range)
+    events_c11, bins1 = np.histogram(energy_c11, energy_range)
+    events_b11, bins1 = np.histogram(energy_b11, energy_range)
+    events_c10, bins1 = np.histogram(energy_c10, energy_range)
+    events_b10, bins1 = np.histogram(energy_b10, energy_range)
+    events_be10, bins1 = np.histogram(energy_be10, energy_range)
+    events_c9, bins1 = np.histogram(energy_c9, energy_range)
+    events_b9, bins1 = np.histogram(energy_b9, energy_range)
+    events_be9, bins1 = np.histogram(energy_be9, energy_range)
+    events_li9, bins1 = np.histogram(energy_li9, energy_range)
+    events_c8, bins1 = np.histogram(energy_c8, energy_range)
+    events_b8, bins1 = np.histogram(energy_b8, energy_range)
+    events_be8, bins1 = np.histogram(energy_be8, energy_range)
+    events_li8, bins1 = np.histogram(energy_li8, energy_range)
+    events_he8, bins1 = np.histogram(energy_he8, energy_range)
+    events_b7, bins1 = np.histogram(energy_b7, energy_range)
+    events_be7, bins1 = np.histogram(energy_be7, energy_range)
+    events_li7, bins1 = np.histogram(energy_li7, energy_range)
+    events_he7, bins1 = np.histogram(energy_he7, energy_range)
+    events_h7, bins1 = np.histogram(energy_h7, energy_range)
+    events_be6, bins1 = np.histogram(energy_be6, energy_range)
+    events_li6, bins1 = np.histogram(energy_li6, energy_range)
+    events_he6, bins1 = np.histogram(energy_he6, energy_range)
+    events_h6, bins1 = np.histogram(energy_h6, energy_range)
+
+    return (energy_range, events_c12, events_c11, events_b11, events_c10, events_b10, events_be10, events_c9, events_b9,
+            events_be9, events_li9, events_c8, events_b8, events_be8, events_li8, events_he8, events_b7, events_be7,
+            events_li7, events_he7, events_h7, events_be6, events_li6, events_he6, events_h6,
+            number_c12, number_c11, number_b11, number_c10, number_b10, number_be10, number_c9, number_b9, number_be9,
+            number_li9, number_c8, number_b8, number_be8, number_li8, number_he8, number_b7, number_be7, number_li7,
+            number_he7, number_h7, number_be6, number_li6, number_he6, number_h6, number_rest,
+            fraction_c12, fraction_c11, fraction_b11, fraction_c10, fraction_b10, fraction_be10, fraction_c9,
+            fraction_b9, fraction_be9, fraction_li9, fraction_c8, fraction_b8, fraction_be8, fraction_li8, fraction_he8,
+            fraction_b7, fraction_be7, fraction_li7, fraction_he7, fraction_h7, fraction_be6, fraction_li6,
+            fraction_he6, fraction_h6, fraction_rest)
 
 
 def check_high_channelid(channel_id, final_pdg):

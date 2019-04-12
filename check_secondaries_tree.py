@@ -484,9 +484,9 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
             print("\nWARNING:             Different numbers of nCaptures: nCapture tree = {0:d}, secondaries tree = "
                   "{1:d}\n\n".format(number_ncapture, num_n_capture))
 
-        if num_n_capture == number_init_neutrons:
-            print("**************   number of initial neutrons = number of neutron captures!    ***************\n")
-            continue
+        # if num_n_capture == number_init_neutrons:
+        #     print("**************   number of initial neutrons = number of neutron captures!    ***************\n")
+        #     continue
 
         if num_n_capture == 0:
             print("No neutron capture in the event!\n")
@@ -600,8 +600,8 @@ Output_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
 
 # set the file number, the number of the first event and number of the last event that should be read:
 file_number = 0
-first_event = 21
-last_event = 40
+first_event = 0
+last_event = 0
 
 # path to file:
 # Input_file = Input_path + ".root"

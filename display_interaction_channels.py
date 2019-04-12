@@ -110,10 +110,10 @@ F_nu_Be8_2p_2n = 1.1800
 F_nu_C10_p_n_piminus = 1.0105
 F_nu_Be10_p_n_piplus = 0.9422
 
-channels_2 = ('$^{10}Be$ + $p$ + $n$ + $\\pi^+$', '$^{10}C$ + $p$ + $n$ + $\pi^-$', '$^8Be$ + $2p$ + $2n$',
-              'no isotope (only $p$, $n$, $\pi$, ...)', '$^9Be$ + $2p$ + $n$', '$^9B$ + $p$ + $2n$',
-              '$^{11}B$ + $n$ + $\pi^+$', '$^{10}C$ + $2n$', '$^{10}Be$ + $2p$',
-              '$^{11}C$ + $p$ + $\pi^-$', '$^{10}B$ + $p$ + $n$', '$^{11}C$ + $n$', '$^{11}B$ + $p$')
+channels_2 = ('$^{10}Be$ + $p$ + $n$ + $\\pi^+$', '$^{10}C$ + $p$ + $n$ + $\\pi^-$', '$^8Be$ + $2p$ + $2n$',
+              'no isotope (only $p$, $n$, $\\pi$, ...)', '$^9Be$ + $2p$ + $n$', '$^9B$ + $p$ + $2n$',
+              '$^{11}B$ + $n$ + $\\pi^+$', '$^{10}C$ + $2n$', '$^{10}Be$ + $2p$',
+              '$^{11}C$ + $p$ + $\\pi^-$', '$^{10}B$ + $p$ + $n$', '$^{11}C$ + $n$', '$^{11}B$ + $p$')
 
 pos_2 = np.arange(len(channels_2))
 
@@ -129,6 +129,71 @@ plt.xticks(fontsize=11)
 plt.yticks(pos_2, channels_2, fontsize=12)
 plt.xlabel('fraction in %', fontsize=12)
 plt.title('75% of all atmospheric NC neutrino interactions on $^{12}C$\n'
+          '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
+plt.grid(axis='x')
+
+
+""" insert the fractions of the different interaction channels from 'interaction_channels_edit.ods', 
+    sheet 'Interaction Channels after Generator'. These fraction are calculated with checkout_NCgen.py and saved in 
+    file NC_onlyC12_interaction_channels_250000evts.txt.
+    
+    IMPORTANT: fractions of isotopes are only included, when there exists the corresponding TALYS simulation of the 
+    isotope!    """
+# total fractions of each isotope (in %), if total fraction > 2 % (sum of these fraction 77.65 %):
+frac_nu_B11 = 24.55
+frac_nu_C11 = 22.72
+frac_nu_B10 = 16.41
+frac_nu_Be10 = 4.50
+frac_nu_C10 = 4.43
+frac_nu_B9 = 2.68
+frac_nu_Be9 = 2.36
+
+channels_3 = ('$^{9}Be$ + ...', '$^{9}B$ + ...', '$^{10}C$ + ...', '$^{10}Be$ + ...', '$^{10}B$ + ...',
+              '$^{11}C$ + ...', '$^{11}B$ + ...')
+
+pos_3 = np.arange(len(channels_3))
+
+fractions_3 = np.array([frac_nu_Be9, frac_nu_B9, frac_nu_C10, frac_nu_Be10, frac_nu_B10, frac_nu_C11, frac_nu_B11])
+
+""" display in bar chart """
+fig3, ax3 = plt.subplots()
+horizontal_bars_3 = ax3.barh(pos_3, fractions_3, align='center', alpha=0.9)
+label_barh(ax3, horizontal_bars_3, "{:.4}", is_inside=False, fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(pos_3, channels_3, fontsize=12)
+plt.xlabel('fraction in %', fontsize=12)
+plt.title('78% of all atmospheric NC neutrino interactions on $^{12}C$\n'
+          '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
+plt.grid(axis='x')
+
+# leading fractions in % (sum of these fractions 70.02 %):
+frac_nu_B11_p = 21.01
+frac_nu_C11_n = 18.79
+frac_nu_B10_p_n = 14.03
+frac_nu_Be10_2p = 3.30
+frac_nu_C11_p_piminus = 3.25
+frac_nu_C10_2n = 3.24
+frac_nu_B11_n_piplus = 2.67
+frac_nu_B9_p_2n = 2.02
+frac_nu_Be9_2p_n = 1.71
+
+channels_4 = ('$^9Be$ + $2p$ + $n$', '$^9B$ + $p$ + $2n$', '$^{11}B$ + $n$ + $\\pi^+$', '$^{10}C$ + $2n$',
+              '$^{11}C$ + $p$ + $\\pi^-$', '$^{10}Be$ + $2p$', '$^{10}B$ + $p$ + $n$', '$^{11}C$ + $n$',
+              '$^{11}B$ + $p$')
+
+pos_4 = np.arange(len(channels_4))
+
+fractions_4 = np.array([frac_nu_Be9_2p_n, frac_nu_B9_p_2n, frac_nu_B11_n_piplus, frac_nu_C10_2n, frac_nu_C11_p_piminus,
+                        frac_nu_Be10_2p, frac_nu_B10_p_n, frac_nu_C11_n, frac_nu_B11_p])
+
+""" display in bar chart """
+fig4, ax4 = plt.subplots()
+horizontal_bars_4 = ax4.barh(pos_4, fractions_4, align='center', alpha=0.9)
+label_barh(ax4, horizontal_bars_4, "{:.4}", is_inside=False, fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(pos_4, channels_4, fontsize=12)
+plt.xlabel('fraction in %', fontsize=12)
+plt.title('70% of all atmospheric NC neutrino interactions on $^{12}C$\n'
           '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
 plt.grid(axis='x')
 

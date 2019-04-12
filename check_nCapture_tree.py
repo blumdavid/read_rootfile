@@ -207,8 +207,8 @@ Output_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
 
 # set the file number, the number of the first event and number of the last event that should be read:
 file_number = 0
-start_number = 11
-stop_number = 11
+start_number = 0
+stop_number = 2
 
 # path to file:
 # Input_file = Input_path + ".root"

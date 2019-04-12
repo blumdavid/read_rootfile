@@ -15,8 +15,7 @@
     For the interactions with the LS, the interactions on C12, protons, electron, N14, O16 and S32 are considered
     (composition of LS: C12=0.87924, proton=0.1201, O16=0.00034, N14=0.00027, S32=5e-5).
 
-    The output of the GENIE simulation is saved in "genie_data.root". Only QEL AND NC events are taken into account
-    (but all targets)
+    The output of the GENIE simulation is saved in "genie_data.root". Only NC events on C12 are taken into account.
 
     Then the deexcitation of the products from the NC interactions is simulated:
     The status of the residual nucleus is unknown. Therefore the deexcitation of the residual nucleus is assumed from
@@ -102,7 +101,7 @@ else:
     NumEvent = evtnumber_fromLength
 
 
-# get the number of event as function of the energy of the incoming neutrinos for each neutrino type:
+# get the number of events as function of the energy of the incoming neutrinos for each neutrino type:
 (Energy_nu_incoming,
  Event_nu_e_IN, Event_nu_e_bar_IN, Event_nu_mu_IN, Event_nu_mu_bar_IN, Event_nu_tau_IN, Event_nu_tau_bar_IN,
  Number_nu_e_IN, Number_nu_e_bar_IN, Number_nu_mu_IN, Number_nu_mu_bar_IN, Number_nu_tau_IN, Number_nu_tau_bar_IN,
@@ -199,6 +198,20 @@ else:
     = NC_background_functions.get_deex_channel(deexcitation_ID, isotope_PDG, target_PDG)
 
 
+# get the number of events as function of the incoming neutrino energy for the different residual isotopes BEFORE
+# deexcitation (C12, C11, B11, C10, B10, Be10, C9, B9, Be9, Li9, C8, B8, Be8, Li8, He8, B7, Be7, Li7, He7, H7, Be6, Li6,
+# He6, H6):
+(Energy_nu_incoming_2, Events_c12, Events_c11, Events_b11, Events_c10, Events_b10, Events_be10, Events_c9, Events_b9,
+ Events_be9, Events_li9, Events_c8, Events_b8, Events_be8, Events_li8, Events_he8, Events_b7, Events_be7, Events_li7,
+ Events_he7, Events_h7, Events_be6, Events_li6, Events_he6, Events_h6,
+ Number_c12, Number_c11, Number_b11, Number_c10, Number_b10, Number_be10, Number_c9, Number_b9, Number_be9, Number_li9,
+ Number_c8, Number_b8, Number_be8, Number_li8, Number_he8, Number_b7, Number_be7, Number_li7, Number_he7, Number_h7,
+ Number_be6, Number_li6, Number_he6, Number_h6, Number_rest,
+ Fraction_c12, Fraction_c11, Fraction_b11, Fraction_c10, Fraction_b10, Fraction_be10, Fraction_c9, Fraction_b9,
+ Fraction_be9, Fraction_li9, Fraction_c8, Fraction_b8, Fraction_be8, Fraction_li8, Fraction_he8, Fraction_b7,
+ Fraction_be7, Fraction_li7, Fraction_he7, Fraction_h7, Fraction_be6, Fraction_li6, Fraction_he6, Fraction_h6,
+ Fraction_rest) = NC_background_functions.get_residual_isotopes_before_deex(projectile_E, isotope_PDG, target_PDG,
+                                                                            bin_width_incoming)
 
 
 """ Display Output of 'get_neutrino_energy()' in plot: """
@@ -230,10 +243,10 @@ if Number_nu_tau_bar_IN != 0:
              label="interactions with $\\bar{\\nu}_\\tau$: $N_{events} = $"+"{0:.2f}; fraction = {1:.2f}%"
              .format(Number_nu_tau_bar_IN, Frac_nu_tau_bar_IN))
 
-plt.xlim(xmin=0)
+plt.xlim(xmin=0, xmax=10.0)
 plt.ylim(ymin=0)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
-plt.ylabel("events", fontsize=15)
+plt.ylabel("events per bin (bin-width = {0:.2f} GeV)".format(bin_width_incoming), fontsize=15)
 plt.title("Energy spectrum of atmospheric neutrinos (interacting via NC on $^{12}C$ in the JUNO detector)", fontsize=20)
 plt.legend(fontsize=12)
 
@@ -278,10 +291,10 @@ if Number_ES_proton != 0:
              label="interaction on protons: $N_{events} = $"+"{0:.2f}; fraction = {1:.2f}%"
              .format(Number_ES_proton, Frac_ES_proton_target))
 
-plt.xlim(xmin=0)
+plt.xlim(xmin=0, xmax=10.0)
 plt.ylim(ymin=0)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
-plt.ylabel("events", fontsize=15)
+plt.ylabel("events per bin (bin-width = {0:.2f} GeV)".format(bin_width_incoming), fontsize=15)
 plt.title("Neutrino energy spectrum for NC interactions on $^{12}C$", fontsize=20)
 plt.legend(fontsize=12)
 
@@ -684,6 +697,132 @@ if SAVE_TXT:
                .format(input_name, now))
 
 
+""" Display Output of 'get_residual_isotopes_before_deex()' in plot: """
+h3 = plt.figure(3, figsize=(15, 8))
+
+plt.plot([], [], color='w', label="total number of entries = {0:d}".format(NumEvent))
+# do not display the histogram, when fraction is to small:
+if Fraction_c12 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_c12, drawstyle='steps', color='m',
+             label="$^{12}$C:"+" fraction = {0:.2f}%".format(Fraction_c12))
+if Fraction_c11 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_c11, drawstyle='steps', color='b', linestyle='solid',
+             label="$^{11}$C:"+" fraction = {0:.2f}%".format(Fraction_c11))
+if Fraction_b11 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_b11, drawstyle='steps', color='r', linestyle='solid',
+             label="$^{11}$B:"+" fraction = {0:.2f}%".format(Fraction_b11))
+if Fraction_c10 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_c10, drawstyle='steps', color='b', linestyle='dashed',
+             label="$^{10}$C:"+" fraction = {0:.2f}%".format(Fraction_c10))
+if Fraction_b10 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_b10, drawstyle='steps', color='r', linestyle='dashed',
+             label="$^{10}$B:"+" fraction = {0:.2f}%".format(Fraction_b10))
+if Fraction_be10 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_be10, drawstyle='steps', color='g', linestyle='dashed',
+             label="$^{10}$Be:"+" fraction = {0:.2f}%".format(Fraction_be10))
+if Fraction_c9 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_c9, drawstyle='steps', color='b', linestyle='dotted',
+             label="$^{9}$C:"+" fraction = {0:.2f}%".format(Fraction_c9))
+if Fraction_b9 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_b9, drawstyle='steps', color='r', linestyle='dotted',
+             label="$^{9}$B:"+" fraction = {0:.2f}%".format(Fraction_b9))
+if Fraction_be9 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_be9, drawstyle='steps', color='g', linestyle='dotted',
+             label="$^{9}$Be:"+" fraction = {0:.2f}%".format(Fraction_be9))
+if Fraction_li9 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_li9, drawstyle='steps', color='k', linestyle='dotted',
+             label="$^{9}$Li:"+" fraction = {0:.2f}%".format(Fraction_li9))
+if Fraction_c8 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_c8, drawstyle='steps', color='m',
+             label="$^{8}$C:"+" fraction = {0:.2f}%".format(Fraction_c8))
+if Fraction_b8 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_b8, drawstyle='steps', color='m',
+             label="$^{8}$B:"+" fraction = {0:.2f}%".format(Fraction_b8))
+if Fraction_be8 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_be8, drawstyle='steps', color='m',
+             label="$^{8}$Be:"+" fraction = {0:.2f}%".format(Fraction_be8))
+if Fraction_li8 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_li8, drawstyle='steps', color='m',
+             label="$^{8}$Li:"+" fraction = {0:.2f}%".format(Fraction_li8))
+if Fraction_he8 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_he8, drawstyle='steps', color='m',
+             label="$^{8}$He:"+" fraction = {0:.2f}%".format(Fraction_he8))
+if Fraction_b7 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_b7, drawstyle='steps', color='r', linestyle='dashdot',
+             label="$^{7}$B:"+" fraction = {0:.2f}%".format(Fraction_b7))
+if Fraction_be7 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_be7, drawstyle='steps', color='g', linestyle='dashdot',
+             label="$^{7}$Be:"+" fraction = {0:.2f}%".format(Fraction_be7))
+if Fraction_li7 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_li7, drawstyle='steps', color='k', linestyle='dashdot',
+             label="$^{7}$Li:"+" fraction = {0:.2f}%".format(Fraction_li7))
+if Fraction_he7 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_he7, drawstyle='steps', color='m', linestyle='dashdot',
+             label="$^{7}$He:"+" fraction = {0:.2f}%".format(Fraction_he7))
+if Fraction_h7 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_h7, drawstyle='steps', color='c', linestyle='dashdot',
+             label="$^{7}$H:"+" fraction = {0:.2f}%".format(Fraction_h7))
+if Fraction_be6 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_be6, drawstyle='steps', color='m',
+             label="$^{6}$Be:"+" fraction = {0:.2f}%".format(Fraction_be6))
+if Fraction_li6 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_li6, drawstyle='steps', color='m',
+             label="$^{6}$Li:"+" fraction = {0:.2f}%".format(Fraction_li6))
+if Fraction_he6 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_he6, drawstyle='steps', color='m',
+             label="$^{6}$He:"+" fraction = {0:.2f}%".format(Fraction_he6))
+if Fraction_h6 > 2.0:
+    plt.plot(Energy_nu_incoming_2[:-1], Events_h6, drawstyle='steps', color='m',
+             label="$^{6}$H:"+" fraction = {0:.2f}%".format(Fraction_h6))
+plt.xlim(xmin=0, xmax=10.0)
+plt.ylim(ymin=0)
+plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
+plt.ylabel("events per bin (bin-width = {0:.2f} GeV)".format(bin_width_incoming), fontsize=15)
+plt.title("Neutrino energy spectrum for NC interactions on $^{12}C$ for different residual isotopes"
+          "\n($\\nu_x$+$^{12}C$ $\\rightarrow$ $\\nu_x$ + ...)", fontsize=20)
+plt.legend(fontsize=12)
+
+if SAVE_FIG:
+    plt.savefig(output_path + "residual_isotopes_before_deex_{0:.0f}evts.png".format(NumEvent))
+
+""" Save information about residual isotopes before deexcitation into txt file: """
+if SAVE_TXT:
+    np.savetxt(output_path + "residual_isotopes_before_deex_{0:.0f}evts.txt".format(NumEvent),
+               np.array([NumEvent, Fraction_c12, Fraction_c11, Fraction_b11, Fraction_c10, Fraction_b10, Fraction_be10,
+                         Fraction_c9, Fraction_b9, Fraction_be9, Fraction_li9, Fraction_c8, Fraction_b8, Fraction_be8,
+                         Fraction_li8, Fraction_he8, Fraction_b7, Fraction_be7, Fraction_li7, Fraction_he7,
+                         Fraction_h7, Fraction_be6, Fraction_li6, Fraction_he6, Fraction_h6, Fraction_rest]),
+               fmt='%4.5f',
+               header="Information about the fraction (in %) of residual isotopes before deexcitation, which are"
+                      " produced, when neutrinos interact via NC on C12 in the JUNO liquid scintillator\n"
+                      "(input file: {0}, script: checkout_NCgen.py ({1})):\n"
+                      "Number of events in the input file,\n"
+                      "Fraction of C12 in %,\n"
+                      "Fraction of C11 in %,\n"
+                      "Fraction of B11 in %,\n"
+                      "Fraction of C10 in %,\n"
+                      "Fraction of B10 in %,\n"
+                      "Fraction of Be10 in %,\n"
+                      "Fraction of C9 in %,\n"
+                      "Fraction of B9 in %,\n"
+                      "Fraction of Be9 in %,\n"
+                      "Fraction of Li9 in %,\n"
+                      "Fraction of C8 in %,\n"
+                      "Fraction of B8 in %,\n"
+                      "Fraction of Be8 in %,\n"
+                      "Fraction of Li8 in %,\n"
+                      "Fraction of He8 in %,\n"
+                      "Fraction of B7 in %,\n"
+                      "Fraction of Be7 in %,\n"
+                      "Fraction of Li7 in %,\n"
+                      "Fraction of He7 in %,\n"
+                      "Fraction of H7 in %,\n"
+                      "Fraction of Be6 in %,\n"
+                      "Fraction of Li6 in %,\n"
+                      "Fraction of He6 in %,\n"
+                      "Fraction of H6 in %,\n"
+                      "Fraction of isotopes not yet included:"
+               .format(input_name, now))
 
 if SHOW_PLOT:
     plt.show()
