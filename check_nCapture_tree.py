@@ -199,8 +199,8 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # set the path of the input files (filename must be 'user_atmoNC_{}.root'):
-# Input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/"
-Input_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
+Input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/"
+# Input_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
 
 # set path, where results should be saved:
 Output_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"

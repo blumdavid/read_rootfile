@@ -40,10 +40,32 @@ number_events_total_rest = (stop_number_rest - start_number + 1) * Number_entrie
 PLOT_POSITION = True
 PLOT_INITENERGY = True
 PLOT_HITTIME = True
+READ_DATA = False
+
+
+def save_array_to_file(arr, out_path, file_name, number_events):
+    """
+    function to save an array (either number_pe or qedep) to txt file to save time, because you must read the file only
+    once
+    :param arr: array that should be saved (array of float)
+    :param out_path: path, where the txt file should be saved (string)
+    :param file_name: file name of the txt file (string)
+    :param number_events: number of events in the array/root-file
+    :return:
+    """
+    np.savetxt(out_path + file_name + ".txt", arr, fmt='%1.5f',
+               header="{0} of {1:d} events analyzed with script check_delayed_energy.py\n(number of photo-electron per "
+                      "event OR quenched deposited energy/ visible energy per event in MeV).\n"
+                      "({2}):".format(file_name, number_events, now))
+
+    return
+
 
 """ preallocate arrays for 2.2 MeV gamma: """
 # number of PE of each event:
 number_pe_2_2 = np.array([])
+# visible energy of each event in MeV:
+evis_2_2 = np.array([])
 # initial x position of each event in mm:
 xposition_init_2_2 = np.array([])
 # initial y position of each event in mm:
@@ -53,30 +75,43 @@ zposition_init_2_2 = np.array([])
 # initial total momentum of each event in MeV:
 momentum_init_2_2 = np.array([])
 
-print("\nstart reading 2.2 MeV gamma files...")
+if READ_DATA:
+    print("\nstart reading 2.2 MeV gamma files...")
 
-# loop over files of gamma = 2.2 MeV:
-for number in range(start_number, stop_number_2_2+1, 1):
-    # path to file:
-    input_file = input_path + "user_gamma_2_2_MeV_{0:d}.root".format(number)
-    # print(input_file)
+    # loop over files of gamma = 2.2 MeV:
+    for number in range(start_number, stop_number_2_2+1, 1):
+        # path to file:
+        input_file = input_path + "user_gamma_2_2_MeV_{0:d}.root".format(number)
+        # print(input_file)
 
-    # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
-    # initial x, y, z position per event in mm (arrays of float) and initial momentum per event in MeV (array of float):
-    num_pe_2_2, hittimes_2_2, xpos_2_2, ypos_2_2, zpos_2_2, momentum_2_2 = \
-        NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
+        # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
+        # initial x, y, z position per event in mm (arrays of float), initial momentum per event in MeV (array of float)
+        # and visible energy (quenched deposit energy) per event in MeV (array of float):
+        num_pe_2_2, hittimes_2_2, xpos_2_2, ypos_2_2, zpos_2_2, momentum_2_2, qedep_2_2 = \
+            NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
 
-    # append arrays to array:
-    number_pe_2_2 = np.append(number_pe_2_2, num_pe_2_2)
-    xposition_init_2_2 = np.append(xposition_init_2_2, xpos_2_2)
-    yposition_init_2_2 = np.append(yposition_init_2_2, ypos_2_2)
-    zposition_init_2_2 = np.append(zposition_init_2_2, zpos_2_2)
-    momentum_init_2_2 = np.append(momentum_init_2_2, momentum_2_2)
+        # append arrays to array:
+        number_pe_2_2 = np.append(number_pe_2_2, num_pe_2_2)
+        evis_2_2 = np.append(evis_2_2, qedep_2_2)
+        xposition_init_2_2 = np.append(xposition_init_2_2, xpos_2_2)
+        yposition_init_2_2 = np.append(yposition_init_2_2, ypos_2_2)
+        zposition_init_2_2 = np.append(zposition_init_2_2, zpos_2_2)
+        momentum_init_2_2 = np.append(momentum_init_2_2, momentum_2_2)
 
+    # save number of pe to txt file:
+    save_array_to_file(number_pe_2_2, output_path, "number_pe_gamma_2_2", len(number_pe_2_2))
+    # save evis to txt file:
+    save_array_to_file(evis_2_2, output_path, "qedep_gamma_2_2", len(evis_2_2))
+else:
+    # load number of pe and qedep array from txt file:
+    number_pe_2_2 = np.loadtxt(output_path + "number_pe_gamma_2_2.txt")
+    evis_2_2 = np.loadtxt(output_path + "qedep_gamma_2_2.txt")
 
 """ preallocate arrays for 1.9 MeV gamma: """
 # number of PE of each event:
 number_pe_1_9 = np.array([])
+# visible energy of each event in MeV:
+evis_1_9 = np.array([])
 # initial x position of each event in mm:
 xposition_init_1_9 = np.array([])
 # initial y position of each event in mm:
@@ -86,30 +121,43 @@ zposition_init_1_9 = np.array([])
 # initial total momentum of each event in MeV:
 momentum_init_1_9 = np.array([])
 
-print("\nstart reading 1.9 MeV gamma files...")
+if READ_DATA:
+    print("\nstart reading 1.9 MeV gamma files...")
 
-# loop over files of gamma = 1.9 MeV:
-for number in range(start_number, stop_number_rest+1, 1):
-    # path to file:
-    input_file = input_path + "user_gamma_1_9_MeV_{0:d}.root".format(number)
-    # print(input_file)
+    # loop over files of gamma = 1.9 MeV:
+    for number in range(start_number, stop_number_2_2+1, 1):
+        # path to file:
+        input_file = input_path + "user_gamma_1_9_MeV_{0:d}.root".format(number)
+        # print(input_file)
 
-    # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
-    # initial x, y, z position per event in mm (arrays of float) and initial momentum per event in MeV (array of float):
-    num_pe_1_9, hittimes_1_9, xpos_1_9, ypos_1_9, zpos_1_9, momentum_1_9 = \
-        NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
+        # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
+        # initial x, y, z position per event in mm (arrays of float), initial momentum per event in MeV (array of float)
+        # and visible energy (quenched deposit energy) per event in MeV (array of float):
+        num_pe_1_9, hittimes_1_9, xpos_1_9, ypos_1_9, zpos_1_9, momentum_1_9, qedep_1_9 = \
+            NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
 
-    # append arrays to array:
-    number_pe_1_9 = np.append(number_pe_1_9, num_pe_1_9)
-    xposition_init_1_9 = np.append(xposition_init_1_9, xpos_1_9)
-    yposition_init_1_9 = np.append(yposition_init_1_9, ypos_1_9)
-    zposition_init_1_9 = np.append(zposition_init_1_9, zpos_1_9)
-    momentum_init_1_9 = np.append(momentum_init_1_9, momentum_1_9)
+        # append arrays to array:
+        number_pe_1_9 = np.append(number_pe_1_9, num_pe_1_9)
+        evis_1_9 = np.append(evis_1_9, qedep_1_9)
+        xposition_init_1_9 = np.append(xposition_init_1_9, xpos_1_9)
+        yposition_init_1_9 = np.append(yposition_init_1_9, ypos_1_9)
+        zposition_init_1_9 = np.append(zposition_init_1_9, zpos_1_9)
+        momentum_init_1_9 = np.append(momentum_init_1_9, momentum_1_9)
 
+    # save number of pe to txt file:
+    save_array_to_file(number_pe_1_9, output_path, "number_pe_gamma_1_9", len(number_pe_1_9))
+    # save evis to txt file:
+    save_array_to_file(evis_1_9, output_path, "qedep_gamma_1_9", len(evis_1_9))
+else:
+    # load number of pe and qedep array from txt file:
+    number_pe_1_9 = np.loadtxt(output_path + "number_pe_gamma_1_9.txt")
+    evis_1_9 = np.loadtxt(output_path + "qedep_gamma_1_9.txt")
 
 """ preallocate arrays for 2.5 MeV gamma: """
 # number of PE of each event:
 number_pe_2_5 = np.array([])
+# visible energy of each event in MeV:
+evis_2_5 = np.array([])
 # initial x position of each event in mm:
 xposition_init_2_5 = np.array([])
 # initial y position of each event in mm:
@@ -119,25 +167,37 @@ zposition_init_2_5 = np.array([])
 # initial total momentum of each event in MeV:
 momentum_init_2_5 = np.array([])
 
-print("\nstart reading 2.5 MeV gamma files...")
+if READ_DATA:
+    print("\nstart reading 2.5 MeV gamma files...")
 
-# loop over files of gamma = 2.5 MeV:
-for number in range(start_number, stop_number_rest+1, 1):
-    # path to file:
-    input_file = input_path + "user_gamma_2_5_MeV_{0:d}.root".format(number)
-    # print(input_file)
+    # loop over files of gamma = 2.5 MeV:
+    for number in range(start_number, stop_number_rest+1, 1):
+        # path to file:
+        input_file = input_path + "user_gamma_2_5_MeV_{0:d}.root".format(number)
+        # print(input_file)
 
-    # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
-    # initial x, y, z position per event in mm (arrays of float) and initial momentum per event in MeV (array of float):
-    num_pe_2_5, hittimes_2_5, xpos_2_5, ypos_2_5, zpos_2_5, momentum_2_5 = \
-        NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
+        # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
+        # initial x, y, z position per event in mm (arrays of float), initial momentum per event in MeV (array of float)
+        # and visible energy (quenched deposit energy) per event in MeV (array of float):
+        num_pe_2_5, hittimes_2_5, xpos_2_5, ypos_2_5, zpos_2_5, momentum_2_5, qedep_2_5 = \
+            NC_background_functions.read_gamma_delayed_signal(input_file, Number_entries_input)
 
-    # append arrays to array:
-    number_pe_2_5 = np.append(number_pe_2_5, num_pe_2_5)
-    xposition_init_2_5 = np.append(xposition_init_2_5, xpos_2_5)
-    yposition_init_2_5 = np.append(yposition_init_2_5, ypos_2_5)
-    zposition_init_2_5 = np.append(zposition_init_2_5, zpos_2_5)
-    momentum_init_2_5 = np.append(momentum_init_2_5, momentum_2_5)
+        # append arrays to array:
+        number_pe_2_5 = np.append(number_pe_2_5, num_pe_2_5)
+        evis_2_5 = np.append(evis_2_5, qedep_2_5)
+        xposition_init_2_5 = np.append(xposition_init_2_5, xpos_2_5)
+        yposition_init_2_5 = np.append(yposition_init_2_5, ypos_2_5)
+        zposition_init_2_5 = np.append(zposition_init_2_5, zpos_2_5)
+        momentum_init_2_5 = np.append(momentum_init_2_5, momentum_2_5)
+
+    # save number of pe to txt file:
+    save_array_to_file(number_pe_2_5, output_path, "number_pe_gamma_2_5", len(number_pe_2_5))
+    # save evis to txt file:
+    save_array_to_file(evis_2_5, output_path, "qedep_gamma_2_5", len(evis_2_5))
+else:
+    # load number of pe and qedep array from txt file:
+    number_pe_2_5 = np.loadtxt(output_path + "number_pe_gamma_2_5.txt")
+    evis_2_5 = np.loadtxt(output_path + "qedep_gamma_2_5.txt")
 
 """ calculate R**2 with initial x, y, z-positions in mm**2: """
 # r**2 of 2.2 MeV gamma:
@@ -155,7 +215,7 @@ def gaussian(x, a, b, c):
 
 
 h1 = plt.figure(1, figsize=(15, 8))
-n_PE_2_2_MeV, bins_2_2_MeV, patches1 = plt.hist(number_pe_2_2, align='mid', bins=50,
+n_PE_2_2_MeV, bins_2_2_MeV, patches1 = plt.hist(number_pe_2_2, align='mid', bins=100,
                                                 label="{0:d} $\\gamma'$s with E = 2.2 MeV"
                                                 .format(number_events_total_2_2))
 # Fit gaussian distribution to histogram:
@@ -181,9 +241,9 @@ plt.savefig(output_path + "hist_nPE_2_2_MeV.png")
 
 
 h2 = plt.figure(2, figsize=(15, 8))
-n_PE_1_9_MeV, bins_1_9_MeV, patches2 = plt.hist(number_pe_1_9, align='mid', bins=50,
+n_PE_1_9_MeV, bins_1_9_MeV, patches2 = plt.hist(number_pe_1_9, align='mid', bins=100,
                                                 label="{0:d} $\\gamma'$s with E = 1.9 MeV"
-                                                .format(number_events_total_rest))
+                                                .format(number_events_total_2_2))
 # Fit gaussian distribution to histogram:
 # calculate mean of number of PE:
 mean_1_9_MeV = np.mean(number_pe_1_9)
@@ -206,7 +266,7 @@ plt.grid()
 plt.savefig(output_path + "hist_nPE_1_9_MeV.png")
 
 h3 = plt.figure(3, figsize=(15, 8))
-n_PE_2_5_MeV, bins_2_5_MeV, patches3 = plt.hist(number_pe_2_5, align='mid', bins=50,
+n_PE_2_5_MeV, bins_2_5_MeV, patches3 = plt.hist(number_pe_2_5, align='mid', bins=100,
                                                 label="{0:d} $\\gamma'$s with E = 2.5 MeV"
                                                 .format(number_events_total_rest))
 # Fit gaussian distribution to histogram:
@@ -230,8 +290,8 @@ plt.legend()
 plt.grid()
 plt.savefig(output_path + "hist_nPE_2_5_MeV.png")
 
-# plot initial position of gammas:
-if PLOT_POSITION:
+# plot initial position of gammas (READ_DATA must be True, otherwise the array are empty):
+if PLOT_POSITION and READ_DATA:
     h4 = plt.figure(4, figsize=(15, 8))
     range_detector = (-17700, 17700)
     plt.hist(xposition_init_2_2, bins=50, range=range_detector, align='mid', alpha=0.8, color='b', label="x position")
@@ -286,7 +346,7 @@ if PLOT_POSITION:
     plt.savefig(output_path + "init_R_square.png")
 
 # plot initial energy of gammas:
-if PLOT_INITENERGY:
+if PLOT_INITENERGY and READ_DATA:
     h7 = plt.figure(7, figsize=(15, 8))
     bin_width = 0.005
     Bins = np.arange(1.75, 2.65, bin_width)
@@ -304,7 +364,7 @@ if PLOT_INITENERGY:
     plt.savefig(output_path + "init_energy.png")
 
 # plot example of hittimes:
-if PLOT_HITTIME:
+if PLOT_HITTIME and READ_DATA:
     h8 = plt.figure(8, figsize=(15, 8))
     plt.hist(hittimes_2_2, bins=50, align='mid', histtype='step')
     plt.xlabel("hit-time in ns", fontsize=13)
@@ -314,8 +374,23 @@ if PLOT_HITTIME:
     plt.grid()
     plt.savefig(output_path + "example_hittime_2_2_MeV.png")
 
-""" Efficiency of energy cut of delayed signal (1.9 MeV < E_delayed < 2.5 MeV): """
-# 1.9 MeV correspond to number of PE of popt_1_9[1] (mean of gaussian fit of number_pe_1_9):
+
+""" plot E_visible as function of nPE: """
+h10 = plt.figure(10, figsize=(15, 8))
+plt.plot(number_pe_2_2, evis_2_2, "x", label="$E_{\\gamma}$ = 2.2 MeV"+" ({0:d} entries)".format(len(number_pe_2_2)))
+plt.plot(number_pe_1_9, evis_1_9, "x", label="$E_{\\gamma}$ = 1.9 MeV"+" ({0:d} entries)".format(len(number_pe_1_9)))
+plt.plot(number_pe_2_5, evis_2_5, "x", label="$E_{\\gamma}$ = 2.5 MeV"+" ({0:d} entries)".format(len(number_pe_2_5)))
+plt.xlabel("number of p.e.")
+plt.ylabel("visible energy in JUNO detector (in MeV)")
+plt.title("Visible energy vs. number of p.e. of $\\gamma$'s")
+plt.legend()
+plt.grid()
+plt.savefig(output_path + "qedep_vs_nPE_gamma.png")
+
+""" Efficiency of energy cut of delayed signal (1.9 MeV < E_visible_delayed < 2.5 MeV): """
+
+
+# 1.9 MeV correspond to number of PE of popt_n_10MeV[1] (mean of gaussian fit of number_pe_1_9):
 PE_cut_min = popt_1_9[1]
 # 2.5 MeV correspond to number of PE pf popt_2_5[1] (mean of gaussian fit of number_pe_2_5):
 PE_cut_max = popt_2_5[1]
@@ -333,8 +408,8 @@ for index in range(len(number_pe_2_2)):
 # efficiency of energy cut on delayed signal (in percent):
 efficiency = float(entries_notcutaway) / float(number_events_total_2_2) * 100
 
-h10 = plt.figure(10, figsize=(15, 8))
-plt.hist(number_pe_2_2, align='mid', bins=50, label="{0:d} $\\gamma'$s with E = 2.2 MeV\ncut efficiency = {1:0.2f}%"
+h11 = plt.figure(11, figsize=(15, 8))
+plt.hist(number_pe_2_2, align='mid', bins=100, label="{0:d} $\\gamma'$s with E = 2.2 MeV\ncut efficiency = {1:0.2f}%"
          .format(number_events_total_2_2, efficiency))
 plt.axvline(PE_cut_min, ymin=0, ymax=max(n_PE_2_2_MeV), color='r', linestyle=":",
             label="lower cut parameter = {0:0.2f} PE (correspond to 1.9 MeV)".format(PE_cut_min))

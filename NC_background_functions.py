@@ -409,6 +409,146 @@ def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hit
            number_possible_delayed, number_possible_second_delayed
 
 
+def conversion_npe_mev(rootfile_input, number_entries_input):
+    """
+    function to read user_proton_..._.root files from detsim simulation to convert neutron/proton energy of possible
+    prompt signal from number of photo-electron (nPE) to MeV.
+
+    :param rootfile_input: input root file from tut_detsim.py: e.g. user_proton_10_MeV_0.root (string)
+    :param number_entries_input: number of entries, that the input files should have (int)
+
+    :return:
+    """
+    # load ROOT file:
+    rfile = ROOT.TFile(rootfile_input)
+    # get the "evt"-TTree from the TFile:
+    rtree_evt = rfile.Get("evt")
+    # get the number of events in the geninfo Tree:
+    number_events_evt = rtree_evt.GetEntries()
+
+    # get the "geninfo"-TTree from the TFile:
+    rtree_geninfo = rfile.Get("geninfo")
+    # get the number of events in the geninfo Tree:
+    number_events_geninfo = rtree_geninfo.GetEntries()
+
+    # get the 'prmtrkdep' tree:
+    rtree_prmtrkdep = rfile.Get('prmtrkdep')
+    # get number of events in the tree:
+    number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
+
+    # check if number of events are equal in both trees:
+    if number_events_geninfo == number_events_evt and number_events_evt == number_events_prmtrkdep:
+        number_events = number_events_geninfo
+    else:
+        sys.exit("ERROR: number of events in t Trees are NOT equal!!")
+
+    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    if number_events != number_entries_input:
+        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
+                 .format(number_entries_input))
+
+    # preallocate array, where number of PE per event (e.g. per gamma) is saved (np.array of int):
+    number_pe = np.array([])
+
+    # preallocate array. where initial momentum per event is saved (in MeV):
+    init_momentum = np.array([])
+    # preallocate array, where deposit energy per event is saved (in MeV):
+    edep = np.array([])
+    # preallocate array, where quenched deposit energy (visible energy) is saved (in MeV):
+    qedep = np.array([])
+
+    # loop over every event, i.e. every entry, in the TTree:
+    for event in range(number_events):
+
+        """ first read 'evt' tree: """
+        # get the current event in the TTree:
+        rtree_evt.GetEntry(event)
+
+        # get event ID of evt-tree:
+        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of photons of this event:
+        n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
+
+        """ preallocate variables: """
+        # number of pe in event:
+        number_pe_event = 0
+        # hittime of photons in event in ns:
+        hittime_event = np.array([])
+
+        # loop over every photon in the event:
+        for index in range(n_photons):
+
+            # get PMT ID, where photon is absorbed:
+            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
+
+            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
+            if pmt_id < 25000:
+                # get nPE for this photon:
+                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
+                # check, if photon produces only 1 PE:
+                if n_pe != 1:
+                    print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+
+                # add n_pe to number_pe_event:
+                number_pe_event = number_pe_event + n_pe
+
+                # get hittime of this photon:
+                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
+                # append hit_time to hittime_event:
+                hittime_event = np.append(hittime_event, hit_time)
+
+            else:
+                continue
+
+        # append number of PE of this event to number_pe array:
+        number_pe = np.append(number_pe, number_pe_event)
+
+        """ read 'geninfo' tree to check initial energy of gammas: """
+        # get the current event in the TTree:
+        rtree_geninfo.GetEntry(event)
+
+        # get event ID of geninfo-tree:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of particles of this event:
+        n_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+        # check, that only 1 particle per event:
+        if n_particles == 1:
+
+            # get initial momenta in x, y, z in MeV:
+            px_init = float(rtree_geninfo.GetBranch('InitPX').GetLeaf('InitPX').GetValue())
+            py_init = float(rtree_geninfo.GetBranch('InitPY').GetLeaf('InitPY').GetValue())
+            pz_init = float(rtree_geninfo.GetBranch('InitPZ').GetLeaf('InitPZ').GetValue())
+
+            # total initial momentum in MeV:
+            momentum = np.sqrt(px_init**2 + py_init**2 + pz_init**2)
+            # append momentum to array:
+            init_momentum = np.append(init_momentum, momentum)
+
+        else:
+            print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
+
+        """ read 'prmtrkdep' tree to check deposit energy and quenched deposit energy: """
+        # get the current event in the TTree:
+        rtree_prmtrkdep.GetEntry(event)
+
+        # get number of particles:
+        n_part = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+        # check, that only 1 particle per event:
+        if n_part == 1:
+
+            # get deposit energy in MeV:
+            edep_value = float(rtree_prmtrkdep.GetBranch('edep').GetLeaf('edep').GetValue())
+            edep = np.append(edep, edep_value)
+
+            # get quenched energy in MeV:
+            qedep_value = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue())
+            qedep = np.append(qedep, qedep_value)
+
+    return number_pe, hittime_event, init_momentum, edep, qedep
+
+
 def read_gamma_delayed_signal(rootfile_input, number_entries_input):
     """
     function to read user_gamma_..._.root files from detsim simulation to convert gamma energy of possible delayed
@@ -432,8 +572,13 @@ def read_gamma_delayed_signal(rootfile_input, number_entries_input):
     # get the number of events in the geninfo Tree:
     number_events_geninfo = rtree_geninfo.GetEntries()
 
+    # get "prmtrkdep" tree from root file:
+    rtree_prmtrkdep = rfile.Get("prmtrkdep")
+    # get number of events in prmtrkdep tree:
+    number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
+
     # check if number of events are equal in both trees:
-    if number_events_geninfo == number_events_evt:
+    if number_events_geninfo == number_events_evt and number_events_geninfo == number_events_prmtrkdep:
         number_events = number_events_geninfo
     else:
         sys.exit("ERROR: number of events in t Trees are NOT equal!!")
@@ -445,6 +590,9 @@ def read_gamma_delayed_signal(rootfile_input, number_entries_input):
 
     # preallocate array, where number of PE per event (e.g. per gamma) is saved (np.array of int):
     number_pe = np.array([])
+
+    # preallocate array, where visible energy (quenched deposited energy) of each event is saved (in MeV):
+    evis_array = np.array([])
 
     # preallocate array. where initial x position per event is saved (in mm):
     init_xpos = np.array([])
@@ -539,7 +687,23 @@ def read_gamma_delayed_signal(rootfile_input, number_entries_input):
         else:
             print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
 
-    return number_pe, hittime_event, init_xpos, init_ypos, init_zpos, init_momentum
+        """ read 'prmtrkdep' tree to get the visible energy of the gamma: """
+        # get current event:
+        rtree_prmtrkdep.GetEntry(event)
+
+        # get number of particles of this event (should be 0):
+        number_particles = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+        # check, that only 1 particles per event:
+        if number_particles == 1:
+            # get quenched deposit energy in MeV:
+            qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue())
+            # append to array:
+            evis_array = np.append(evis_array, qedep)
+
+        else:
+            print("{0:d} particles in event {1:d} in file {2}".format(number_particles, evt_id_geninfo, rootfile_input))
+
+    return number_pe, hittime_event, init_xpos, init_ypos, init_zpos, init_momentum, evis_array
 
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
@@ -1177,267 +1341,509 @@ def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e
             number_check2, number_case3_moreibdlike)
 
 
-def preselect_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
-                                 time_cut_max,
-                                 number_entries_input):
+def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_prompt_energy, time_cut_min,
+                                 time_cut_max, distance_cut, number_entries_input):
     """
     function to read the sample_detsim_user.root file and do a preselection of possible IBD-like signals
 
     :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
     :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
-    :param e_prompt_min: minimal prompt energy from energy cut in MeV, normally e_prompt_min = 10 MeV
-    :param e_prompt_max: maximal prompt energy from energy cut in MeV, normally e_prompt_max = 105 MeV
-    :param e_delayed_min: minimal delayed energy from energy cut in MeV, normally e_delayed_min = 1.9 MeV
-    :param e_delayed_max: maximal delayed energy from energy cut in MeV, normally e_delayed_max = 2.5 MeV
+    :param min_prompt_energy:   sets the minimal energy of the prompt signal in MeV -> compare this with total deposit
+                                energy of the event
+    :param max_prompt_energy:   maximum of total deposit energy of one event, does not contribute to cuts, just for
+                                information (in MeV)
+    :param time_cut_min: minimal time difference delayed to prompt in ns
     :param time_cut_max: maximal time difference delayed to prompt in ns, normally time_cut_max = 1 ms = 1 000 000 ns
-    :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
+    :param distance_cut: specifies distance cut between prompt and delayed signal, normally distance < 1.5 m = 1500 mm
+    :param number_entries_input: number of entries, that the input files should have (integer), normally = 1000
 
     :return:
     """
     # load the ROOT file:
     rfile = ROOT.TFile(rootfile_input)
     # get the "evt"-TTree from the TFile:
-    # rtree_evt = rfile.Get("evt")
+    rtree_evt = rfile.Get("evt")
     # get the "geninfo"-TTree from the TFile:
     rtree_geninfo = rfile.Get("geninfo")
     # get the "prmtrkdep"-TTree from the TFile:
     rtree_prmtrkdep = rfile.Get("prmtrkdep")
+    # get the "nCapture"-TTree from TFile:
+    rtree_ncapture = rfile.Get("nCapture")
+    # get the "secondaries"-TTree from TFile:
+    # rtree_secondaries = rfile.Get("secondaries")
 
+    # get number of events in evt tree:
+    number_events_evt = rtree_evt.GetEntries()
     # get the number of events in the geninfo Tree:
     number_events_geninfo = rtree_geninfo.GetEntries()
-    # get the number of events in the prmtrkdep Tree:
+    # get the number of events in the prmtrkdep tree:
     number_events_prmtrkdep = rtree_prmtrkdep.GetEntries()
-    if number_events_geninfo == number_events_prmtrkdep:
+    # get number of events in nCapture tree:
+    number_events_ncapture = rtree_ncapture.GetEntries()
+    # get number of events in secondaries tree:
+    # number_events_secondaries = rtree_secondaries.GetEntries()
+    number_events_secondaries = 100
+
+    if (number_events_evt == number_events_geninfo and number_events_evt == number_events_ncapture and
+            number_events_evt == number_events_secondaries and number_events_evt == number_events_prmtrkdep):
         number_events = number_events_geninfo
     else:
-        # number_events = 0
-        # print("ERROR: number of events in the Trees are NOT equal!!")
-        sys.exit("ERROR: number of events in t Trees are NOT equal!!")
+        sys.exit("ERROR: number of events in the Trees are NOT equal!!")
 
     # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
     if number_events != number_entries_input:
-        # number_events = 0
-        # print("ERROR: number of events are not equal to {0:d}".format(number_entries_input))
-        # print("-> Detector Simulation not correct!!")
-        sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
-                 .format(number_entries_input))
+        sys.exit("ERROR: number of events {0:d} are not equal to {1:d} -> Detector Simulation not correct!"
+                 .format(number_events, number_entries_input))
 
     # preallocate array, where event ID of events are saved, that pass the preselection (np.array of float):
     evt_id_preselected = np.array([])
+    # preallocate array, where the total deposit energy of the event is saved in MeV (np.array of float):
+    edep_total = np.array([])
 
-    # preallocate number of events, that pass the preselection (volume cut and (prompt energy cut or delayed energy
-    # cut)):
+    # preallocate number of events, that pass the preselection (volume cut and neutron-multiplicity cut, time cut and
+    # distance cut):
     number_preselected = 0
     # preallocate number of events, which are rejected by preselection criteria:
     number_rejected = 0
+    # preallocate number of events that pass volume cut:
+    number_vol_pass = 0
+    # preallocate number of events that are rejected by volume cut:
+    number_vol_reject = 0
+    # preallocate number of events that are rejected by volume cut of init_geninfo position:
+    number_vol_reject_init_geninfo = 0
+    # preallocate number of events that are rejected by volume cut of exit_geninfo position:
+    number_vol_reject_exit_geninfo = 0
+    # preallocate number of events that are rejected by volume cut of edep_prmtrkdep position:
+    number_vol_reject_edep_prmtrkdep = 0
+    # preallocate number of events that are rejected by volume cut of start_ncap position:
+    number_vol_reject_start_ncap = 0
+    # preallocate number of events that are rejected by volume cut of stop_ncap position:
+    number_vol_reject_stop_ncap = 0
+    # preallocate number of events that pass the energy cut:
+    number_e_pass = 0
+    # preallocate number of events that are rejected of minimal energy cut:
+    number_mine_reject = 0
+    # number of events that are rejected of maximum energy cut:
+    number_maxe_reject = 0
+    # preallocate number of events without nCapture:
+    number_without_ncap = 0
+    # preallocate, number of events, that pass neutron-multiplicity cut:
+    number_nmult_pass = 0
+    # preallocate, number of events, that are rejected by neutron-multiplicity cut:
+    number_nmult_reject = 0
+    # preallocate, number of events, that pass time cut:
+    number_time_pass = 0
+    # preallocate, number of events, that are rejected by time cut:
+    number_time_reject = 0
+    # preallocate, number of events, that pass distance cut:
+    number_dist_pass = 0
+    # preallocate, number of events, that are rejected by distance cut:
+    number_dist_reject = 0
 
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
-        """ preallocate arrays: """
+        """ preallocate variables for evt tree: """
+        # total deposited energy of this event (in MeV):
+        edep_evt = 0
+
+        """ preallocate variables for geninfo tree: """
         # PDG ID of initial particles of geninfo tree of each particle in the event:
         pdgid_init_geninfo = np.array([])
-        # initial position in x-direction in millimeter of each particle in the event:
-        x_init = np.array([])
-        # initial position in y-direction in millimeter of each particle in the event:
-        y_init = np.array([])
-        # initial position in z-direction in millimeter of each particle in the event:
-        z_init = np.array([])
-        # initial time in nanoseconds of each particle in the event:
-        time_init = np.array([])
-        # exit or stopping position in x-direction in millimeter of each particle in the event:
-        x_exit = np.array([])
-        # exit or stopping position in y-direction in millimeter of each particle in the event:
-        y_exit = np.array([])
-        # exit or stopping position in z-direction in millimeter of each particle in the event:
-        z_exit = np.array([])
-        # exit or stopping time in nanoseconds of each particle in the event:
-        time_exit = np.array([])
-        # deposited energy of each particle in the event in MeV:
-        e_dep = np.array([])
-        # visible energy (quenched deposited energy) of each particle in the event in MeV:
-        e_qdep = np.array([])
+        # initial position in x-direction in mm of initial particle in the event:
+        x_init_geninfo = np.array([])
+        # initial position in y-direction in mm of initial particle in the event:
+        y_init_geninfo = np.array([])
+        # initial position in z-direction in mm of initial particle in the event:
+        z_init_geninfo = np.array([])
+        # initial time in nanoseconds of initial particle in the event:
+        time_init_geninfo = np.array([])
+        # exit or stopping position in x-direction in mm of initial particle in the event:
+        x_exit_geninfo = np.array([])
+        # exit or stopping position in y-direction in mm of initial particle in the event:
+        y_exit_geninfo = np.array([])
+        # exit or stopping position in z-direction in mm of initial particle in the event:
+        z_exit_geninfo = np.array([])
 
-        # PDG ID of each particle in the event:
-        pdgid = np.array([])
+        """ preallocate variables for prmtrkdep tree: """
+        # stop position, where initial particles deposit their energy:
+        x_edep_prmtrkdep = np.array([])
+        y_edep_prmtrkdep = np.array([])
+        z_edep_prmtrkdep = np.array([])
 
-        """ first read the "geninfo" Tree"""
+        """ preallocate variables for nCapture tree: """
+        # time, when neutron is captured in ns:
+        capture_time_ncap = np.array([])
+        # start position of neutron capture in mm:
+        x_start_ncap = np.array([])
+        y_start_ncap = np.array([])
+        z_start_ncap = np.array([])
+        # stop position of neutron capture in mm:
+        x_stop_ncap = np.array([])
+        y_stop_ncap = np.array([])
+        z_stop_ncap = np.array([])
+        # kinetic energy in MeV of the gamma, that is produced by neutron capture:
+        kine_gamma_ncap = np.array([])
+
+        """ read 'evt' tree: """
+        # get current event:
+        rtree_evt.GetEntry(event)
+        # get the value of the event ID:
+        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+        # get total deposited energy of this event in MeV:
+        edep_evt = float(rtree_evt.GetBranch('edep').GetLeaf('edep').GetValue())
+
+        """ read the 'geninfo' Tree """
         # get the current event in the TTree:
         rtree_geninfo.GetEntry(event)
-
         # get the value of the event ID:
         evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # check event ID of the Trees:
+        if evt_id_geninfo == evt_id_evt:
+            evt_id = evt_id_evt
+        else:
+            sys.exit("ERROR: event ID in the Trees are NOT equal!")
 
         # get the value of the number of initial particles:
         n_par_geninfo = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
 
         # loop over the number of particles to get information about every particle in the event:
         for index in range(n_par_geninfo):
-
             # get the value of the initial PDG ID:
             init_pdgid_geninfo = int(rtree_geninfo.GetBranch('InitPDGID').GetLeaf('InitPDGID').GetValue(index))
             pdgid_init_geninfo = np.append(pdgid_init_geninfo, init_pdgid_geninfo)
 
             # get initial x position:
-            init_x = rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index)
-            x_init = np.append(x_init, init_x)
+            init_x = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index))
+            x_init_geninfo = np.append(x_init_geninfo, init_x)
 
             # get initial y position:
-            init_y = rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index)
-            y_init = np.append(y_init, init_y)
+            init_y = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index))
+            y_init_geninfo = np.append(y_init_geninfo, init_y)
 
             # get initial z position:
-            init_z = rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index)
-            z_init = np.append(z_init, init_z)
+            init_z = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index))
+            z_init_geninfo = np.append(z_init_geninfo, init_z)
 
             # get initial time:
-            init_time = rtree_geninfo.GetBranch('InitTime').GetLeaf('InitTime').GetValue(index)
-            time_init = np.append(time_init, init_time)
+            init_time = float(rtree_geninfo.GetBranch('InitTime').GetLeaf('InitTime').GetValue(index))
+            time_init_geninfo = np.append(time_init_geninfo, init_time)
 
             # get exit/stopping x-position:
-            exit_x = rtree_geninfo.GetBranch('ExitX').GetLeaf('ExitX').GetValue(index)
-            x_exit = np.append(x_exit, exit_x)
+            exit_x = float(rtree_geninfo.GetBranch('ExitX').GetLeaf('ExitX').GetValue(index))
+            x_exit_geninfo = np.append(x_exit_geninfo, exit_x)
 
             # get exit/stopping y-position:
-            exit_y = rtree_geninfo.GetBranch('ExitY').GetLeaf('ExitY').GetValue(index)
-            y_exit = np.append(y_exit, exit_y)
+            exit_y = float(rtree_geninfo.GetBranch('ExitY').GetLeaf('ExitY').GetValue(index))
+            y_exit_geninfo = np.append(y_exit_geninfo, exit_y)
 
             # get exit/stopping z-position:
-            exit_z = rtree_geninfo.GetBranch('ExitZ').GetLeaf('ExitZ').GetValue(index)
-            z_exit = np.append(z_exit, exit_z)
-
-            # get the exit/stopping time:
-            exit_time = rtree_geninfo.GetBranch('ExitT').GetLeaf('ExitT').GetValue(index)
-            time_exit = np.append(time_exit, exit_time)
+            exit_z = float(rtree_geninfo.GetBranch('ExitZ').GetLeaf('ExitZ').GetValue(index))
+            z_exit_geninfo = np.append(z_exit_geninfo, exit_z)
 
         """ then read the "prmtrkdep" Tree"""
         # get the current event in the TTree:
         rtree_prmtrkdep.GetEntry(event)
-
         # get the value of the event ID:
         evt_id_prmtrkdep = int(rtree_prmtrkdep.GetBranch('evtID').GetLeaf('evtID').GetValue())
 
+        # check event ID of the Trees:
+        if evt_id_prmtrkdep == evt_id_evt:
+            evt_id = evt_id_evt
+        else:
+            sys.exit("ERROR: event ID in the Trees are NOT equal!")
+
         # get the value of the number of initial particles:
         n_par_prmtrkdep = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
-
-        # check event ID of the Trees:
-        if evt_id_prmtrkdep == evt_id_geninfo:
-            evt_id = evt_id_geninfo
-        else:
-            # evt_id = 0
-            # print("ERROR: event ID in the Trees are NOT equal!!")
-            sys.exit("ERROR: event ID in the Trees are NOT equal!")
 
         # check number of initial particles of the Trees:
         if n_par_prmtrkdep == n_par_geninfo:
             n_par = n_par_geninfo
         else:
-            # n_par = 0
-            # print("ERROR: number of initial particles in the Trees are NOT equal!!")
             sys.exit("ERROR: number of initial particles in the Trees are NOT equal!")
 
         # loop over the number of particles to get information about every particle in the event:
         for index in range(n_par):
-
             # get the value of the PDG ID:
             pdgid_prmtrkdep = int(rtree_prmtrkdep.GetBranch('PDGID').GetLeaf('PDGID').GetValue(index))
             # check PDG ID of the Trees:
-            if pdgid_prmtrkdep == pdgid_init_geninfo[index]:
-                pdgid = np.append(pdgid, pdgid_prmtrkdep)
-            else:
-                pdgid = np.append(pdgid, 0)
-                print("ERROR: PDG ID in the Trees are NOT equal!!")
+            if pdgid_prmtrkdep != pdgid_init_geninfo[index]:
+                sys.exit("ERROR: PDG ID in the Trees are NOT equal!!")
 
-            # get deposited energy:
-            dep_e = rtree_prmtrkdep.GetBranch('edep').GetLeaf('edep').GetValue(index)
-            e_dep = np.append(e_dep, dep_e)
+            # get position deposited energy:
+            x_edep = float(rtree_prmtrkdep.GetBranch('edepX').GetLeaf('edepX').GetValue(index))
+            x_edep_prmtrkdep = np.append(x_edep_prmtrkdep, x_edep)
+            y_edep = float(rtree_prmtrkdep.GetBranch('edepY').GetLeaf('edepY').GetValue(index))
+            y_edep_prmtrkdep = np.append(y_edep_prmtrkdep, y_edep)
+            z_edep = float(rtree_prmtrkdep.GetBranch('edepZ').GetLeaf('edepZ').GetValue(index))
+            z_edep_prmtrkdep = np.append(z_edep_prmtrkdep, z_edep)
 
-            # get visible energy:
-            qdep_e = rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index)
-            e_qdep = np.append(e_qdep, qdep_e)
+        """ read 'nCapture' tree: """
+        # get current event:
+        rtree_ncapture.GetEntry(event)
+        # get value of eventID:
+        evt_id_ncap = int(rtree_ncapture.GetBranch('evtID').GetLeaf('evtID').GetValue())
 
-        """ Does the event mimic an IBD signal? """
-        # preallocate flag (array of boolean):
-        is_prompt_signal = np.array([])
-        is_delayed_signal = np.array([])
-
-        # set flags:
-        for index in range(n_par):
-            # calculate the distance of the particle to the center of the event:
-            r_init = np.sqrt(x_init[index]**2 + y_init[index]**2 + z_init[index]**2)
-            r_exit = np.sqrt(x_exit[index]**2 + y_exit[index]**2 + z_exit[index]**2)
-
-            # set is_prompt_signal flag (criteria: 10 MeV <= edep <= 105 MeV AND r_init < 17m AND r_exit < 17m):
-            if e_prompt_min <= e_dep[index] <= e_prompt_max and r_init < r_cut and r_exit < r_cut:
-                is_prompt_signal = np.append(is_prompt_signal, True)
-            else:
-                is_prompt_signal = np.append(is_prompt_signal, False)
-
-            # set is_delayed_signal flag (criteria: 1.9 MeV <= edep <= 2.5 MeV AND r_init < 17m AND r_exit < 17m):
-            if e_delayed_min <= e_dep[index] <= e_delayed_max and r_init < r_cut and r_exit < r_cut:
-                is_delayed_signal = np.append(is_delayed_signal, True)
-            else:
-                is_delayed_signal = np.append(is_delayed_signal, False)
-
-        # check if there are prompt and delayed signals in the event
-        check_prompt = np.count_nonzero(is_prompt_signal)
-        check_delayed = np.count_nonzero(is_delayed_signal)
-        if check_prompt == 0 or check_delayed == 0:
-            # no prompt signal OR no delayed signal in the event -> go to the next event
-
-            # increment number_rejected:
-            number_rejected = number_rejected + 1
-
-            continue
+        # check event ID of the Trees:
+        if evt_id_ncap == evt_id_evt:
+            evt_id = evt_id_evt
         else:
-            # there are at least 1 possible prompt and 1 possible delayed signal in the event:
+            sys.exit("ERROR: event ID in the Trees are NOT equal!")
 
-            # increment number_preselected:
-            number_preselected = number_preselected + 1
-            # add evt_id to array:
+        # get number of neutron captures in the event:
+        number_ncap = int(rtree_ncapture.GetBranch('NeutronN').GetLeaf('NeutronN').GetValue())
+
+        # get number of particles that are produced by neutron capture in the whole event:
+        n_ncap = int(rtree_ncapture.GetBranch('n').GetLeaf('n').GetValue())
+
+        # loop over number of neutron captures:
+        for index in range(number_ncap):
+
+            # get track ID of neutron:
+            trkid_neutron = int(rtree_ncapture.GetBranch('NeutronTrkid').GetLeaf('NeutronTrkid').GetValue(index))
+
+            # is there a gamma between 2.2 and 2.25 MeV:
+            number_gamma = 0
+
+            # loop over particles that are produced by neutron capture:
+            for index2 in range(n_ncap):
+                # get PDGID of the particle:
+                pdgid = int(rtree_ncapture.GetBranch('pdgid').GetLeaf('pdgid').GetValue(index2))
+                # get Track id of the particle:
+                trkid = int(rtree_ncapture.GetBranch('trkid').GetLeaf('trkid').GetValue(index2))
+                # check if particle is gamma and that it corresponds to the neutron:
+                if pdgid == 22 and trkid == trkid_neutron:
+                    # get kinetic energy of gamma:
+                    kine_gamma = float(rtree_ncapture.GetBranch('kine').GetLeaf('kine').GetValue(index2))
+
+                    if 2.2 < kine_gamma < 2.25:
+                        kine_gamma_ncap = np.append(kine_gamma_ncap, kine_gamma)
+                        # increment number_gamma:
+                        number_gamma += 1
+
+                        # if one 2.2 MeV gamma was found, go to the next neutron capture. This will maybe overestimate
+                        # the number of possible IBD-events, but the preselected events will be analyzed in detail
+                        # later, so this is no problem.
+                        break
+
+                else:
+                    continue
+
+            # when there is no gamma between 2.2 and 2.25 MeV corresponding to the neutron capture, so if
+            # number_gamma = 0, add 0.0 to kine_gamma_ncap array:
+            if number_gamma == 0:
+                kine_gamma_ncap = np.append(kine_gamma_ncap, 0.0)
+
+            # time, when neutron is captured
+            time_ncap = float(rtree_ncapture.GetBranch('NeutronCaptureT').GetLeaf('NeutronCaptureT').GetValue(index))
+            capture_time_ncap = np.append(capture_time_ncap, time_ncap)
+            # start position of neutron capture:
+            x_start = float(rtree_ncapture.GetBranch('NCStartX').GetLeaf('NCStartX').GetValue(index))
+            x_start_ncap = np.append(x_start_ncap, x_start)
+            y_start = float(rtree_ncapture.GetBranch('NCStartY').GetLeaf('NCStartY').GetValue(index))
+            y_start_ncap = np.append(y_start_ncap, y_start)
+            z_start = float(rtree_ncapture.GetBranch('NCStartZ').GetLeaf('NCStartZ').GetValue(index))
+            z_start_ncap = np.append(z_start_ncap, z_start)
+            # stop position of neutron capture:
+            x_stp = float(rtree_ncapture.GetBranch('NCStopX').GetLeaf('NCStopX').GetValue(index))
+            x_stop_ncap = np.append(x_stop_ncap, x_stp)
+            y_stp = float(rtree_ncapture.GetBranch('NCStopY').GetLeaf('NCStopY').GetValue(index))
+            y_stop_ncap = np.append(y_stop_ncap, y_stp)
+            z_stp = float(rtree_ncapture.GetBranch('NCStopZ').GetLeaf('NCStopZ').GetValue(index))
+            z_stop_ncap = np.append(z_stop_ncap, z_stp)
+
+        # set flag for different cuts of preselection:
+        flag_vol_pass = True
+        flag_vol_pass_init_geninfo = True
+        # flag_vol_pass_exit_geninfo = True
+        # flag_vol_pass_edep_prmtrkdep = True
+        flag_vol_pass_start_ncap = True
+        flag_vol_pass_stop_ncap = True
+        flag_e_pass = False
+        flag_nmult_pass = False
+        flag_time_pass = False
+        # flag_dist_pass: 0 means event is rejected, 1 means event passes distance cut,
+        # 2 means 0 or more than 1 neutron capture (do not count these cases)
+        flag_dist_pass = 2
+
+        """ check volume cut: """
+        # calculate position of init_geninfo particles, exit_geninfo particles and edep_prmtrkdep particles:
+        for index in range(n_par):
+            # start position of initial particles:
+            r_init_geninfo = np.sqrt(x_init_geninfo[index]**2 + y_init_geninfo[index]**2 + z_init_geninfo[index]**2)
+            if r_init_geninfo >= r_cut:
+                flag_vol_pass = False
+                flag_vol_pass_init_geninfo = False
+                # break
+
+            # stop position of initial particles:
+            # r_exit_geninfo = np.sqrt(x_exit_geninfo[index]**2 + y_exit_geninfo[index]**2 + z_exit_geninfo[index]**2)
+            # if r_exit_geninfo >= r_cut:
+            #     flag_vol_pass = False
+            #     flag_vol_pass_exit_geninfo = False
+            #     break
+
+            # position, where initial particles deposit energy:
+            # r_edep_prmtrkdep = np.sqrt(x_edep_prmtrkdep[index]**2 + y_edep_prmtrkdep[index]**2 +
+            #                            z_edep_prmtrkdep[index]**2)
+            # if r_edep_prmtrkdep >= r_cut:
+            #     flag_vol_pass = False
+            #     flag_vol_pass_edep_prmtrkdep = False
+            #     break
+
+        # check also neutron capture positions:
+        # calculate position of ncapture:
+        for index in range(number_ncap):
+            # start neutron capture:
+            r_start_ncap = np.sqrt(x_start_ncap[index]**2 + y_start_ncap[index]**2 + z_start_ncap[index]**2)
+            if r_start_ncap >= r_cut:
+                flag_vol_pass = False
+                flag_vol_pass_start_ncap = False
+                # break
+            # stop neutron capture:
+            r_stop_ncap = np.sqrt(x_stop_ncap[index]**2 + y_stop_ncap[index]**2 + z_stop_ncap[index]**2)
+            if r_stop_ncap >= r_cut:
+                flag_vol_pass = False
+                flag_vol_pass_stop_ncap = False
+                # break
+
+        if flag_vol_pass:
+            number_vol_pass += 1
+        else:
+            number_vol_reject += 1
+
+            if not flag_vol_pass_init_geninfo:
+                number_vol_reject_init_geninfo += 1
+
+            # if not flag_vol_pass_exit_geninfo:
+            #     number_vol_reject_exit_geninfo += 1
+
+            # if not flag_vol_pass_edep_prmtrkdep:
+            #     number_vol_reject_edep_prmtrkdep += 1
+
+            if not flag_vol_pass_start_ncap:
+                number_vol_reject_start_ncap += 1
+
+            if not flag_vol_pass_stop_ncap:
+                number_vol_reject_stop_ncap += 1
+
+        """ check energy cut: """
+        if min_prompt_energy <= edep_evt <= max_prompt_energy:
+            flag_e_pass = True
+            number_e_pass += 1
+        elif edep_evt < min_prompt_energy:
+            number_mine_reject += 1
+        else:
+            # edep_evt > max_prompt_energy:
+            number_maxe_reject += 1
+
+        """ check time cut: """
+        # check if starting time of initial particles is zero:
+        for index in range(n_par):
+            if time_init_geninfo[index] == 0:
+                time_init = 0
+            else:
+                sys.exit("ERROR: initial time is not zero in evtid = {0:d}".format(evt_id))
+
+        # check if there are neutron captures in the event:
+        if number_ncap == 0:
+            # no nCaptures in the event:
+            number_without_ncap += 1
+
+        # preallocate number of neutron captures on hydrogen within 1 ms:
+        number_ncapture_window = 0
+        # preallocate array, where the indices of the neutron capture are saved:
+        index_ncapture = np.array([])
+
+        if len(capture_time_ncap) > len(kine_gamma_ncap):
+            sys.exit("ERROR: len(capture_time_ncap > len(kine_gamma_ncap) in evtID = {0:d}".format(evt_id))
+        elif len(capture_time_ncap) < len(kine_gamma_ncap):
+            print("WARNING: len(capture_time_ncap) < len(kine_gamma_ncap)! At least 1 neutron capture, where two 2.2 "
+                  "MeV gammas are produced!")
+            print("evtID = {0:d}".format(evt_id))
+            print("len(capture_time_ncap) = {0:d}".format(len(capture_time_ncap)))
+            print("capture_time_ncap = {0}".format(capture_time_ncap))
+
+        # calculate time difference between 0 and neutron capture:
+        for index in range(number_ncap):
+            if time_cut_min < capture_time_ncap[index] < time_cut_max and 2.2 < kine_gamma_ncap[index] < 2.25:
+                # neutron is captured on Hydrogen within time window:
+                flag_time_pass = True
+                # increment number of n-captures within time window:
+                number_ncapture_window += 1
+                # save index of the neutron capture:
+                index_ncapture = np.append(index_ncapture, index)
+            else:
+                continue
+
+        if flag_time_pass:
+            number_time_pass += 1
+        else:
+            number_time_reject += 1
+
+        """ check neutron multiplicity cut: """
+        # check number of neutron captures on hydrogen within time window:
+        if number_ncapture_window == 1:
+            flag_nmult_pass = True
+            number_nmult_pass += 1
+        else:
+            number_nmult_reject += 1
+
+        """ check distance cut: """
+        # check distance only, when there is just 1 neutron capture on hydrogen in the time window:
+        if number_ncapture_window == 1 and len(index_ncapture) == 1:
+            for index in range(n_par):
+                # check distance: start position initials -> neutron capture:
+                r_dist_start_nc = np.sqrt((x_stop_ncap[int(index_ncapture[0])] - x_init_geninfo[index])**2 +
+                                          (y_stop_ncap[int(index_ncapture[0])] - y_init_geninfo[index])**2 +
+                                          (z_stop_ncap[int(index_ncapture[0])] - z_init_geninfo[index])**2)
+                # check distance: position, where initials deposit energy -> neutron capture:
+                # r_dist_edep_nc = np.sqrt((x_stop_ncap[int(index_ncapture[0])] - x_edep_prmtrkdep[index])**2 +
+                #                          (y_stop_ncap[int(index_ncapture[0])] - y_edep_prmtrkdep[index])**2 +
+                #                          (z_stop_ncap[int(index_ncapture[0])] - z_edep_prmtrkdep[index])**2)
+
+                if r_dist_start_nc >= distance_cut:
+                    # event is rejected
+                    flag_dist_pass = 0
+                    break
+                else:
+                    # event passes cut
+                    flag_dist_pass = 1
+                    continue
+        else:
+            # no or more than one neutron capture:
+            flag_dist_pass = 2
+
+        if flag_dist_pass == 1:
+            number_dist_pass += 1
+        elif flag_dist_pass == 0:
+            number_dist_reject += 1
+
+        """ check flags: """
+        if flag_vol_pass and flag_e_pass and flag_nmult_pass and flag_time_pass and flag_dist_pass == 1:
+            # event passes all cuts!
+            # add evt ID to array:
             evt_id_preselected = np.append(evt_id_preselected, evt_id)
+            # add total deposit energy to array:
+            edep_total = np.append(edep_total, edep_evt)
+            # increment number of preselected events:
+            number_preselected += 1
 
-            # check initial position of particles:
-            check_initial_position = False
-            # Info-me: initial position is exactly the same of particles in 1 event:
-            if check_initial_position:
-                print("---------------------------")
-                print("evt_id = {0:d}".format(evt_id))
-                print("x_init = {0}".format(x_init))
-                print("y_init = {0}".format(y_init))
-                print("z_init = {0}\n".format(z_init))
+            # """ check total deposit energy of the preselected events: """
+            # if edep_evt >= max_prompt_energy:
+            #     number_maxe_reject += 1
 
-            # check PDG ID of particles:
-            check_pdgid = True
-            if check_pdgid:
-                print("-----------------------------")
-                print("evt_id = {0:d}".format(evt_id))
-                print("pdgid = {0}\n".format(pdgid))
+        else:
+            # event is rejected:
+            number_rejected += 1
+            continue
 
-
-            # display energy and exit time information:
-            plot_energy_time = False
-            if plot_energy_time:
-                print("---------------------------------------")
-                print("evt_id = {0:d}".format(evt_id))
-                print("time_exit in ns = {0}".format(time_exit))
-                print("deposit energy in MeV = {0}\n".format(e_dep))
-
-                # fig, ax = plt.plot()
-                plt.plot(time_exit, e_dep, "rx")
-                plt.fill_between(range(0, time_cut_max+1000, 1), e_prompt_min, e_prompt_max, color="b", alpha=0.2,
-                                 label="E_prompt cut")
-                plt.fill_between(range(0, time_cut_max+1000, 1), e_delayed_min, e_delayed_max, color="g", alpha=0.2,
-                                 label="E_delayed cut")
-                plt.xlim(xmin=-1000)
-                plt.ylim(ymin=0)
-                plt.xlabel("exit time of MC truth in ns")
-                plt.ylabel("deposit energy of MC truth in MeV")
-                plt.title("edep of event = {0:d} in file {1}.root".format(evt_id, rootfile_input))
-
-                plt.show()
-
-    return number_events, evt_id_preselected, number_preselected, number_rejected
+    return (number_events, evt_id_preselected, edep_total, number_preselected, number_rejected, number_vol_pass,
+            number_vol_reject, number_vol_reject_init_geninfo, number_vol_reject_start_ncap,
+            number_vol_reject_stop_ncap, number_e_pass, number_mine_reject, number_maxe_reject,
+            number_nmult_pass, number_nmult_reject, number_without_ncap, number_time_pass, number_time_reject,
+            number_dist_pass, number_dist_reject)
 
 
 def number_c12_atoms(radius_cut):
@@ -1556,8 +1962,8 @@ def read_xml_xsec(path_file, interval_e):
     return cross_section
 
 
-def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxplot, plot_evt_rate, show_evt_rate,
-               save_evt_rate):
+def event_rate(interval_energy, radius_cut, output_path, plot_flux, show_fluxplot, save_fluxplot, plot_evt_rate,
+               show_evt_rate, save_evt_rate):
     """
     function to calculate the event rate of the atmospheric NC background in JUNO
     (equation: dN/dT(E) = A * fluxes * cross_sections):
@@ -1590,6 +1996,7 @@ def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxp
     :param radius_cut: radius, which defines the fiducial volume in the central detector in meter (normally 17m is used
     as radius of the fiducial volume like in the calculation of the IBD detection efficiency on page 39 of the yellow
     book) (float)
+    :param output_path: path, where the plots are saved
     :param plot_flux: if True, flux is plotted (boolean)
     :param show_fluxplot: if True, plot of flux is shown (boolean)
     :param save_fluxplot: if True, plot of flux is saved (boolean)
@@ -1682,7 +2089,6 @@ def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxp
                                                  4.1114E+01, 3.1343E+01, 2.3751E+01, 1.7914E+01, 1.3453E+01, 1.0049E+01,
                                                  7.4735E+00, 5.5296E+00, 4.0719E+00, 2.9889E+00, 2.1817E+00, 1.5909E+00,
                                                  1.1558E+00, 8.3657E-01, 6.0575E-01, 4.3508E-01, 3.1237E-01])
-
 
     # all-direction averaged flux for no oscillation for muon-antineutrinos for solar maximum at the site of JUNO
     # (WITHOUT mountain over the detector), in (MeV**(-1) * cm**(-2) * s**(-1) * sr^(-1)) (np.array of float):
@@ -1865,9 +2271,8 @@ def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxp
             plt.show()
 
         if save_fluxplot:
-            plt.savefig("/home/astro/blum/juno/atmoNC/data_NC/output_detsim/neutrino_flux.png")
+            plt.savefig(output_path + "neutrino_flux.png")
             plt.close(h1)
-
 
     """ Calculate the interaction cross-sections of neutrinos with C12 for each neutrino flavour: """
     # for electron-neutrino:
@@ -1898,7 +2303,6 @@ def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxp
     # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
     xsec_numubar = read_xml_xsec(path_xsec_numubar, interval_energy)
 
-
     """ Calculate the number of C12 atoms in the LS for fiducial volume with radius = radius_cut: """
     # number of C12 atoms in fiducial volume (float):
     number_c12 = number_c12_atoms(radius_cut)
@@ -1922,7 +2326,7 @@ def event_rate(interval_energy, radius_cut, plot_flux, show_fluxplot, save_fluxp
             plt.show()
 
         if save_evt_rate:
-            plt.savefig("/home/astro/blum/juno/atmoNC/data_NC/output_detsim/event_rate.png")
+            plt.savefig(output_path + "event_rate.png")
             plt.close(h2)
 
 
@@ -3913,7 +4317,6 @@ def get_number_of_particles_of_deexid(deex_id):
     else:
         print("ERROR in get_number_of_particles_of deexid: deex_id is negative: deex_id = {0:d}".format(deex_id))
 
-
     return number_n, number_p, number_deuterium, number_tritium, number_he3, number_alpha
 
 
@@ -3964,6 +4367,151 @@ def read_nc_data(rootfile):
 
     # loop over every entry, i.e. every event, in the TTree:
     for event in range(number_entries):
+
+        # get the current event in the TTree:
+        rtree.GetEntry(event)
+
+        # get the value of the event ID and append it to the array:
+        evt_id = rtree.GetBranch('t_evtID').GetLeaf('t_evtID').GetValue()
+        event_id = np.append(event_id, evt_id)
+
+        # get the value of the projectile PDG and append it to the array:
+        pjt_pdg = rtree.GetBranch('t_pPdg').GetLeaf('t_pPdg').GetValue()
+        projectile_pdg = np.append(projectile_pdg, pjt_pdg)
+
+        # get the value of the neutrino energy and append it to the array:
+        pjt_e = rtree.GetBranch('t_pEn').GetLeaf('t_pEn').GetValue()
+        projectile_energy = np.append(projectile_energy, pjt_e)
+
+        # get the value of the target PDG and append it to the array:
+        trt_pdg = rtree.GetBranch('t_tPdg').GetLeaf('t_tPdg').GetValue()
+        target_pdg = np.append(target_pdg, trt_pdg)
+
+        # get the value of the channel ID and append it to the array:
+        ch_id = rtree.GetBranch('t_channelID').GetLeaf('t_channelID').GetValue()
+        nc_interaction_ch_id = np.append(nc_interaction_ch_id, ch_id)
+
+        # get the value of the deexcitation ID  and append it to the array:
+        deex_id = rtree.GetBranch('t_deexID').GetLeaf('t_deexID').GetValue()
+        deexcitation_id = np.append(deexcitation_id, deex_id)
+
+        # get the value of the PDG of the produced isotope and append it to the array:
+        iso_pdg = rtree.GetBranch('t_isoPdg').GetLeaf('t_isoPdg').GetValue()
+        isotope_pdg = np.append(isotope_pdg, iso_pdg)
+
+        # get the value of the number of particles and append it to the array:
+        n_par = rtree.GetBranch('t_Npars').GetLeaf('t_Npars').GetValue()
+        n_particles = np.append(n_particles, n_par)
+
+        # get final PDGs of all final particles
+        # preallocate an array, where all "n_par" values are stored:
+        f_pdg_array = np.array([])
+
+        # loop over the number of particles, get the final PDG and append it to the array:
+        for index in range(int(n_par)):
+            # get the value of the final PDG and append it to the array:
+            f_pdg = rtree.GetBranch('t_pdg').GetLeaf('t_pdg').GetValue(index)
+            f_pdg_array = np.append(f_pdg_array, f_pdg)
+
+        # append the np.array to the list:
+        final_pdg.append(f_pdg_array)
+
+        # get final momentum Px of all final particles
+        # preallocate an array, where all "n_par" values are stored:
+        f_px_array = np.array([])
+
+        # loop over the number of particles, get the final momentum and append it to the array:
+        for index in range(int(n_par)):
+            # get the value of the final momentum Px and append it to the array:
+            f_px = rtree.GetBranch('t_px').GetLeaf('t_px').GetValue(index)
+            f_px_array = np.append(f_px_array, f_px)
+
+        # append the np.array to the list:
+        final_px.append(f_px_array)
+
+        # get final momentum Py of all final particles
+        # preallocate an array, where all "n_par" values are stored:
+        f_py_array = np.array([])
+
+        # loop over the number of particles, get the final momentum and append it to the array:
+        for index in range(int(n_par)):
+            # get the value of the final momentum Py and append it to the array:
+            f_py = rtree.GetBranch('t_py').GetLeaf('t_py').GetValue(index)
+            f_py_array = np.append(f_py_array, f_py)
+
+        # append the np.array to the list:
+        final_py.append(f_py_array)
+
+        # get final momentum Pz of all final particles
+        # preallocate an array, where all "n_par" values are stored:
+        f_pz_array = np.array([])
+
+        # loop over the number of particles, get the final momentum and append it to the array:
+        for index in range(int(n_par)):
+            # get the value of the final momentum Pz and append it to the array:
+            f_pz = rtree.GetBranch('t_pz').GetLeaf('t_pz').GetValue(index)
+            f_pz_array = np.append(f_pz_array, f_pz)
+
+        # append the np.array to the list:
+        final_pz.append(f_py_array)
+
+    return (event_id, projectile_pdg, projectile_energy, target_pdg, nc_interaction_ch_id, deexcitation_id,
+            isotope_pdg, n_particles, final_pdg, final_px, final_py, final_pz)
+
+
+def read_nc_data_ibdlike_signal(rootfile, event_number):
+    """
+    function reads a ROOT-file and saves the values from the root-tree to numpy arrays.
+
+    This is the same function like read_nc_data(), BUT not all events in 'rootfile' are read, but only some specific
+    ones (only atmospheric NC events that cause an IBD-like signal in JUNO detector)
+
+    :param rootfile: path to the input root file (string)
+    :param event_number: list of the event numbers in ascending order (array/list)
+
+    :return:
+    """
+    # load the ROOT file:
+    rfile = ROOT.TFile(rootfile)
+    # get the TTree from the TFile:
+    rtree = rfile.Get("genEvt")
+
+    # get the number of entries, i.e. events, in the ROOT-file:
+    number_entries = rtree.GetEntries()
+
+    "preallocate all arrays: "
+    # event ID (starts from 0) (1d array of integer):
+    event_id = np.array([])
+    # PDG ID of the projectile (i.e. which neutrino is interacting) (1d array integer):
+    projectile_pdg = np.array([])
+    # energy of the incoming neutrino in GeV (1d array of float):
+    projectile_energy = np.array([])
+    # PDG ID of the target particle (either C12 or proton) (1d array integer):
+    target_pdg = np.array([])
+    # Channel ID of the NC interaction, represents which particles are produced via the NC interaction
+    # (1d array integer):
+    nc_interaction_ch_id = np.array([])
+    # Channel ID of the deexcitation, represents which particles are produced via the deexication of the produced
+    # excited isotope (1d array integer):
+    deexcitation_id = np.array([])
+    # PDG ID of the isotope after the NC interaction, BUT before the deexcitation (1d array integer):
+    isotope_pdg = np.array([])
+    # number of final particles after NC interactions and deexcitation (1d array integer):
+    n_particles = np.array([])
+
+    # PDG ID of the final particles (list of np.arrays of integers):
+    final_pdg = []
+    # momentum in x-direction of the final particles (list of np.arrays of floats):
+    final_px = []
+    # momentum in y-direction of the final particles (list of np.arrays of floats):
+    final_py = []
+    # momentum in z-direction of the final particles (list of np.arrays of floats):
+    final_pz = []
+
+    # loop over the entries that are specified by event_number (only IBDlike events),
+    # index is counter starting from 0 to len(event_number),
+    # event is the value of event_number[index]:
+    for index, event in enumerate(event_number):
 
         # get the current event in the TTree:
         rtree.GetEntry(event)
@@ -4308,6 +4856,757 @@ def get_target_ratio(projectile_energy, target_pdg, bin_width):
     return (energy_range, events_c12, events_proton, events_n14, events_o16, events_electron, events_s32,
             n_c12, n_proton, n_n14, n_o16, n_electron, n_s32,
             fraction_c12, fraction_proton, fraction_n14, fraction_o16, fraction_electron, fraction_s32)
+
+
+def get_combined_channel(n_particles, particle_pdg, target_pdg):
+    """
+    function to get the combined interaction channels (combined = NC interaction channel + deexcitation channel) from
+    the interaction of neutrinos with the target particles
+
+    :param n_particles: array with number of final particles per event
+    :param particle_pdg: list of array with the PDG ID of the final particles per event
+    :param target_pdg: array with the PDG ID of the target
+    :return:
+    """
+    # get the number of entries of the array (integer):
+    number_entries = len(target_pdg)
+
+    """ preallocate array and variables: """
+    # INFO-me: gamma's are not considered in specification of the channels -> all channels can be with additional gammas
+    # B11:
+    number_b11 = 0
+    number_b11_n_piplus = 0
+    number_b11_p = 0
+    # C11:
+    number_c11 = 0
+    number_c11_n = 0
+    number_c11_p_piminus = 0
+
+    # C10:
+    number_c10 = 0
+    number_c10_2n = 0
+    number_c10_n_p_piminus = 0
+    # B10:
+    number_b10 = 0
+    number_b10_n_p = 0
+    # Be10:
+    number_be10 = 0
+    number_be10_2p = 0
+    number_be10_n_p_piplus = 0
+
+    # C9:
+    number_c9 = 0
+    number_c9_3n = 0
+    number_c9_2n_p_piminus = 0
+    # B9:
+    number_b9 = 0
+    number_b9_n_d = 0
+    number_b9_2n_p = 0
+    number_b9_n_2p_piminus = 0
+    number_b9_3n_piplus = 0
+    # Be9:
+    number_be9 = 0
+    number_be9_n_2p = 0
+    number_be9_p_d = 0
+    number_be9_2n_p_piplus = 0
+    # Li9:
+    number_li9 = 0
+    number_li9_3p = 0
+    number_li9_n_2p_piplus = 0
+
+    # B8:
+    number_b8 = 0
+    number_b8_3n_p = 0
+    number_b8_2n_d = 0
+    # Be8:
+    number_be8 = 0
+    number_be8_n_p_d = 0
+    number_be8_2n_2p = 0
+    number_be8_n_3p_piminus = 0
+    number_be8_n_he3 = 0
+    number_be8_p_t = 0
+    # Li8:
+    number_li8 = 0
+    number_li8_n_3p = 0
+    # He8:
+    number_he8 = 0
+    number_he8_4p = 0
+
+    # B7:
+    number_b7 = 0
+    # Be7:
+    number_be7 = 0
+    number_be7_n_p_t = 0
+    number_be7_3n_2p = 0
+    number_be7_n_alpha = 0
+    number_be7_2n_p_d = 0
+    # Li7:
+    number_li7 = 0
+    number_li7_n_p_he3 = 0
+    number_li7_2n_3p = 0
+    number_li7_n_2p_d = 0
+    number_li7_p_alpha = 0
+    number_li7_n_alpha_piplus = 0
+    # He7:
+    number_he7 = 0
+    number_he7_n_4p = 0
+
+    # Be6:
+    number_be6 = 0
+    number_be6_3n_p_d = 0
+    number_be6_2n_2d = 0
+    number_be6_4n_2p = 0
+    number_be6_2n_p_t = 0
+    # Li6:
+    number_li6 = 0
+    number_li6_n_p_alpha = 0
+    number_li6_2n_2p_d = 0
+    number_li6_n_2p_t = 0
+    number_li6_3n_3p = 0
+    number_li6_2n_p_he3 = 0
+    number_li6_2n_alpha_piplus = 0
+    number_li6_2n_4p_piminus = 0
+    number_li6_n_2p_he3_piminus = 0
+    # He6:
+    number_he6 = 0
+    number_he6_2n_4p = 0
+    number_he6_n_3p_d = 0
+    number_he6_n_2p_he3 = 0
+    # H6:
+    number_h6 = 0
+    number_h6_n_5p = 0
+
+    # Li5:
+    number_li5 = 0
+    number_li5_2n_p_2d = 0
+    number_li5_2n_p_alpha = 0
+    number_li5_n_alpha_d = 0
+    number_li5_3n_p_he3 = 0
+    number_li5_3n_2p_d = 0
+    number_li5_2n_he3_d = 0
+    # He5:
+    number_he5 = 0
+    number_he5_n_3p_t = 0
+    number_he5_n_2p_alpha = 0
+    number_he5_n_2p_2d = 0
+    number_he5_3n_4p = 0
+    # H5:
+    number_h5 = 0
+    number_h5_2n_5p = 0
+
+    # Li4:
+    number_li4 = 0
+    number_li4_3n_p_alpha = 0
+    # He4:
+    number_he4 = 0
+    number_he4_n_2p_t_d = 0
+    number_he4_3n_2p_he3 = 0
+    number_he4_n_alpha_he3 = 0
+    number_he4_2n_p_he3_d = 0
+    number_he4_4n_4p = 0
+    number_he4_2n_2he3 = 0
+    # H4:
+    number_h4 = 0
+    number_h4_n_3p_alpha = 0
+    number_h4_3n_5p = 0
+
+    # FALSE channel:
+    number_false_channel = 0
+
+    """ target """
+    # number of events with C12 as target:
+    number_c12 = 0
+    # number of events without C12 as target (integer):
+    number_no_c12 = 0
+
+    # loop over all entries of the array:
+    for index in range(number_entries):
+
+        # check, if target is C12 (PDG ID = 1000060120):
+        if target_pdg[index] == 1000060120:
+            # increment number_c12:
+            number_c12 += 1
+
+            # get the final PDG IDs of this event (final_pdg_event is array):
+            final_pdg_event = particle_pdg[index]
+
+            # check if n_particles[index] is equal to len(final_pdg_event:
+            if n_particles[index] != len(final_pdg_event):
+                sys.exit("ERROR: number of particles is NOT equal to length of particle_pdg")
+
+            # preallocate number of single particles:
+            num_b11 = 0
+            num_c11 = 0
+            num_c10 = 0
+            num_b10 = 0
+            num_be10 = 0
+            num_c9 = 0
+            num_b9 = 0
+            num_be9 = 0
+            num_li9 = 0
+            num_c8 = 0
+            num_b8 = 0
+            num_be8 = 0
+            num_li8 = 0
+            num_he8 = 0
+            num_b7 = 0
+            num_be7 = 0
+            num_li7 = 0
+            num_he7 = 0
+            num_be6 = 0
+            num_li6 = 0
+            num_he6 = 0
+            num_h6 = 0
+            num_li5 = 0
+            num_he5 = 0
+            num_alpha = 0
+            num_he3 = 0
+            num_triton = 0
+            num_deuteron = 0
+            num_proton = 0
+            num_neutron = 0
+            num_gamma = 0
+            num_piplus = 0
+            num_piminus = 0
+
+            # loop over final_pdg_event to check the PDG of the particles:
+            for index1 in range(int(n_particles[index])):
+                if final_pdg_event[index1] == 1000050110:
+                    num_b11 += 1
+                elif final_pdg_event[index1] == 1000060110:
+                    num_c11 += 1
+                elif final_pdg_event[index1] == 1000060100:
+                    num_c10 += 1
+                elif final_pdg_event[index1] == 1000050100:
+                    num_b10 += 1
+                elif final_pdg_event[index1] == 1000040100:
+                    num_be10 += 1
+                elif final_pdg_event[index1] == 1000060090:
+                    num_c9 += 1
+                elif final_pdg_event[index1] == 1000050090:
+                    num_b9 += 1
+                elif final_pdg_event[index1] == 1000040090:
+                    num_be9 += 1
+                elif final_pdg_event[index1] == 1000030090:
+                    num_li9 += 1
+                elif final_pdg_event[index1] == 1000060080:
+                    num_c8 += 1
+                elif final_pdg_event[index1] == 1000050080:
+                    num_b8 += 1
+                elif final_pdg_event[index1] == 1000040080:
+                    num_be8 += 1
+                elif final_pdg_event[index1] == 1000030080:
+                    num_li8 += 1
+                elif final_pdg_event[index1] == 1000020080:
+                    num_he8 += 1
+                elif final_pdg_event[index1] == 1000050070:
+                    num_b7 += 1
+                elif final_pdg_event[index1] == 1000040070:
+                    num_be7 += 1
+                elif final_pdg_event[index1] == 1000030070:
+                    num_li7 += 1
+                elif final_pdg_event[index1] == 1000020070:
+                    num_he7 += 1
+                elif final_pdg_event[index1] == 1000040060:
+                    num_be6 += 1
+                elif final_pdg_event[index1] == 1000030060:
+                    num_li6 += 1
+                elif final_pdg_event[index1] == 1000020060:
+                    num_he6 += 1
+                elif final_pdg_event[index1] == 1000010060:
+                    num_h6 += 1
+                elif final_pdg_event[index1] == 1000030050:
+                    num_li5 += 1
+                elif final_pdg_event[index1] == 1000020050:
+                    num_he5 += 1
+                elif final_pdg_event[index1] == 1000020040:
+                    num_alpha += 1
+                elif final_pdg_event[index1] == 1000020030:
+                    num_he3 += 1
+                elif final_pdg_event[index1] == 1000010030:
+                    num_triton += 1
+                elif final_pdg_event[index1] == 1000010020:
+                    num_deuteron += 1
+                elif final_pdg_event[index1] == 2212:
+                    num_proton += 1
+                elif final_pdg_event[index1] == 2112:
+                    num_neutron += 1
+                elif final_pdg_event[index1] == 22:
+                    num_gamma += 1
+                elif final_pdg_event[index1] == 211:
+                    num_piplus += 1
+                elif final_pdg_event[index1] == -211:
+                    num_piminus += 1
+                else:
+                    print("particle not yet included: PDG = {0:.0f}".format(final_pdg_event[index1]))
+
+            if num_b11 == 1:
+                # event with B11:
+                number_b11 += 1
+                if (num_neutron == num_piplus == 1 and num_proton == num_alpha == num_he3 == num_triton
+                        == num_deuteron == num_piminus == 0):
+                    number_b11_n_piplus += 1
+                elif (num_proton == 1 and num_neutron == num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_b11_p += 1
+                else:
+                    print("B11 channel")
+
+            elif num_c11 == 1:
+                # event with C11:
+                number_c11 += 1
+                if (num_neutron == 1 and num_proton == num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_c11_n += 1
+                elif (num_proton == num_piminus == 1 and num_neutron == num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_c11_p_piminus += 1
+                else:
+                    print("C11 channel")
+
+            elif num_c10 == 1:
+                # event with C10:
+                number_c10 += 1
+                if (num_neutron == 2 and num_proton == num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_c10_2n += 1
+                elif (num_neutron == num_proton == num_piminus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_c10_n_p_piminus += 1
+                else:
+                    print("C10 channel")
+
+            elif num_b10 == 1:
+                # event with B10:
+                number_b10 += 1
+                if (num_neutron == num_proton == 1 and num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_b10_n_p += 1
+                else:
+                    print("B10 channel")
+
+            elif num_be10 == 1:
+                # event with Be10:
+                number_be10 += 1
+                if (num_proton == 2 and num_neutron == num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_be10_2p += 1
+                elif (num_neutron == num_proton == num_piplus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piminus == 0):
+                    number_be10_n_p_piplus += 1
+                else:
+                    print("Be10 channel")
+
+            elif num_c9 == 1:
+                # event with C9:
+                number_c9 += 1
+                if (num_neutron == 3 and num_proton == num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_c9_3n += 1
+                elif (num_neutron == 2 and num_proton == num_piminus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_c9_2n_p_piminus += 1
+                else:
+                    print("C9 channel")
+
+            elif num_b9 == 1:
+                # event with B9:
+                number_b9 += 1
+                if (num_neutron == 2 and num_proton == 1 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_b9_2n_p += 1
+                elif (num_neutron == num_deuteron == 1 and num_proton == num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    number_b9_n_d += 1
+                elif (num_proton == 2 and num_neutron == num_piminus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_b9_n_2p_piminus += 1
+                elif (num_neutron == 3 and num_piplus == 1 and num_proton == num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piminus == 0):
+                    number_b9_3n_piplus += 1
+                else:
+                    print("B9 channel")
+
+            elif num_be9 == 1:
+                # event with Be9:
+                number_be9 += 1
+                if (num_neutron == 1 and num_proton == 2 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_be9_n_2p += 1
+                elif (num_proton == num_deuteron == 1 and num_neutron == num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    number_be9_p_d += 1
+                elif (num_neutron == 2 and num_proton == num_piplus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piminus == 0):
+                    number_be9_2n_p_piplus += 1
+                else:
+                    print("Be9 channel")
+
+            elif num_li9 == 1:
+                # event with Li9:
+                number_li9 += 1
+                if (num_proton == 3 and num_neutron == num_alpha == num_he3 == num_triton == num_deuteron == num_piplus
+                        == num_piminus == 0):
+                    number_li9_3p += 1
+                elif (num_proton == 2 and num_neutron == num_piplus == 1 and num_alpha == num_he3 == num_triton
+                        == num_deuteron == num_piminus == 0):
+                    number_li9_n_2p_piplus += 1
+                else:
+                    print("Li9 channel")
+
+            elif num_b8 == 1:
+                # event with B8:
+                number_b8 += 1
+                if (num_neutron == 3 and num_proton == 1 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_b8_3n_p += 1
+                elif (num_neutron == 2 and num_deuteron == 1 and num_proton == num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    number_b8_2n_d += 1
+                else:
+                    print("B8 channel")
+
+            elif num_be8 == 1:
+                # event with Be8:
+                number_be8 += 1
+                if (num_neutron == num_proton == num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    number_be8_n_p_d += 1
+                elif (num_neutron == num_proton == 2 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_be8_2n_2p += 1
+                    print("index = {0:d}".format(index))
+                    interesting_index = index
+                elif (num_proton == 3 and num_neutron == num_piminus == 1 and num_alpha == num_he3 == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_be8_n_3p_piminus += 1
+                elif (num_neutron == num_he3 == 1 and num_proton == num_alpha == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_be8_n_he3 += 1
+                elif (num_proton == num_triton == 1 and num_neutron == num_alpha == num_he3 == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_be8_p_t += 1
+                else:
+                    print("Be8 channel")
+
+            elif num_li8 == 1:
+                # event with Li8:
+                number_li8 += 1
+                if (num_neutron == 1 and num_proton == 3 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li8_n_3p += 1
+                else:
+                    print("Li8 channel")
+
+            elif num_be7 == 1:
+                # event with Be7:
+                number_be7 += 1
+                if (num_neutron == num_proton == num_triton == 1 and num_alpha == num_he3 == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_be7_n_p_t += 1
+                elif (num_neutron == 3 and num_proton == 2 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_be7_3n_2p += 1
+                elif (num_neutron == num_alpha == 1 and num_proton == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_be7_n_alpha += 1
+                elif (num_neutron == 2 and num_proton == num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    number_be7_2n_p_d += 1
+                else:
+                    print("Be7 channel")
+
+            elif num_li7 == 1:
+                # event with Li7:
+                number_li7 += 1
+                if (num_neutron == num_proton == num_he3 == 1 and num_alpha == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li7_n_p_he3 += 1
+                elif (num_neutron == 2 and num_proton == 3 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    number_li7_2n_3p += 1
+                elif (num_proton == 2 and num_neutron == num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    number_li7_n_2p_d += 1
+                elif (num_proton == num_alpha == 1 and num_neutron == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li7_p_alpha += 1
+                elif (num_neutron == num_alpha == num_piplus == 1 and num_proton == num_he3 == num_triton
+                      == num_deuteron == num_piminus == 0):
+                    number_li7_n_alpha_piplus += 1
+                else:
+                    print("Li7 channel")
+
+            elif num_li6 == 1:
+                # event with Li6:
+                number_li6 += 1
+                if (num_neutron == num_proton == num_alpha == 1 and num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li6_n_p_alpha += 1
+                elif (num_neutron == num_proton == 2 and num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    number_li6_2n_2p_d += 1
+                elif (num_proton == 2 and num_neutron == num_triton == 1 and num_alpha == num_he3 == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li6_n_2p_t += 1
+                elif (num_neutron == num_proton == 3 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li6_3n_3p += 1
+                elif (num_neutron == 2 and num_proton == num_he3 == 1 and num_alpha == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    number_li6_2n_p_he3 += 1
+                elif (num_neutron == 2 and num_alpha == num_piplus == 1 and num_proton == num_he3 == num_triton
+                      == num_deuteron == num_piminus == 0):
+                    number_li6_2n_alpha_piplus += 1
+                elif (num_proton == 2 and num_neutron == num_he3 == num_piminus == 1 and num_alpha == num_triton
+                      == num_deuteron == num_piplus == 0):
+                    number_li6_n_2p_he3_piminus += 1
+                else:
+                    print("Li6 channel")
+
+            else:
+                # channels, where no TALYS simulation of the deexcitation of the isotope exist:
+                if (num_neutron == num_proton == 2 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope Be8:
+                    number_be8 += 1
+                    number_be8_2n_2p += 1
+
+                elif (num_proton == 4 and num_neutron == num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope He8:
+                    number_he8 += 1
+                    number_he8_4p += 1
+
+                elif (num_neutron == 1 and num_proton == 4 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope He7:
+                    number_he7 += 1
+                    number_he7_n_4p += 1
+
+                elif (num_neutron == 3 and num_proton == num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    # isotope Be6:
+                    number_be6 += 1
+                    number_be6_3n_p_d += 1
+                elif (num_neutron == num_deuteron == 2 and num_proton == num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    # isotope Be6:
+                    number_be6 += 1
+                    number_be6_2n_2d += 1
+                elif (num_neutron == 4 and num_proton == 2 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope Be6:
+                    number_be6 += 1
+                    number_be6_4n_2p += 1
+                elif (num_neutron == 2 and num_proton == num_triton == 1 and num_alpha == num_he3 == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope Be6:
+                    number_be6 += 1
+                    number_be6_2n_p_t += 1
+
+                elif (num_neutron == 2 and num_proton == 4 and num_piminus == 1 and num_alpha == num_he3 == num_triton
+                        == num_deuteron == num_piplus == 0):
+                    # isotope Be6:
+                    number_li6 += 1
+                    number_li6_2n_4p_piminus += 1
+                elif (num_neutron == num_proton == 3 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope Be6:
+                    number_li6 += 1
+                    number_li6_3n_3p += 1
+
+                elif (num_neutron == 2 and num_proton == 4 and num_alpha == num_he3 == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope He6:
+                    number_he6 += 1
+                    number_he6_2n_4p += 1
+                elif (num_proton == 3 and num_neutron == num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                        == num_piplus == num_piminus == 0):
+                    # isotope He6:
+                    number_he6 += 1
+                    number_he6_n_3p_d += 1
+                elif (num_proton == 2 and num_neutron == num_he3 == 1 and num_alpha == num_triton == num_deuteron
+                        == num_piplus == num_piminus == 0):
+                    # isotope He6:
+                    number_he6 += 1
+                    number_he6_n_2p_he3 += 1
+
+                elif (num_neutron == 1 and num_proton == 5 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope H6:
+                    number_h6 += 1
+                    number_h6_n_5p += 1
+
+                elif (num_neutron == num_deuteron == 2 and num_proton == 1 and num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_2n_p_2d += 1
+                elif (num_neutron == 2 and num_proton == num_alpha == 1 and num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_2n_p_alpha += 1
+                elif (num_neutron == num_alpha == num_deuteron == 1 and num_proton == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_n_alpha_d += 1
+                elif (num_neutron == 3 and num_proton == num_he3 == 1 and num_alpha == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_3n_p_he3 += 1
+                elif (num_neutron == 3 and num_proton == 2 and num_deuteron == 1 and num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_3n_2p_d += 1
+                elif (num_neutron == 2 and num_he3 == num_deuteron == 1 and num_proton == num_alpha == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li5:
+                    number_li5 += 1
+                    number_li5_2n_he3_d += 1
+
+                elif (num_proton == 3 and num_neutron == num_triton == 1 and num_alpha == num_he3 == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He5:
+                    number_he5 += 1
+                    number_he5_n_3p_t += 1
+                elif (num_proton == 2 and num_neutron == num_alpha == 1 and num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He5:
+                    number_he5 += 1
+                    number_he5_n_2p_alpha += 1
+                elif (num_proton == num_deuteron == 2 and num_neutron == 1 and num_alpha == num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope He5:
+                    number_he5 += 1
+                    number_he5_n_2p_2d += 1
+                elif (num_neutron == 3 and num_proton == 4 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He5:
+                    number_he5 += 1
+                    number_he5_3n_4p += 1
+
+                elif (num_neutron == 2 and num_proton == 5 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope H5:
+                    number_h5 += 1
+                    number_h5_2n_5p += 1
+
+                elif (num_neutron == 3 and num_proton == num_alpha == 1 and num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope Li4:
+                    number_li4 += 1
+                    number_li4_3n_p_alpha += 1
+
+                elif (num_proton == 2 and num_neutron == num_triton == num_deuteron == 1 and num_alpha == num_he3
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_n_2p_t_d += 1
+                elif (num_neutron == 3 and num_proton == 2 and num_he3 == 1 and num_alpha == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_3n_2p_he3 += 1
+                elif (num_neutron == 1 and num_alpha == 2 and num_proton == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_n_alpha_he3 += 1
+                elif (num_proton == 2 and num_neutron == num_alpha == num_deuteron == 1 and num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_n_2p_t_d += 1
+                elif (num_neutron == 2 and num_proton == num_alpha == num_deuteron == 1 and num_he3 == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4 (actually He3 is the isotope, but take He4 because it is heavier):
+                    number_he4 += 1
+                    number_he4_2n_p_he3_d += 1
+                elif (num_neutron == 2 and num_proton == num_he3 == num_deuteron == 1 and num_alpha == num_triton
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_2n_p_he3_d += 1
+                elif (num_neutron == num_proton == 4 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_4n_4p += 1
+                elif (num_neutron == 2 and num_alpha == num_he3 == 1 and num_proton == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope He4:
+                    number_he4 += 1
+                    number_he4_2n_2he3 += 1
+
+                elif (num_proton == 3 and num_neutron == num_alpha == 1 and num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope H4:
+                    number_h4 += 1
+                    number_h4_n_3p_alpha += 1
+                elif (num_proton == 5 and num_neutron == 3 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # isotope H4:
+                    number_h4 += 1
+                    number_h4_3n_5p += 1
+
+                elif (num_neutron == 1 and num_proton == 6 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # WRONG channel: 5 neutrons are left -> no isotope:
+                    number_false_channel += 1
+                elif (num_neutron == 2 and num_proton == 6 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # WRONG channel: 4 neutrons are left -> no isotope:
+                    number_false_channel += 1
+                elif (num_neutron == 3 and num_proton == 6 and num_alpha == num_he3 == num_triton == num_deuteron
+                      == num_piplus == num_piminus == 0):
+                    # WRONG channel: 3 neutrons are left -> no isotope:
+                    number_false_channel += 1
+
+                else:
+                    print("new channel")
+
+        else:
+            # target is not C12:
+            number_no_c12 += 1
+
+    return (number_c12, number_no_c12,
+            number_b11, number_b11_n_piplus, number_b11_p,
+            number_c11, number_c11_n, number_c11_p_piminus,
+            number_c10, number_c10_2n, number_c10_n_p_piminus,
+            number_b10, number_b10_n_p,
+            number_be10, number_be10_2p, number_be10_n_p_piplus,
+            number_c9, number_c9_3n, number_c9_2n_p_piminus,
+            number_b9, number_b9_n_d, number_b9_2n_p, number_b9_n_2p_piminus, number_b9_3n_piplus,
+            number_be9, number_be9_n_2p, number_be9_p_d, number_be9_2n_p_piplus,
+            number_li9, number_li9_3p, number_li9_n_2p_piplus,
+            number_b8, number_b8_3n_p, number_b8_2n_d,
+            number_be8, number_be8_n_p_d, number_be8_2n_2p, number_be8_n_3p_piminus, number_be8_n_he3, number_be8_p_t,
+            number_li8, number_li8_n_3p,
+            number_he8, number_he8_4p,
+            number_b7,
+            number_be7, number_be7_n_p_t, number_be7_3n_2p, number_be7_n_alpha, number_be7_2n_p_d,
+            number_li7, number_li7_n_p_he3, number_li7_2n_3p, number_li7_n_2p_d, number_li7_p_alpha,
+            number_li7_n_alpha_piplus,
+            number_he7, number_he7_n_4p,
+            number_be6, number_be6_3n_p_d, number_be6_2n_2d, number_be6_4n_2p, number_be6_2n_p_t,
+            number_li6, number_li6_n_p_alpha, number_li6_2n_2p_d, number_li6_n_2p_t, number_li6_3n_3p,
+            number_li6_2n_p_he3, number_li6_2n_alpha_piplus, number_li6_2n_4p_piminus, number_li6_n_2p_he3_piminus,
+            number_he6, number_he6_2n_4p, number_he6_n_3p_d, number_he6_n_2p_he3,
+            number_h6, number_h6_n_5p,
+            number_li5, number_li5_2n_p_2d, number_li5_2n_p_alpha, number_li5_n_alpha_d, number_li5_3n_p_he3,
+            number_li5_3n_2p_d, number_li5_2n_he3_d,
+            number_he5, number_he5_n_3p_t, number_he5_n_2p_alpha, number_he5_n_2p_2d, number_he5_3n_4p,
+            number_h5, number_h5_2n_5p,
+            number_li4, number_li4_3n_p_alpha,
+            number_he4, number_he4_n_2p_t_d, number_he4_3n_2p_he3, number_he4_n_alpha_he3, number_he4_2n_p_he3_d,
+            number_he4_4n_4p, number_he4_2n_2he3,
+            number_h4, number_h4_n_3p_alpha, number_h4_3n_5p,
+            number_false_channel, interesting_index)
 
 
 def get_interaction_channel(channel_id, isotope_pdg, target_pdg):

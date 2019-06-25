@@ -250,7 +250,7 @@ def get_process_name(process_number):
     return process_name
 
 
-def check_secondaries_tree(input_file, first_evt, last_evt):
+def check_secondaries_tree(input_file, first_evt, last_evt, print_all, print_process, print_initials):
     """
     function to read the secondaries tree and get the processes, which lead to neutron capture. This is to understand,
     which processes can cause neutron capture and therefore a possible delayed signal for IBD-like signals.
@@ -258,6 +258,10 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
     :param input_file: input root file with user output
     :param first_evt: first event in the file to be read
     :param last_evt: last event in the file to be read
+    :param print_all: print all information into terminal (boolean)
+    :param print_process: print only the information of the processes, where there is neutron capture, but no initial
+    neutron (boolean)
+    :param print_initials: print numbers of different initial particles, that cause neutron capture, but aren't neutrons
     :return:
     """
     # load the ROOT file:
@@ -269,10 +273,19 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
     # get the "nCapture"-TTree from the TFile:
     rtree_ncapture = rfile.Get("nCapture")
 
+    # preallocate numbers of different initial particles, that cause neutron capture, but aren't neutrons:
+    number_initial_proton = 0
+    number_initial_piminus = 0
+    number_initial_piplus = 0
+    number_initial_pizero = 0
+    # preallocate number of neutron, that cause neutron capture:
+    number_initial_neutron = 0
+
     # loop over events, i.e. entries, in the TTree:
     for event in range(first_evt, last_evt+1, 1):
 
-        print("#####################    read event {0:d}:   ########################".format(event))
+        if print_all:
+            print("#####################    read event {0:d}:   ########################".format(event))
 
         """ read geninfo tree """
         # get the current event in the geninfo tree:
@@ -280,7 +293,8 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
 
         # get the value of the event ID:
         evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
-        print("\n--------read geninfo Tree (evtID={0:d}):--------".format(evt_id_geninfo))
+        if print_all:
+            print("\n--------read geninfo Tree (evtID={0:d}):--------".format(evt_id_geninfo))
 
         # get the number of initial particles:
         n_init_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
@@ -292,18 +306,28 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
         # preallocate number of initial neutrons:
         number_init_neutrons = 0
 
+        flag_pion_plus = False
+
         # get initial PDG IDs:
         for index in range(n_init_particles):
             init_pdgid = int(rtree_geninfo.GetBranch('InitPDGID').GetLeaf('InitPDGID').GetValue(index))
-            print("Initial PDGID = {0:d}".format(init_pdgid))
+            if print_all:
+                print("Initial PDGID = {0:d}".format(init_pdgid))
             init_pdgid_arr = np.append(init_pdgid_arr, init_pdgid)
 
             if init_pdgid == 2112:
                 number_init_neutrons += 1
 
+            if init_pdgid == 211:
+                flag_pion_plus = True
+
             init_trkid = int(rtree_geninfo.GetBranch('InitTRKID').GetLeaf('InitTRKID').GetValue(index))
-            print("Initial TRKID = {0:d}".format(init_trkid))
+            if print_all:
+                print("Initial TRKID = {0:d}".format(init_trkid))
             init_trkid_arr = np.append(init_trkid_arr, init_trkid)
+
+        # if not flag_pion_plus:
+        #     continue
 
         """ read nCapture tree """
         # get the current event in the nCapture tree:
@@ -311,18 +335,21 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
 
         # get evtID of nCapture tree:
         evt_id_ncapture = int(rtree_ncapture.GetBranch('evtID').GetLeaf('evtID').GetValue())
-        print("\n--------read nCapture Tree (evtID={0:d}):--------".format(evt_id_ncapture))
+        if print_all:
+            print("\n--------read nCapture Tree (evtID={0:d}):--------".format(evt_id_ncapture))
 
         # get the number of nCaptures in the event:
         number_ncapture = int(rtree_ncapture.GetBranch('NeutronN').GetLeaf('NeutronN').GetValue())
-        print("Number of nCaptures from nCapture tree = {0:d}".format(number_ncapture))
+        if print_all:
+            print("Number of nCaptures from nCapture tree = {0:d}".format(number_ncapture))
 
         # preallocate trkid of neutron:
         neutron_trkid_arr = np.array([])
         # get TrkID of neutron:
         for index in range(number_ncapture):
             neutron_trkid = int(rtree_ncapture.GetBranch('NeutronTrkid').GetLeaf('NeutronTrkid').GetValue(index))
-            print("TrkID of neutron from nCapture Tree = {0:d}".format(neutron_trkid))
+            if print_all:
+                print("TrkID of neutron from nCapture Tree = {0:d}".format(neutron_trkid))
             neutron_trkid_arr = np.append(neutron_trkid_arr, neutron_trkid)
 
         """ read secondaries tree: """
@@ -345,7 +372,8 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
 
         # get the value of the event ID:
         evt_id = int(rtree_sec.GetBranch('evtID').GetLeaf('evtID').GetValue())
-        print("\n--------read secondaries Tree (evtID={0:d}):--------".format(evt_id))
+        if print_all:
+            print("\n--------read secondaries Tree (evtID={0:d}):--------".format(evt_id))
 
         # get the number of primaries:
         num_primaries = int(rtree_sec.GetBranch('numPrimaries').GetLeaf('numPrimaries').GetValue())
@@ -354,13 +382,13 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
         num_secondaries = int(rtree_sec.GetBranch('numSec').GetLeaf('numSec').GetValue())
 
         if num_primaries == 0 and num_secondaries == 0:
-
-            print("NO particles in event\n")
+            if print_all:
+                print("NO particles in event\n")
             continue
 
         elif num_secondaries == 0:
-
-            print("NO secondaries in event\n")
+            if print_all:
+                print("NO secondaries in event\n")
             continue
 
         else:
@@ -475,7 +503,9 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
         # divide num_n_capture by 2, because there are always TWO secondaries (gamma and deuteron) to ONE neutron
         # capture:
         num_n_capture = num_n_capture / 2
-        print("Number of nCaptures from secondaries tree = {0:d}\n".format(num_n_capture))
+        if print_all:
+            print("Number of nCaptures from secondaries tree = {0:d}\n".format(num_n_capture))
+
         # remove the first entry of index_primary_n_capture (the value -1), because it was just added as place holder:
         index_primary_n_capture = np.delete(index_primary_n_capture, 0)
 
@@ -489,7 +519,8 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
         #     continue
 
         if num_n_capture == 0:
-            print("No neutron capture in the event!\n")
+            if print_all:
+                print("No neutron capture in the event!\n")
             continue
 
         # loop over number of nCaptures from secondaries tree:
@@ -498,16 +529,25 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
             # set flag, that primary particle is equal to initial particle:
             flag_primary_equal_initial = False
 
+            # set flag, that initial particle of neutron capture is no neutron:
+            flag_initial_no_neutron = False
+
+            # preallocate array, where indices of the primaries are saved:
+            index_primary_array = np.array([])
+            # preallocate list, where indices of secondaries corresponding to one primary are saved in arrays:
+            index_secondary_list = []
+
             # check if pri_pdgid is neutron:
             if pri_pdgid_arr[index_primary_n_capture[index]] != 2112:
                 print("WARNING: primary particles of nCapture is NO neutron")
             else:
                 # get info of 'last' primary before nCapture (must be a neutron):
-                print("nCapture of:")
-                print("PDG ID of ncapture pri. = {0:.0f}".format(pri_pdgid_arr[index_primary_n_capture[index]]))
-                print("TrkID of ncapture pri. = {0:.0f}".format(pri_trkid_arr[index_primary_n_capture[index]]))
-                print("KinE of ncapture pri. = {0:.3f} MeV".format(pri_kine_arr[index_primary_n_capture[index]]))
-                print("time of ncapture pri. = {0:.3f} ns".format(pri_time_arr[index_primary_n_capture[index]]))
+                if print_all:
+                    print("nCapture of:")
+                    print("PDG ID of ncapture pri. = {0:.0f}".format(pri_pdgid_arr[index_primary_n_capture[index]]))
+                    print("TrkID of ncapture pri. = {0:.0f}".format(pri_trkid_arr[index_primary_n_capture[index]]))
+                    print("KinE of ncapture pri. = {0:.3f} MeV".format(pri_kine_arr[index_primary_n_capture[index]]))
+                    print("time of ncapture pri. = {0:.3f} ns".format(pri_time_arr[index_primary_n_capture[index]]))
 
                 # set values of 'last' primary before nCapture (must be a neutron):
                 trkid_to_be_check = pri_trkid_arr[index_primary_n_capture[index]]
@@ -518,7 +558,14 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
                         if pri_trkid_arr[index_primary_n_capture[index]] == init_trkid_arr[index1]:
                             # neutron is initial particle:
                             flag_primary_equal_initial = True
-                            print("\nInitial Neutron is captured (TrkID = {0:.0f})\n\n".format(init_trkid_arr[index1]))
+                            if print_all:
+                                print("\nInitial Neutron is captured (TrkID = {0:.0f})\n\n"
+                                      .format(init_trkid_arr[index1]))
+
+                            if print_initials:
+                                # increment number_initial_neutron:
+                                number_initial_neutron += 1
+
                             # break from FOR loop
                             break
 
@@ -533,19 +580,30 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
                                 # check next secondary
                                 continue
                             else:
-                                # trk id are equal:
+                                # trk id's are equal:
+                                # index of the primary to array:
+                                index_primary_array = np.append(index_primary_array, index2)
+                                # preallocate array, where indices of secondaries are saved:
+                                index_secondary_array = np.array([])
+
                                 # get the process name which created the secondary:
-                                print("\nProcess name = {0}".format(sec_process_name_list[index2][index3]))
-                                print("PrimaryPDGID of this process = {0:.0f}".format(pri_pdgid_arr[index2]))
-                                print("PrimaryTrkID of this process = {0:.0f}".format(pri_trkid_arr[index2]))
-                                print("PrimaryKine of this process = {0:.3f} MeV".format(pri_kine_arr[index2]))
-                                print("PrimaryTime of this process = {0:.3f} ns".format(pri_time_arr[index2]))
-                                print("Secondaries of this process:")
-                                print("SecPDGID = {0:.0f}".format(sec_pdgid_list[index2][index3]))
-                                print("SecTrkID = {0:.0f}".format(sec_trkid_list[index2][index3]))
+                                if print_all:
+                                    print("\nProcess name = {0}".format(sec_process_name_list[index2][index3]))
+                                    print("PrimaryPDGID of this process = {0:.0f}".format(pri_pdgid_arr[index2]))
+                                    print("PrimaryTrkID of this process = {0:.0f}".format(pri_trkid_arr[index2]))
+                                    print("PrimaryKine of this process = {0:.3f} MeV".format(pri_kine_arr[index2]))
+                                    print("PrimaryTime of this process = {0:.3f} ns".format(pri_time_arr[index2]))
+                                    print("Secondaries of this process:")
+                                    print("SecPDGID = {0:.0f}".format(sec_pdgid_list[index2][index3]))
+                                    print("SecTrkID = {0:.0f}".format(sec_trkid_list[index2][index3]))
+
+                                # append index of secondary:
+                                index_secondary_array = np.append(index_secondary_array, index3)
 
                                 # get all other secondaries that are created from this primary:
-                                print("Other corresponding secondaries:")
+                                if print_all:
+                                    print("Other corresponding secondaries:")
+
                                 for index5 in range(len(sec_trkid_list[index2])):
                                     if sec_trkid_list[index2][index5] == sec_trkid_list[index2][index3]:
                                         continue
@@ -556,8 +614,14 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
                                         # do not print info about gammas:
                                         continue
                                     else:
-                                        print("SecPDGID = {0:.0f}".format(sec_pdgid_list[index2][index5]))
-                                        print("SecTrkID = {0:.0f}".format(sec_trkid_list[index2][index5]))
+                                        # append index of other secondary:
+                                        index_secondary_array = np.append(index_secondary_array, index5)
+                                        if print_all:
+                                            print("SecPDGID = {0:.0f}".format(sec_pdgid_list[index2][index5]))
+                                            print("SecTrkID = {0:.0f}".format(sec_trkid_list[index2][index5]))
+
+                                # append array to list:
+                                index_secondary_list.append(index_secondary_array)
 
                                 # get the trkid of the primary corresponding to this secondary:
                                 trkid_to_be_check = pri_trkid_arr[index2]
@@ -567,9 +631,20 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
                                     if trkid_to_be_check == init_trkid_arr[index4]:
                                         # primary is initial particle:
                                         flag_primary_equal_initial = True
-                                        print("\nPrimaryTrkID equal to InitTRKID = {0:.0f}"
-                                              .format(init_trkid_arr[index4]))
-                                        print("InitPDGID = {0:.0f}\n\n".format(init_pdgid_arr[index4]))
+                                        if print_all:
+                                            print("\nPrimaryTrkID equal to InitTRKID = {0:.0f}"
+                                                  .format(init_trkid_arr[index4]))
+                                            print("InitPDGID = {0:.0f}\n\n".format(init_pdgid_arr[index4]))
+
+                                        # check, if initial particle of nCapture is no neutron:
+                                        if init_pdgid_arr[index4] != 2112:
+                                            flag_initial_no_neutron = True
+
+                                        else:
+                                            if print_initials:
+                                                # initial particle of nCapture is neutron:
+                                                number_initial_neutron += 1
+
                                         # break from FOR loop
                                         break
 
@@ -585,7 +660,56 @@ def check_secondaries_tree(input_file, first_evt, last_evt):
                         # break from WHILE loop
                         break
 
-    return
+            if flag_initial_no_neutron and print_process:
+                print("************** event {0:d} ****************".format(event))
+
+                # when initial is no neutron and print_process = True:
+                for index6 in range(len(index_primary_array)):
+                    print("\nneutron capture with no neutron as initial particle:")
+                    print("TrkID of ncapture pri. = {0:.0f}".format(pri_trkid_arr[index_primary_n_capture[index]]))
+                    print("PrimaryPDGID of this process = {0:.0f}"
+                          .format(pri_pdgid_arr[int(index_primary_array[index6])]))
+                    print("PrimaryTrkID of this process = {0:.0f}"
+                          .format(pri_trkid_arr[int(index_primary_array[index6])]))
+                    print("PrimaryKine of this process = {0:.3f} MeV"
+                          .format(pri_kine_arr[int(index_primary_array[index6])]))
+                    print("PrimaryTime of this process = {0:.3f} ns"
+                          .format(pri_time_arr[int(index_primary_array[index6])]))
+
+                    for index7 in range(len(index_secondary_list[index6])):
+
+                        print("Process name = {0}"
+                              .format(sec_process_name_list[int(index_primary_array[index6])][int(index_secondary_list[index6][index7])]))
+                        print("Secondaries of this process:")
+                        print("SecPDGID = {0:.0f}"
+                              .format(sec_pdgid_list[int(index_primary_array[index6])][int(index_secondary_list[index6][index7])]))
+                        print("SecTrkID = {0:.0f}"
+                              .format(sec_trkid_list[int(index_primary_array[index6])][int(index_secondary_list[index6][index7])]))
+
+            if flag_initial_no_neutron and print_initials:
+                print("************** event {0:d} ****************".format(event))
+
+                # preallocate variable, where PDG ID of initial particle is saved:
+                initial_pdg_of_n_capture = 0
+
+                # when initial is no neutron and print_process = True:
+                for index6 in range(len(index_primary_array)):
+                    # set variable, where PDG ID of initial particle is saved:
+                    initial_pdg_of_n_capture = pri_pdgid_arr[int(index_primary_array[index6])]
+
+                if initial_pdg_of_n_capture == 2212:
+                    number_initial_proton += 1
+                elif initial_pdg_of_n_capture == 211:
+                    number_initial_piplus += 1
+                elif initial_pdg_of_n_capture == -211:
+                    number_initial_piminus += 1
+                elif initial_pdg_of_n_capture == 111:
+                    number_initial_pizero += 1
+                else:
+                    print("other initial cause nCapture:    PDG ID = {0:.0f}".format(initial_pdg_of_n_capture))
+
+    return (number_initial_neutron, number_initial_proton, number_initial_piminus, number_initial_piplus,
+            number_initial_pizero)
 
 
 # get the date and time, when the script was run:
@@ -593,25 +717,36 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # set the path of the input files (filename must be 'user_atmoNC_{}.root'):
-Input_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
+# Input_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
+Input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data_noopt/"
 
 # set path, where results should be saved:
-Output_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
+# Output_path = "/home/astro/blum/juno/atmoNC/data_NC/secondary_anamgr/"
+Output_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data_noopt/"
 
 # set the file number, the number of the first event and number of the last event that should be read:
-file_number = 0
-first_event = 0
-last_event = 0
+file_number = 95
+first_event = 326
+last_event = 326
+
+# set print flags:
+Print_all = True
+Print_process = True
+Print_initials = True
 
 # path to file:
 # Input_file = Input_path + ".root"
-Input_file = Input_path + "user_atmoNC_{0:d}_secAnaMgr.root".format(file_number)
+Input_file = Input_path + "user_atmoNC_noopt_{0:d}.root".format(file_number)
 
-# print("########################## nCapture Tree #############################")
-# check_n_capture(Input_file, first_event, last_event)
 
 print("########################## secondaries Tree #############################")
 
-# read_secondaries_tree(Input_file, first_event, last_event)
+Number_initial_neutron, Number_initial_proton, Number_initial_piminus, Number_initial_piplus, Number_initial_pizero = \
+    check_secondaries_tree(Input_file, first_event, last_event, Print_all, Print_process, Print_initials)
 
-check_secondaries_tree(Input_file, first_event, last_event)
+print("Initial particles that cause neutron capture:")
+print("number of neutron = {0:.0f}".format(Number_initial_neutron))
+print("number of proton = {0:.0f}".format(Number_initial_proton))
+print("number of pi_minus = {0:.0f}".format(Number_initial_piminus))
+print("number of pi_plus = {0:.0f}".format(Number_initial_piplus))
+print("number of pi_zero = {0:.0f}".format(Number_initial_pizero))

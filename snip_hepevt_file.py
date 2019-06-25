@@ -23,13 +23,14 @@ input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_generator/"
 
 # input file name of the hep file (string):
 input_file = input_path + "gen_NC_onlyC12_250000evts_seed1.txt"
-# input_file = input_path + "gen_test.txt"
+# input_file = input_path + "NC_onlyC12_250000evts_preselect37008evts_seed1.txt"
 
 # output path (string):
-output_path = input_path + "folder_NC_onlyC12_250000evts_seed1_1000/"
+output_path = input_path + "folder_NC_onlyC12_250000evts_seed1_100/"
+# output_path = input_path + "folder_NC_onlyC12_250000evts_preselect37008evts_seed1_72/"
 
 # output file name (string):
-output_name = output_path + "out_gen_NC_onlyC12_1000evts_seed1_"
+output_name = output_path + "out_gen_NC_onlyC12_100evts_seed1_"
 
 
 """ read hep file """
@@ -47,9 +48,9 @@ hep_file.close()
 
 """ write snippets of hep file to output file: """
 # preallocate number of events per output file:
-num_evts_out = 1000
+num_evts_out = 100
 # preallocate number of output files:
-number_files = 250
+number_files = 2500
 # set start index of the line in hep_file_arr for the new output file:
 index_line = 0
 

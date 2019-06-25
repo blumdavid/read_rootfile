@@ -74,7 +74,7 @@ time_resolution = 20
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
-stop_number = 99
+stop_number = 0
 # number of entries in the input files:
 Number_entries_input = 100
 # set the path of the inputs:
@@ -223,10 +223,12 @@ else:
 
 
 """ Event rate calculation: """
+# path, where plots are saved:
+output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/"
 # calculate the theoretical event rate in events/sec for neutrino energies from 0 MeV to 10 GeV (float)
 # (event_rate = A * (flux_nue*xsec_nue + flux_nuebar*xsec_nuebar + flux_numu*xsec_numu + flux_numubar*xsec_numubar)):
-event_rate = NC_background_functions.event_rate(interval_energy, R_cut_meter, PLOT_FLUX, SHOW_FLUXPLOT, SAVE_FLUXPLOT,
-                                                PLOT_EVT_RATE, SHOW_EVT_RATE, SAVE_EVT_RATE)
+event_rate = NC_background_functions.event_rate(interval_energy, R_cut_meter, output_path, PLOT_FLUX, SHOW_FLUXPLOT,
+                                                SAVE_FLUXPLOT, PLOT_EVT_RATE, SHOW_EVT_RATE, SAVE_EVT_RATE)
 
 # This event rate (event_rate) corresponds to the number of simulated events (number_events) per time "time" ("time" is
 # unknown). The time "time, in which 'number_events' NC interactions proceed (stattfinden), is given by
