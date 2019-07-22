@@ -40,6 +40,272 @@ from matplotlib import pyplot as plt
 import xml.etree.ElementTree as ET
 
 
+def energy_resolution(e_vis):
+    """ 'energy resolution' of the JUNO detector (same function like energy_resolution() in
+        /home/astro/blum/PhD/work/MeVDM_JUNO/source/gen_spectrum_functions.py):
+
+        INFO-me: in detail: energy_resolution returns the width sigma of the gaussian distribution.
+        The real energy of the neutrino is smeared by a gaussian distribution characterized by sigma.
+
+        :param e_vis: visible energy in MeV (float or np.array of float)
+
+        :return sigma/width of the gaussian distribution in no units (float or np.array of float)
+        """
+    # parameters to describe the energy resolution in percent (maximum values of table 13-4, page 196, PhysicsReport):
+    # TODO-me: p0, p1 and p2 are determined by the maximum values of the parameters from table 13-4
+    # p0: is the leading term dominated by the photon statistics (in percent):
+    p0 = 2.8
+    # p1 and p2 come from detector effects such as PMT dark noise, variation of the PMT QE and the
+    # reconstructed vertex smearing (in percent):
+    p1 = 0.26
+    p2 = 0.9
+    # energy resolution defined as sigma/E_visible in percent, 3-parameter function (page 195, PhysicsReport) (float):
+    energy_res = np.sqrt((p0 / np.sqrt(e_vis))**2 + p1**2 + (p2 / e_vis)**2)
+    # sigma or width of the gaussian distribution in percent (float):
+    sigma_resolution = energy_res * e_vis
+    # sigma converted from percent to 'no unit' (float):
+    sigma_resolution = sigma_resolution / 100
+
+    return sigma_resolution
+
+
+def analyze_delayed_signal(npe_per_time, bins_time, first_index, threshold, threshold2, min_pe_delayed, max_pe_delayed,
+                           evt):
+    """
+    function to analyze the time window, where a delayed signal could be. This time window is check for a possible
+    delayed signal (signal has to be greater than 'threshold' and nPE of signal peak must be between 'min_pe_delayed'
+    and 'max_pe_delayed')
+
+    :param npe_per_time: number of pe as function of hittime for time window of delayed signal (array of integer)
+    :param bins_time: array of bins, which contains the information about the hittime in ns (array of float)
+    :param first_index: first index of npe_per_time, that should be analyzed (integer)
+    :param threshold: threshold in nPE per bin, that a delayed signal must have (integer)
+    :param threshold2: threshold in nPE per bin, that specifies the minimal nPE corresponding to a peak
+    :param min_pe_delayed:  minimum number of PE for delayed energy cut of neutron capture on Hydrogen
+                            (values from check_delayed_energy.py)
+    :param max_pe_delayed:  maximum number of PE for delayed energy cut of neutron capture on Hydrogen
+                            (values from check_delayed_energy.py)
+    :param evt: event ID of the event
+
+    :return:
+    """
+    # preallocate number of delayed signal and index_after_peak1 and number of pe in the delayed signal:
+    num_del_signal = 0
+    index_after_peak1 = len(npe_per_time)
+    num_pe_del = 0
+    begin_peak = 0
+    end_peak = 2000000
+
+    # loop over values of the histogram bins of delayed window:
+    for index4 in range(first_index, len(npe_per_time)):
+        # check if number of PE in this bin is above the threshold:
+        if npe_per_time[index4] > threshold:
+            # possible delayed signal (signal in delayed window):
+
+            # check if index4 = first_value -> first value of npe_per_time above threshold -> break from for loop and
+            # return index_after_peak1 = index4 + 1:
+            if index4 == first_index:
+                index_after_peak1 = index4 + 1
+                print("WARNING: npe_per_time[{1:d}] > threshold in evtID = {0:d}".format(evt, index4))
+                break
+
+            # calculate number of PEs in this signal peak:
+            # preallocate sum of PE per bin in the signal peak:
+            sum_pe_peak = 0
+
+            # add nPE of npe_per_time[index4] to sum_pe_peak:
+            sum_pe_peak = sum_pe_peak + npe_per_time[index4]
+
+            # check previous bins:
+            for num1 in range(1, 100, 1):
+                # check if value in previous bins_time[index4 - num1] is above threshold2:
+                if npe_per_time[index4 - num1] > threshold2:
+                    # add nPE of this bin to sum_pe_peak:
+                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 - num1]
+
+                else:
+                    # hittime, when signal peak begins, in ns:
+                    begin_peak = bins_time[index4 - num1]
+                    break
+
+            # check following bins:
+            for num2 in range(1, 1000, 1):
+                # check if (index4 + num2 + 2) is in the range of npe_per_time array:
+                if (index4 + num2 + 2) >= len(npe_per_time):
+                    print("Warning: iteration reaches last index of npe_per_time in evtID = {0:d}".format(evt))
+                    break
+
+                # check if value bins_time[index4 + num2] is <= threshold2 and if following bins_time[index4 + num2 + 1]
+                # and bins_time[index4 + num2 + 2] are also <= threshold2:
+                if (npe_per_time[index4 + num2] <= threshold2 and npe_per_time[index4 + num2 + 1] <= threshold2 and
+                        npe_per_time[index4 + num2 + 2] <= threshold2):
+                    # get hittime, when delayed signal peak ends, in ns:
+                    end_peak = bins_time[index4 + num2]
+
+                    # get index, where npe_hittime is below threshold2:
+                    index_after_peak1 = index4 + num2
+                    break
+                else:
+                    # npe_per_time[index4 + num2] or npe_per_time[index4 + num2 + 1] are above threshold2:
+                    # add nPE of this bin to sum_pe_peak:
+                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 + num2]
+
+            # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
+
+            # set number of pe of delayed signal:
+            num_pe_del = sum_pe_peak
+
+            # first peak is analyzed:
+            # check, if number of PE in this signal peak agree with delayed energy cut:
+            if min_pe_delayed < sum_pe_peak < max_pe_delayed:
+                # PE of signal peak agree with delayed energy cut
+                # set delayed flag:
+                num_del_signal = 1
+            else:
+                lala = 0
+                # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
+
+            # after analyzing the first peak, break out of for-loop (possible second delayed signal will be checked
+            # below)
+            break
+        else:
+            # go to next bin:
+            continue
+
+    return num_del_signal, index_after_peak1, num_pe_del, begin_peak, end_peak
+
+
+def position_smearing(pos_init, e_in_mev):
+    """
+    function to smear the initial position of an event with the vertex resolution.
+
+    :param pos_init: initial x,y or z position in mm of the event
+    :param e_in_mev: energy of the event in MeV (normally sum of quenched deposited energy of primary particles
+    from prmtrkdep-tree is used)
+    :return: reconstructed (smeared) x,y or z position of the event
+    """
+    # mean of the gaussian equal to initial position in mm:
+    mu = pos_init
+    # sigma of the gaussian given by the vertex resolution (sigma = 120 mm / sqrt(E[MeV])) (source YellowBook, p. 157):
+    sigma = 120.0 / np.sqrt(e_in_mev)
+    # generate random number from normal distribution defined by mu and sigma. This represents the reconstructed
+    # position in mm:
+    pos_recon = np.random.normal(mu, sigma)
+
+    return pos_recon
+
+
+def conversion_npe_to_evis(number_photo_electron):
+    """
+    Function to calculate the visible energy in MeV for a given number of p.e. for the prompt signal.
+    This function is the result of linear fit from script check_conversion_npe_mev.py.
+
+    :param number_photo_electron: number of photo-electrons of the prompt signal
+    :return: quenched deposited energy (visible energy in MeV)
+    """
+    # TODO-me: parameters of the fit has to be checked!!!!!!!!!
+    # first fit parameter (slope) in MeV/nPE:
+    parameter_a = 0.0007483
+
+    energy = parameter_a * number_photo_electron
+
+    return energy
+
+
+def get_pmt_position(filename):
+    """
+    function to read the file PMT_position.root to get the PMT position as function of the PMT ID.
+
+    Position of all PMTs (20inch and 3inch) is saved.
+
+    :param filename: path and file name of PMT_position.root
+    :return:
+    """
+    # preallocate list for PMT ID:
+    arr_pmt_id = []
+    # preallocate list for PMT position in mm:
+    arr_pmt_x = []
+    arr_pmt_y = []
+    arr_pmt_z = []
+
+    # read root file:
+    rfile = ROOT.TFile(filename)
+    # get the pmtpos-tree from the TFile:
+    rtree = rfile.Get("pmtpos")
+    # get the number of events in the tree:
+    number_pmts = rtree.GetEntries()
+
+    # loop over PMTs:
+    for index in range(number_pmts):
+        rtree.GetEntry(index)
+
+        # get PMT ID:
+        pmt_id = int(rtree.GetBranch('pmtID').GetLeaf('pmtID').GetValue())
+        arr_pmt_id.append(pmt_id)
+        # get x-position of PMT in mm:
+        pmt_x = float(rtree.GetBranch('x').GetLeaf('x').GetValue())
+        arr_pmt_x.append(pmt_x)
+        # get y-position of PMT in mm:
+        pmt_y = float(rtree.GetBranch('y').GetLeaf('y').GetValue())
+        arr_pmt_y.append(pmt_y)
+        # get z-position of PMT in mm:
+        pmt_z = float(rtree.GetBranch('z').GetLeaf('z').GetValue())
+        arr_pmt_z.append(pmt_z)
+
+    return arr_pmt_id, arr_pmt_x, arr_pmt_y, arr_pmt_z
+
+
+def get_20inchpmt_tts(filename):
+    """
+    function to read the file PmtData.root (originally saved in folder
+    /home/astro/blum/juno/JUNO-SOFT/data/Simulation/ElecSim/) to get the time spread (TTS)
+    of the 20 inch PMTs as function of the PMT ID.
+
+    TTS of the small 3inch PMTs has to be considered differently.
+
+    :param filename: path and file name of PmtData.root
+    :return:
+    """
+    # preallocate list for PMT ID:
+    arr_pmt_id = []
+    # preallocate list for PMT 'time resolution' in ns (must be sigma of normal distribution):
+    arr_sigma_time = []
+
+    # read root file:
+    rfile = ROOT.TFile(filename)
+    # get the pmtpos-tree from the TFile:
+    rtree = rfile.Get("PmtData")
+
+    # set the number of 20 inch PMTs in Central Detector by hand:
+    number_pmts = 17739
+
+    # INFO-me: in PmtData.root, 20000 large PMTs are saved. In detsim version J18v1r1-Pre1 (used for NC simulation),
+    # INFO-me: only 17739 large PMTs are installed. -> Therefore number_pmts = 17739!
+
+    # loop over 20inch PMTs:
+    for index in range(number_pmts):
+        # get event:
+        rtree.GetEntry(index)
+
+        # get PMT ID:
+        pmt_id = int(rtree.GetBranch('pmtId').GetLeaf('m_pmtId').GetValue())
+        arr_pmt_id.append(pmt_id)
+
+        # get timeSpread of PMT in ns:
+        timespread = float(rtree.GetBranch('timeSpread').GetLeaf('&m_timeSpread').GetValue())
+
+        # The timespread (given by the TTS) defines the time resolution of the PMT, which is defined as FWHM.
+        # (see Flyckt: "Photomultiplier Tubes, principles and applications", 2-11).
+        # Therefore you have to calculate sigma of the normal distribution with the FWHM.
+        # For normal distribution: FWHM = 2 * sqrt(2 * ln(2)) * sigma:
+        # sigma in ns:
+        sigma = timespread / (2 * np.sqrt(2 * np.log(2)))
+
+        arr_sigma_time.append(sigma)
+
+    return arr_pmt_id, arr_sigma_time
+
+
 def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hittime, threshold, threshold2,
                       binwidth_hittime, min_pe_delayed, max_pe_delayed, number_entries_input, save_hittime):
     """
@@ -409,13 +675,14 @@ def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hit
            number_possible_delayed, number_possible_second_delayed
 
 
-def conversion_npe_mev(rootfile_input, number_entries_input):
+def conversion_npe_mev(rootfile_input, number_entries_input, radius_cut):
     """
     function to read user_proton_..._.root files from detsim simulation to convert neutron/proton energy of possible
     prompt signal from number of photo-electron (nPE) to MeV.
 
     :param rootfile_input: input root file from tut_detsim.py: e.g. user_proton_10_MeV_0.root (string)
     :param number_entries_input: number of entries, that the input files should have (int)
+    :param radius_cut: radius, that defines the volume cut, in mm
 
     :return:
     """
@@ -460,7 +727,45 @@ def conversion_npe_mev(rootfile_input, number_entries_input):
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
-        """ first read 'evt' tree: """
+        """ read 'geninfo' tree to check initial energy and to apply volume cut: """
+        # get the current event in the TTree:
+        rtree_geninfo.GetEntry(event)
+
+        # get event ID of geninfo-tree:
+        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+
+        # get number of particles of this event:
+        n_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        # check, that only 1 particle per event:
+        if n_particles == 1:
+
+            # get the initial position in x, y, z in mm:
+            x_init = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue())
+            y_init = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue())
+            z_init = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue())
+
+            # calculate the radius in mm:
+            r_init = np.sqrt(x_init**2 + y_init**2 + z_init**2)
+
+            if r_init > radius_cut:
+                # apply volume cut:
+                continue
+
+            # get initial momenta in x, y, z in MeV:
+            px_init = float(rtree_geninfo.GetBranch('InitPX').GetLeaf('InitPX').GetValue())
+            py_init = float(rtree_geninfo.GetBranch('InitPY').GetLeaf('InitPY').GetValue())
+            pz_init = float(rtree_geninfo.GetBranch('InitPZ').GetLeaf('InitPZ').GetValue())
+
+            # total initial momentum in MeV:
+            momentum = np.sqrt(px_init ** 2 + py_init ** 2 + pz_init ** 2)
+            # append momentum to array:
+            init_momentum = np.append(init_momentum, momentum)
+
+        else:
+            print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
+
+        """ read 'evt' tree: """
         # get the current event in the TTree:
         rtree_evt.GetEntry(event)
 
@@ -474,60 +779,29 @@ def conversion_npe_mev(rootfile_input, number_entries_input):
         # number of pe in event:
         number_pe_event = 0
         # hittime of photons in event in ns:
-        hittime_event = np.array([])
+        hittime_event = []
 
         # loop over every photon in the event:
         for index in range(n_photons):
 
-            # get PMT ID, where photon is absorbed:
-            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
+            # Read all PMTs (20inch AND 3inch):
 
-            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
-            if pmt_id < 25000:
-                # get nPE for this photon:
-                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
-                # check, if photon produces only 1 PE:
-                if n_pe != 1:
-                    print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+            # get nPE for this photon:
+            n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
+            # check, if photon produces only 1 PE:
+            if n_pe != 1:
+                print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
 
-                # add n_pe to number_pe_event:
-                number_pe_event = number_pe_event + n_pe
+            # add n_pe to number_pe_event:
+            number_pe_event = number_pe_event + n_pe
 
-                # get hittime of this photon:
-                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
-                # append hit_time to hittime_event:
-                hittime_event = np.append(hittime_event, hit_time)
-
-            else:
-                continue
+            # get hittime of this photon:
+            hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
+            # append hit_time to hittime_event:
+            hittime_event.append(hit_time)
 
         # append number of PE of this event to number_pe array:
         number_pe = np.append(number_pe, number_pe_event)
-
-        """ read 'geninfo' tree to check initial energy of gammas: """
-        # get the current event in the TTree:
-        rtree_geninfo.GetEntry(event)
-
-        # get event ID of geninfo-tree:
-        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
-
-        # get number of particles of this event:
-        n_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
-        # check, that only 1 particle per event:
-        if n_particles == 1:
-
-            # get initial momenta in x, y, z in MeV:
-            px_init = float(rtree_geninfo.GetBranch('InitPX').GetLeaf('InitPX').GetValue())
-            py_init = float(rtree_geninfo.GetBranch('InitPY').GetLeaf('InitPY').GetValue())
-            pz_init = float(rtree_geninfo.GetBranch('InitPZ').GetLeaf('InitPZ').GetValue())
-
-            # total initial momentum in MeV:
-            momentum = np.sqrt(px_init**2 + py_init**2 + pz_init**2)
-            # append momentum to array:
-            init_momentum = np.append(init_momentum, momentum)
-
-        else:
-            print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
 
         """ read 'prmtrkdep' tree to check deposit energy and quenched deposit energy: """
         # get the current event in the TTree:
@@ -544,18 +818,40 @@ def conversion_npe_mev(rootfile_input, number_entries_input):
 
             # get quenched energy in MeV:
             qedep_value = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue())
+            # consider energy resolution of detector:
+            if qedep_value > 0:
+                # get the value of sigma of energy resolution for value of qedep_value:
+                sigma_energy = energy_resolution(qedep_value)
+                # generate normal distributed random number with mean = qedep_value and sigma = sigma_energy:
+                qedep_value = np.random.normal(qedep_value, sigma_energy)
             qedep = np.append(qedep, qedep_value)
 
     return number_pe, hittime_event, init_momentum, edep, qedep
 
 
-def read_gamma_delayed_signal(rootfile_input, number_entries_input):
+def read_gamma_delayed_signal(rootfile_input, number_entries_input, radius_cut, x_position_pmt, y_position_pmt,
+                              z_position_pmt, sigma_t_20inch, sigma_t_3inch, c_eff, min_t, max_t, bin_width,
+                              threshold1, threshold2):
     """
-    function to read user_gamma_..._.root files from detsim simulation to convert gamma energy of possible delayed
-    signal (from neutron capture) from MeV to number of PE
+    function to read user_gamma_..._.root file from detsim simulation to convert gamma energy of possible delayed
+    signal (from neutron capture) from MeV to number of PE.
+
+    Do the exact same analysis of the signal like for the delayed signal in prompt_signal_preselected_evts.py.
 
     :param rootfile_input: input root file from tut_detsim.py: e.g. user_gamma_2_2_MeV_0.root (string)
     :param number_entries_input: number of entries, that the input files should have (integer), normally = 10
+    :param radius_cut: radius, that defines the volume cut, in mm
+    :param x_position_pmt: array of x position of the PMTs in mm
+    :param y_position_pmt: array of y position of the PMTs in mm
+    :param z_position_pmt: array of z position of the PMTs in mm
+    :param sigma_t_20inch: array of time resolution (sigma) of the 20 inch PMTs in ns
+    :param sigma_t_3inch: value of the time resolution (sigma) of the 3inch PMTs in ns
+    :param c_eff: effective speed of light in liquid scintillator in mm/ns
+    :param min_t: time, where the hittime histogram starts, in ns
+    :param max_t: time, where the hittime histogram ends, in ns
+    :param bin_width: binwidth of the hittime histogram in ns
+    :param threshold1: threshold of number of PE per bin for signal (bin-width = 5 ns)
+    :param threshold2: threshold2 of number of PEs per bin (signal peak is summed as long as nPE is above threshold2)
 
     :return:
 
@@ -591,119 +887,207 @@ def read_gamma_delayed_signal(rootfile_input, number_entries_input):
     # preallocate array, where number of PE per event (e.g. per gamma) is saved (np.array of int):
     number_pe = np.array([])
 
-    # preallocate array, where visible energy (quenched deposited energy) of each event is saved (in MeV):
-    evis_array = np.array([])
-
-    # preallocate array. where initial x position per event is saved (in mm):
-    init_xpos = np.array([])
-    # preallocate array. where initial y position per event is saved (in mm):
-    init_ypos = np.array([])
-    # preallocate array. where initial z position per event is saved (in mm):
-    init_zpos = np.array([])
-    # preallocate array. where initial momentum per event is saved (in MeV):
-    init_momentum = np.array([])
+    # preallocate number of analyzed events:
+    number_analyzed = 0
 
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
-        """ first read 'evt' tree: """
-        # get the current event in the TTree:
-        rtree_evt.GetEntry(event)
+        """ check volume cut: """
+        # get current event in prmtrkdep tree:
+        rtree_prmtrkdep.GetEntry(event)
+        # get number of initial particles:
+        n_init_part = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
 
-        # get event ID of evt-tree:
-        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+        if n_init_part != 1:
+            # check if there is just one initial positron:
+            sys.exit("ERROR: more than 1 initial particles in event {0:d}".format(event))
+
+        # get quenched deposited energy of the initial particle in MeV:
+        qedep_prmtrkdep = float(rtree_prmtrkdep.GetBranch("Qedep").GetLeaf("Qedep").GetValue())
+
+        # get current event in geninfo tree:
+        rtree_geninfo.GetEntry(event)
+
+        # get number of initial particles:
+        n_init_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+
+        if n_init_particles != 1:
+            # check if there is just one initial positron:
+            sys.exit("ERROR: more than 1 initial particles in event {0:d}".format(event))
+
+        # get initial x, y, z position:
+        x_init = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue())
+        y_init = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue())
+        z_init = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue())
+
+        # do vertex reconstruction with function position_smearing():
+        # Smear x,y and z position of the initial position (returns reconstructed position in mm):
+        x_reconstructed = position_smearing(x_init, qedep_prmtrkdep)
+        y_reconstructed = position_smearing(y_init, qedep_prmtrkdep)
+        z_reconstructed = position_smearing(z_init, qedep_prmtrkdep)
+
+        # calculate distance to detector center in mm:
+        r_reconstructed = np.sqrt(x_reconstructed**2 + y_reconstructed**2 + z_reconstructed**2)
+
+        # check if event passes the volume cut:
+        if r_reconstructed >= radius_cut:
+            # event is rejected by volume cut.
+            print("file {0}, event = {1:d}: r_init = {2:0.2f} mm".format(rootfile_input, event, r_reconstructed))
+            # go to next event
+            continue
+        else:
+            # event passes volume cut. increment number_analyzed:
+            number_analyzed += 1
+
+        """ calculate the real hittime distribution (time of flight correction with reconstructed position and time 
+        smearing with TTS for each hit): """
+        # get event of 'evt'-tree:
+        rtree_evt.GetEntry(event)
+        # get evtID of the tree and compare with event:
+        evt_id = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
+        if evt_id != event:
+            sys.exit("ERROR: evtID of tree ({0:d}) != {1:d}".format(evt_id, event))
 
         # get number of photons of this event:
         n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
 
-        """ preallocate variables: """
-        # number of pe in event:
-        number_pe_event = 0
-        # hittime of photons in event in ns:
-        hittime_event = np.array([])
+        # preallocate list, where corrected (real) hittimes are saved:
+        hittime_array = []
 
         # loop over every photon in the event:
-        for index in range(n_photons):
+        for index1 in range(n_photons):
 
-            # get PMT ID, where photon is absorbed:
-            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
+            # get number of pe per photon and check if it is equal to 1:
+            npe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index1))
+            if npe != 1:
+                sys.exit("ERROR: more than one p.e. per photon in event {0:d}, file {1}".format(event, index))
 
-            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
-            if pmt_id < 25000:
-                # get nPE for this photon:
-                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
-                # check, if photon produces only 1 PE:
-                if n_pe != 1:
-                    print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+            # get the pmtID of the hit PMT:
+            pmtid = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index1))
 
-                # add n_pe to number_pe_event:
-                number_pe_event = number_pe_event + n_pe
+            """ time of flight correction: """
+            # get hittime of PMT from tree in ns:
+            hittime = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index1))
 
-                # get hittime of this photon:
-                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
-                # append hit_time to hittime_event:
-                hittime_event = np.append(hittime_event, hit_time)
+            # get position of the PMT with specific pmtID (pmtID is ascending number from 0 to 17738 (17739 large PMTs)
+            # and from 300000 to 336571 (36572 small PMTs)).
+            # For large PMTs -> For 20inch PMTs, the pmtID is equal to index of x,y,z_pos_pmt array.
+            # For small PMTs -> For 3inch PMTs, the pmtID - (300000 - 17739) is equal to index of x,y,z_pos_pmt array.
+            # check if PMT is 20 inch or 3inch (pmtID < 50000 means 20inch PMT):
+            if pmtid < 50000:
+                # 20inch PMT:
+                # get PMT position in mm from arrays:
+                x_pmt = x_position_pmt[pmtid]
+                y_pmt = y_position_pmt[pmtid]
+                z_pmt = z_position_pmt[pmtid]
+            else:
+                # 3inch PMT:
+                # calculate index of pos_pmt array that correspond to pmtID of 3inch PMTs (for example:
+                # first small PMT: 300000-282261 = 17739, last small PMT: 336571-282261 = 54310)
+                index_3inch = pmtid - 282261
+                # get PMT position in mm from arrays:
+                x_pmt = x_position_pmt[index_3inch]
+                y_pmt = y_position_pmt[index_3inch]
+                z_pmt = z_position_pmt[index_3inch]
+
+            # calculate distance between reconstructed position of event and position of PMT (in mm):
+            distance_tof = np.sqrt((x_reconstructed - x_pmt)**2 + (y_reconstructed - y_pmt)**2 +
+                                   (z_reconstructed - z_pmt)**2)
+
+            # calculate time of flight in ns:
+            time_of_flight = distance_tof / c_eff
+
+            """ time resolution of PMT: """
+            # get time resolution of PMT with specific pmtID (pmtID is ascending number from 0 to 17738 (17739 large
+            # PMTs)) -> For 20inch PMTs, the pmtID is equal to index of sigma_time_20inch array.
+            # check if PMT is 20 inch or 3inch (pmtID < 50000 means 20inch PMT):
+            if pmtid < 50000:
+                # 20inch PMT:
+                # get time resolution (sigma) of PMT in ns from array:
+                sigma_pmt = sigma_t_20inch[pmtid]
 
             else:
+                # 3inch PMT:
+                sigma_pmt = sigma_t_3inch
+
+            # consider time resolution of PMT by generating normal distributed random number with mu = hittime and
+            # sigma = sigma_pmt (only the hittime at the PMT must be smeared, not the time-of-flight):
+            hittime_tts = np.random.normal(hittime, sigma_pmt)
+
+            """ calculate the 'real' hittime of the photon in ns: """
+            hittime_real = hittime_tts - time_of_flight
+            if hittime_real < min_t:
+                print("------")
+                print(hittime_real)
+                print(pmtid)
+                print(sigma_pmt)
+
+            # append real hittime to array:
+            hittime_array.append(hittime_real)
+
+        """ analyze signal: """
+        # build histogram, where hittimes are saved:
+        # set bin-edges of hittime histogram in ns:
+        bins_hittime = np.arange(min_t, max_t + 2 * bin_width, bin_width)
+        # build hittime histogram:
+        npe_per_hittime, bin_edges_hittime = np.histogram(hittime_array, bins_hittime)
+
+        # preallocate number of pe of this event:
+        num_pe = 0
+
+        # loop over values of the histogram bins:
+        for index1 in range(len(npe_per_hittime)):
+            # check if number of PE in this bin is above the threshold:
+            if npe_per_hittime[index1] > threshold1:
+                # calculate number of PEs in this signal peak:
+                # preallocate sum of PE per bin in the signal peak:
+                sum_pe_peak = 0
+
+                # add nPE of npe_per_hittime[index1] to sum_pe_peak:
+                sum_pe_peak = sum_pe_peak + npe_per_hittime[index1]
+
+                # check previous bins:
+                for num1 in range(1, 100, 1):
+                    # check if value in previous bins_hittime[index1 - num1] is above threshold2:
+                    if npe_per_hittime[index1 - num1] > threshold2:
+                        # add nPE of this bin to sum_pe_peak:
+                        sum_pe_peak = sum_pe_peak + npe_per_hittime[index1 - num1]
+
+                    else:
+                        break
+
+                # check following bins:
+                for num2 in range(1, 1000, 1):
+                    # check if (index1 + num2 + 2) is in the range of npe_per_time array:
+                    if (index1 + num2 + 2) >= len(npe_per_hittime):
+                        print("Warning: iteration reaches last index of npe_per_time in evtID = {0:d}".format(evt))
+                        break
+
+                    # check if value bins_hittime[index1 + num2] is <= threshold2 and if following
+                    # bins_hittime[index1 + num2 + 1] and bins_hittime[index1 + num2 + 2] are also <= threshold2:
+                    if (npe_per_hittime[index1 + num2] <= threshold2 and
+                            npe_per_hittime[index1 + num2 + 1] <= threshold2 and
+                            npe_per_hittime[index1 + num2 + 2] <= threshold2):
+                        break
+                    else:
+                        # npe_per_hittime[index1 + num2] or npe_per_hittime[index1 + num2 + 1] are above threshold2:
+                        # add nPE of this bin to sum_pe_peak:
+                        sum_pe_peak = sum_pe_peak + npe_per_hittime[index1 + num2]
+
+                # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
+
+                # set number of pe of delayed signal:
+                num_pe = sum_pe_peak
+                break
+            else:
+                # go to next bin:
                 continue
 
-        # append number of PE of this event to number_pe array:
-        number_pe = np.append(number_pe, number_pe_event)
+        # append the number of pe of one event to the array:
+        number_pe = np.append(number_pe, num_pe)
 
-        """ read 'geninfo' tree to check spatial distribution and initial energy of gammas: """
-        # get the current event in the TTree:
-        rtree_geninfo.GetEntry(event)
-
-        # get event ID of evt-tree:
-        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
-
-        # get number of particles of this event:
-        n_particles = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
-        # check, that only 1 particles per event:
-        if n_particles == 1:
-            # get initial x position in mm:
-            x_init = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue())
-            # append to array:
-            init_xpos = np.append(init_xpos, x_init)
-            # get initial y position in mm:
-            y_init = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue())
-            # append to array:
-            init_ypos = np.append(init_ypos, y_init)
-            # get initial z position in mm:
-            z_init = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue())
-            # append to array:
-            init_zpos = np.append(init_zpos, z_init)
-
-            # get initial momenta in x, y, z in MeV:
-            px_init = float(rtree_geninfo.GetBranch('InitPX').GetLeaf('InitPX').GetValue())
-            py_init = float(rtree_geninfo.GetBranch('InitPY').GetLeaf('InitPY').GetValue())
-            pz_init = float(rtree_geninfo.GetBranch('InitPZ').GetLeaf('InitPZ').GetValue())
-
-            # total initial momentum in MeV:
-            momentum = np.sqrt(px_init**2 + py_init**2 + pz_init**2)
-            # append momentum to array:
-            init_momentum = np.append(init_momentum, momentum)
-
-        else:
-            print("{0:d} particles in event {1:d} in file {2}".format(n_particles, evt_id_geninfo, rootfile_input))
-
-        """ read 'prmtrkdep' tree to get the visible energy of the gamma: """
-        # get current event:
-        rtree_prmtrkdep.GetEntry(event)
-
-        # get number of particles of this event (should be 0):
-        number_particles = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
-        # check, that only 1 particles per event:
-        if number_particles == 1:
-            # get quenched deposit energy in MeV:
-            qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue())
-            # append to array:
-            evis_array = np.append(evis_array, qedep)
-
-        else:
-            print("{0:d} particles in event {1:d} in file {2}".format(number_particles, evt_id_geninfo, rootfile_input))
-
-    return number_pe, hittime_event, init_xpos, init_ypos, init_zpos, init_momentum, evis_array
+    return number_pe, number_analyzed
 
 
 def read_sample_detsim_user(rootfile_input, r_cut, e_prompt_min, e_prompt_max, e_delayed_min, e_delayed_max,
@@ -1347,7 +1731,7 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
     function to read the sample_detsim_user.root file and do a preselection of possible IBD-like signals
 
     :param rootfile_input: input root file from tut_detsim.py: sample_detsim_user.root
-    :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 17 m = 17000 mm
+    :param r_cut: specifies fiducial volume cut, radius is mm, normally r < 16 m = 16000 mm
     :param min_prompt_energy:   sets the minimal energy of the prompt signal in MeV -> compare this with total deposit
                                 energy of the event
     :param max_prompt_energy:   maximum of total deposit energy of one event, does not contribute to cuts, just for
@@ -1399,26 +1783,24 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
     evt_id_preselected = np.array([])
     # preallocate array, where the total deposit energy of the event is saved in MeV (np.array of float):
     edep_total = np.array([])
+    # preallocate array, where reconstructed x-position of the event is saved in mm:
+    x_reco_array = np.array([])
+    # preallocate array, where reconstructed y-position of the event is saved in mm:
+    y_reco_array = np.array([])
+    # preallocate array, where reconstructed z-position of the event is saved in mm:
+    z_reco_array = np.array([])
 
     # preallocate number of events, that pass the preselection (volume cut and neutron-multiplicity cut, time cut and
     # distance cut):
     number_preselected = 0
     # preallocate number of events, which are rejected by preselection criteria:
     number_rejected = 0
-    # preallocate number of events that pass volume cut:
+    # preallocate number of events with position reconstruction that pass volume cut:
     number_vol_pass = 0
+    # preallocate number of events, where initial position (without position reconstruction) pass volume cut:
+    number_vol_pass_initial = 0
     # preallocate number of events that are rejected by volume cut:
     number_vol_reject = 0
-    # preallocate number of events that are rejected by volume cut of init_geninfo position:
-    number_vol_reject_init_geninfo = 0
-    # preallocate number of events that are rejected by volume cut of exit_geninfo position:
-    number_vol_reject_exit_geninfo = 0
-    # preallocate number of events that are rejected by volume cut of edep_prmtrkdep position:
-    number_vol_reject_edep_prmtrkdep = 0
-    # preallocate number of events that are rejected by volume cut of start_ncap position:
-    number_vol_reject_start_ncap = 0
-    # preallocate number of events that are rejected by volume cut of stop_ncap position:
-    number_vol_reject_stop_ncap = 0
     # preallocate number of events that pass the energy cut:
     number_e_pass = 0
     # preallocate number of events that are rejected of minimal energy cut:
@@ -1443,10 +1825,6 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
-        """ preallocate variables for evt tree: """
-        # total deposited energy of this event (in MeV):
-        edep_evt = 0
-
         """ preallocate variables for geninfo tree: """
         # PDG ID of initial particles of geninfo tree of each particle in the event:
         pdgid_init_geninfo = np.array([])
@@ -1470,6 +1848,8 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
         x_edep_prmtrkdep = np.array([])
         y_edep_prmtrkdep = np.array([])
         z_edep_prmtrkdep = np.array([])
+        # quenched deposit energy of the primary particles in MeV (is used to apply the vertex smearing):
+        qedep_prmtrkdep = 0
 
         """ preallocate variables for nCapture tree: """
         # time, when neutron is captured in ns:
@@ -1579,6 +1959,11 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
             z_edep = float(rtree_prmtrkdep.GetBranch('edepZ').GetLeaf('edepZ').GetValue(index))
             z_edep_prmtrkdep = np.append(z_edep_prmtrkdep, z_edep)
 
+            # get quenched deposited energy in MeV:
+            qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index))
+            # add qedep to qedep_prmtrkdep to get the sum of Qedep of the primary particles:
+            qedep_prmtrkdep += qedep
+
         """ read 'nCapture' tree: """
         # get current event:
         rtree_ncapture.GetEntry(event)
@@ -1655,11 +2040,7 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
 
         # set flag for different cuts of preselection:
         flag_vol_pass = True
-        flag_vol_pass_init_geninfo = True
-        # flag_vol_pass_exit_geninfo = True
-        # flag_vol_pass_edep_prmtrkdep = True
-        flag_vol_pass_start_ncap = True
-        flag_vol_pass_stop_ncap = True
+        flag_vol_pass_initial = True
         flag_e_pass = False
         flag_nmult_pass = False
         flag_time_pass = False
@@ -1667,68 +2048,54 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
         # 2 means 0 or more than 1 neutron capture (do not count these cases)
         flag_dist_pass = 2
 
+        # check if there is a particle in the event:
+        if len(pdgid_init_geninfo) == 0:
+            # this means pdgid_init_geninfo array is empty -> no particle in the event.
+            # therefore: go to next event
+            continue
+
         """ check volume cut: """
-        # calculate position of init_geninfo particles, exit_geninfo particles and edep_prmtrkdep particles:
+        # Do vertex smearing of the position of init_geninfo particles:
+        # set x-position of first initial particle:
+        x_initial = x_init_geninfo[0]
+        # set y-position of first initial particle:
+        y_initial = y_init_geninfo[0]
+        # set z-position of first initial particles:
+        z_initial = z_init_geninfo[0]
+        # loop over position of initial particles and check if the positions are equal for all initial particles:
         for index in range(n_par):
-            # start position of initial particles:
-            r_init_geninfo = np.sqrt(x_init_geninfo[index]**2 + y_init_geninfo[index]**2 + z_init_geninfo[index]**2)
-            if r_init_geninfo >= r_cut:
-                flag_vol_pass = False
-                flag_vol_pass_init_geninfo = False
-                # break
+            if (x_initial != x_init_geninfo[index] or y_initial != y_init_geninfo[index]
+                    or z_initial != z_init_geninfo[index]):
+                # position of initial particles differ:
+                sys.exit("position of initial particles differ!!!! (file = {0}, evtID = {1:d})"
+                         .format(rootfile_input, event))
 
-            # stop position of initial particles:
-            # r_exit_geninfo = np.sqrt(x_exit_geninfo[index]**2 + y_exit_geninfo[index]**2 + z_exit_geninfo[index]**2)
-            # if r_exit_geninfo >= r_cut:
-            #     flag_vol_pass = False
-            #     flag_vol_pass_exit_geninfo = False
-            #     break
+        # all initial particles have same initial position. Smear x,y and z position of this initial position with
+        # function position_smearing(). (returns reconstructed position in mm):
+        x_reconstructed = position_smearing(x_initial, qedep_prmtrkdep)
+        y_reconstructed = position_smearing(y_initial, qedep_prmtrkdep)
+        z_reconstructed = position_smearing(z_initial, qedep_prmtrkdep)
 
-            # position, where initial particles deposit energy:
-            # r_edep_prmtrkdep = np.sqrt(x_edep_prmtrkdep[index]**2 + y_edep_prmtrkdep[index]**2 +
-            #                            z_edep_prmtrkdep[index]**2)
-            # if r_edep_prmtrkdep >= r_cut:
-            #     flag_vol_pass = False
-            #     flag_vol_pass_edep_prmtrkdep = False
-            #     break
+        # calculate the distance to detector center for the reconstructed position in mm:
+        r_reconstructed = np.sqrt(x_reconstructed**2 + y_reconstructed**2 + z_reconstructed**2)
+        if r_reconstructed >= r_cut:
+            flag_vol_pass = False
 
-        # check also neutron capture positions:
-        # calculate position of ncapture:
-        for index in range(number_ncap):
-            # start neutron capture:
-            r_start_ncap = np.sqrt(x_start_ncap[index]**2 + y_start_ncap[index]**2 + z_start_ncap[index]**2)
-            if r_start_ncap >= r_cut:
-                flag_vol_pass = False
-                flag_vol_pass_start_ncap = False
-                # break
-            # stop neutron capture:
-            r_stop_ncap = np.sqrt(x_stop_ncap[index]**2 + y_stop_ncap[index]**2 + z_stop_ncap[index]**2)
-            if r_stop_ncap >= r_cut:
-                flag_vol_pass = False
-                flag_vol_pass_stop_ncap = False
-                # break
+        # as cross-check calculate the distance to detector center for the initial position in mm (not reconstructed):
+        r_initial = np.sqrt(x_initial**2 + y_initial**2 + z_initial**2)
+        if r_initial >= r_cut:
+            flag_vol_pass_initial = False
 
         if flag_vol_pass:
             number_vol_pass += 1
         else:
             number_vol_reject += 1
 
-            if not flag_vol_pass_init_geninfo:
-                number_vol_reject_init_geninfo += 1
+        if flag_vol_pass_initial:
+            # cross-check for initial position:
+            number_vol_pass_initial += 1
 
-            # if not flag_vol_pass_exit_geninfo:
-            #     number_vol_reject_exit_geninfo += 1
-
-            # if not flag_vol_pass_edep_prmtrkdep:
-            #     number_vol_reject_edep_prmtrkdep += 1
-
-            if not flag_vol_pass_start_ncap:
-                number_vol_reject_start_ncap += 1
-
-            if not flag_vol_pass_stop_ncap:
-                number_vol_reject_stop_ncap += 1
-
-        """ check energy cut: """
+        """ check prompt energy cut: """
         if min_prompt_energy <= edep_evt <= max_prompt_energy:
             flag_e_pass = True
             number_e_pass += 1
@@ -1793,24 +2160,17 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
         """ check distance cut: """
         # check distance only, when there is just 1 neutron capture on hydrogen in the time window:
         if number_ncapture_window == 1 and len(index_ncapture) == 1:
-            for index in range(n_par):
-                # check distance: start position initials -> neutron capture:
-                r_dist_start_nc = np.sqrt((x_stop_ncap[int(index_ncapture[0])] - x_init_geninfo[index])**2 +
-                                          (y_stop_ncap[int(index_ncapture[0])] - y_init_geninfo[index])**2 +
-                                          (z_stop_ncap[int(index_ncapture[0])] - z_init_geninfo[index])**2)
-                # check distance: position, where initials deposit energy -> neutron capture:
-                # r_dist_edep_nc = np.sqrt((x_stop_ncap[int(index_ncapture[0])] - x_edep_prmtrkdep[index])**2 +
-                #                          (y_stop_ncap[int(index_ncapture[0])] - y_edep_prmtrkdep[index])**2 +
-                #                          (z_stop_ncap[int(index_ncapture[0])] - z_edep_prmtrkdep[index])**2)
+            # check distance: reconstructed position of initial particles -> neutron capture:
+            r_dist_start_nc = np.sqrt((x_stop_ncap[int(index_ncapture[0])] - x_reconstructed)**2 +
+                                      (y_stop_ncap[int(index_ncapture[0])] - y_reconstructed)**2 +
+                                      (z_stop_ncap[int(index_ncapture[0])] - z_reconstructed)**2)
 
-                if r_dist_start_nc >= distance_cut:
-                    # event is rejected
-                    flag_dist_pass = 0
-                    break
-                else:
-                    # event passes cut
-                    flag_dist_pass = 1
-                    continue
+            if r_dist_start_nc >= distance_cut:
+                # event is rejected
+                flag_dist_pass = 0
+            else:
+                # event passes cut
+                flag_dist_pass = 1
         else:
             # no or more than one neutron capture:
             flag_dist_pass = 2
@@ -1827,22 +2187,27 @@ def preselect_sample_detsim_user(rootfile_input, r_cut, min_prompt_energy, max_p
             evt_id_preselected = np.append(evt_id_preselected, evt_id)
             # add total deposit energy to array:
             edep_total = np.append(edep_total, edep_evt)
+            # add reconstructed x-position to array:
+            x_reco_array = np.append(x_reco_array, x_reconstructed)
+            # add reconstructed y-position to array:
+            y_reco_array = np.append(y_reco_array, y_reconstructed)
+            # add reconstructed z-position to array:
+            z_reco_array = np.append(z_reco_array, z_reconstructed)
+
             # increment number of preselected events:
             number_preselected += 1
-
-            # """ check total deposit energy of the preselected events: """
-            # if edep_evt >= max_prompt_energy:
-            #     number_maxe_reject += 1
 
         else:
             # event is rejected:
             number_rejected += 1
             continue
 
-    return (number_events, evt_id_preselected, edep_total, number_preselected, number_rejected, number_vol_pass,
-            number_vol_reject, number_vol_reject_init_geninfo, number_vol_reject_start_ncap,
-            number_vol_reject_stop_ncap, number_e_pass, number_mine_reject, number_maxe_reject,
-            number_nmult_pass, number_nmult_reject, number_without_ncap, number_time_pass, number_time_reject,
+    return (number_events, evt_id_preselected, edep_total, x_reco_array, y_reco_array, z_reco_array,
+            number_preselected, number_rejected,
+            number_vol_pass, number_vol_reject, number_vol_pass_initial,
+            number_e_pass, number_mine_reject, number_maxe_reject,
+            number_nmult_pass, number_nmult_reject, number_without_ncap,
+            number_time_pass, number_time_reject,
             number_dist_pass, number_dist_reject)
 
 
@@ -2275,31 +2640,31 @@ def event_rate(interval_energy, radius_cut, output_path, plot_flux, show_fluxplo
             plt.close(h1)
 
     """ Calculate the interaction cross-sections of neutrinos with C12 for each neutrino flavour: """
+    # path, where cross-sections are saved:
+    path_xsec = "/home/astro/blum/juno/GENIE/genie_xsec_2.12.0_eventrate/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC" \
+                "/data/"
+
     # for electron-neutrino:
     # define path, where cross-sections are saved (string):
-    path_xsec_nue = \
-        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_nue.xml"
+    path_xsec_nue = path_xsec + "gxspl-FNALsmall_nue.xml"
     # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
     xsec_nue = read_xml_xsec(path_xsec_nue, interval_energy)
 
     # for electron-antineutrino:
     # define path, where cross-sections are saved (string):
-    path_xsec_nuebar = \
-        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_nuebar.xml"
+    path_xsec_nuebar = path_xsec + "gxspl-FNALsmall_nuebar.xml"
     # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
     xsec_nuebar = read_xml_xsec(path_xsec_nuebar, interval_energy)
 
     # for muon-neutrino:
     # define path, where cross-sections are saved (string):
-    path_xsec_numu = \
-        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_numu.xml"
+    path_xsec_numu = path_xsec + "gxspl-FNALsmall_numu.xml"
     # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
     xsec_numu = read_xml_xsec(path_xsec_numu, interval_energy)
 
     # for muon-antineutrino:
     # define path, where cross-sections are saved (string):
-    path_xsec_numubar = \
-        "/home/astro/blum/juno/GENIE/genie_xsec/v2_12_0/NULL/DefaultPlusMECWithNC/data/gxspl-FNALsmall_numubar.xml"
+    path_xsec_numubar = path_xsec + "gxspl-FNALsmall_numubar.xml"
     # calculate total cross-section with function 'read_xml_xsec()' (total cross-section in cm**2, array of float):
     xsec_numubar = read_xml_xsec(path_xsec_numubar, interval_energy)
 
@@ -2329,12 +2694,11 @@ def event_rate(interval_energy, radius_cut, output_path, plot_flux, show_fluxplo
             plt.savefig(output_path + "event_rate.png")
             plt.close(h2)
 
-
     """ Event rate of atmospheric NC neutrino interactions in JUNO: """
     # integrate evt_rate_per_energy over the energy to get the total event rate in events/s (float):
-    event_rate = np.trapz(evt_rate_per_energy, energy_neutrino)
+    evt_rate = np.trapz(evt_rate_per_energy, energy_neutrino)
 
-    return event_rate
+    return evt_rate
 
 
 def convert_genie_file_for_generator(rootfile_input, path_output):

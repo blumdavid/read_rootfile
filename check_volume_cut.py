@@ -1,162 +1,143 @@
 """ Script to check the efficiency of the fiducial volume cut for atmoNC events.
 
     The radius of JUNO detector is 17.7m, but only a fiducial volume of the detector is used for detection to suppress
-    background from the surroundings (normally 17 m).
+    background from the surroundings (normally 16 m).
 
-    The efficiency of this volume cut is calculated with 3 different parameters:
-    1. with edepX, edepY, edepZ from 'evt'-tree of user_atmoNC_.root
-    2. with InitX, InitY, InitZ from 'geninfo'-tree of user_atmoNC_.root
-    3. with ExitX, ExitY, ExitZ from 'geninfo'-tree of user_atmoNC_.root
+    The total volume cut efficiency (how many events are inside fiducial volume after vertex reconstruction) is done
+    with script preselection_detsim_user.py. (73.1 % of all events inside 16 m (03.07.2019))
 
-    Then these 3 efficiency can be compared
+    With this script the leak-in/leak-out efficiency can be calculated. This means, how many events with initial
+    position < 16 m are reconstructed outside 16 m (leak-out), and, how many events with initial position >= 16 m, are
+    reconstructed inside 16 m (leak-in).
+
+    In the yellow book, this efficiency (leak-out/leak-in) is 91.8 % for r = 17 m (page 39)
+    (-> this means the number of leak-out events is smaller than the number of leak-in events
+    -> there are more events inside fiducial volume because of reconstruction than in reality)
+
 """
 import datetime
 import numpy as np
 import ROOT
 import sys
+import NC_background_functions
 
 
-def check_volume_cut(input_path, file_number, number_entries_input, radius_cut):
+def check_volume_cut(input_path, number_entries_input, radius_cut):
     """
 
-    :param input_path: path to input root files from tut_detsim.py: user_atmoNC_{}.root
-    :param file_number: number of the input root file: e.g. 2 -> user_atmoNC_2.root
+    :param input_path: file name with path to input root files from tut_detsim.py: user_atmoNC_{}.root
     :param number_entries_input:  number of entries, that the input files should have (integer), normally = 100
     :param radius_cut: radius, which defines the fiducial volume, in mm
     :return:
     """
     # load the ROOT file:
-    rfile = ROOT.TFile(input_path + "user_atmoNC_{0:d}.root".format(file_number))
-    # get the "evt"-TTree from the TFile:
-    rtree_evt = rfile.Get("evt")
+    rfile = ROOT.TFile(input_path)
     # get the "geninfo"-TTree from the TFile:
     rtree_geninfo = rfile.Get("geninfo")
+    # get the "prmtrkdep"-TTree from TFile:
+    rtree_prmtrkdep = rfile.Get("prmtrkdep")
 
-    # get the number of events in the 'evt' Tree:
-    number_events_evt = rtree_evt.GetEntries()
     # get the number of events in the geninfo Tree:
-    number_events_geninfo = rtree_geninfo.GetEntries()
-    if number_events_geninfo == number_events_evt:
-        number_events = number_events_geninfo
-    else:
-        sys.exit("ERROR: number of events in Trees are NOT equal!!")
-
-    # check if number_events is equal to number_entries_input (if not, the detector simulation was incorrect!!):
+    number_events = rtree_geninfo.GetEntries()
+    # check if number_events_geninfo is equal to number_entries_input (if not, the detector simulation was incorrect!!):
     if number_events != number_entries_input:
         sys.exit("ERROR: number of events are not equal to {0:d} -> Detector Simulation not correct!"
                  .format(number_entries_input))
 
-    # preallocate number of events INSIDE fiducial volume for edepX, edepY, edepZ:
-    number_cut_edep_xyz = 0
-    # preallocate number of events INSIDE fiducial volume for InitX, InitY, InitZ:
-    number_cut_init_xyz = 0
-    # preallocate number of events INSIDE fiducial volume for ExitX, ExitYm ExitZ:
-    number_cut_exit_xyz = 0
+    # number of events with reconstructed position inside fiducial volume (r_reco < Radius_cut):
+    n_reco_inside = 0
+    # number of leak-out events (r_init < Radius_cut, but r_reco >= Radius_cut):
+    n_leak_out = 0
+    # number of leak-in events (r_init >= Radius_cut, but r_reco < Radius_cut):
+    n_leak_in = 0
 
     # loop over every event, i.e. every entry, in the TTree:
     for event in range(number_events):
 
-        # set flag, that init-position of all particles in event is inside fiducial volume:
-        flag_init_inside = True
-        # set flag, that exit-position of all particles in event is inside fiducial volume:
-        flag_exit_inside = True
-
-        """ first read 'evt' Tree: """
-        # get the current event in the Tree:
-        rtree_evt.GetEntry(event)
-
-        # get the value of the event ID:
-        evt_id_evt = int(rtree_evt.GetBranch('evtID').GetLeaf('evtID').GetValue())
-
-        # get x-position, where energy is deposited, in mm:
-        edepx = float(rtree_evt.GetBranch('edepX').GetLeaf('edepX').GetValue())
-
-        # get y-position, where energy is deposited, in mm:
-        edepy = float(rtree_evt.GetBranch('edepY').GetLeaf('edepY').GetValue())
-
-        # get z-position, where energy is deposited, in mm:
-        edepz = float(rtree_evt.GetBranch('edepZ').GetLeaf('edepZ').GetValue())
-
-        # calculate distance to detector center in mm:
-        r_edepxyz = np.sqrt(edepx**2 + edepy**2 + edepz**2)
-
-        if r_edepxyz < radius_cut:
-            # deposit energy of whole event inside fiducial volume:
-            number_cut_edep_xyz = number_cut_edep_xyz + 1
+        """ read prmtrkdep tree: """
+        rtree_prmtrkdep.GetEntry(event)
+        # get nInitParticles from prmtrkdep tree:
+        n_par_prmtrkdep = int(rtree_prmtrkdep.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
+        # preallocate sum of Qedep of initial particles:
+        qedep_sum = 0
+        # to get total quenched deposited energy, sum over initial particles:
+        for index1 in range(n_par_prmtrkdep):
+            # get deposit energy of initial neutron in MeV:
+            qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index1))
+            # add qedep to qedep_sum:
+            qedep_sum += qedep
 
         """ read 'geninfo' tree: """
         # get the current event in the Tree:
         rtree_geninfo.GetEntry(event)
 
         # get event ID:
-        evt_id_geninfo = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
-
-        if evt_id_evt == evt_id_geninfo:
-            evt_id = evt_id_evt
-        else:
-            sys.exit("Event ID's of the three trees are NOT equal for 1 event!")
+        evt_id = int(rtree_geninfo.GetBranch('evtID').GetLeaf('evtID').GetValue())
+        if evt_id != event:
+            sys.exit("ERROR: event ID's are not equal in file {0}".format(rfile))
 
         # get number of particles in the event:
         n_par_geninfo = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
 
-        # preallocate array of distance to center of initial and exit position in mm:
-        r_init_array = np.array([])
-        r_exit_array = np.array([])
+        # check if there are initial particles:
+        if n_par_geninfo == 0:
+            # no initial particle -> go to next event
+            continue
+
+        # preallocate array for initial position:
+        initx = np.array([])
+        inity = np.array([])
+        initz = np.array([])
 
         # loop over number of particles in the event:
         for index1 in range(n_par_geninfo):
             # get initial position of the particle in mm :
-            initx = float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index1))
-            inity = float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index1))
-            initz = float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index1))
+            initx = np.append(initx, float(rtree_geninfo.GetBranch('InitX').GetLeaf('InitX').GetValue(index1)))
+            inity = np.append(inity, float(rtree_geninfo.GetBranch('InitY').GetLeaf('InitY').GetValue(index1)))
+            initz = np.append(initz, float(rtree_geninfo.GetBranch('InitZ').GetLeaf('InitZ').GetValue(index1)))
 
-            # calculate distance to center for initial position in mm:
-            r_init = np.sqrt(initx**2 + inity**2 + initz**2)
-            r_init_array = np.append(r_init_array, r_init)
+        # set 0th entry of array as initial position in mm:
+        x_init = initx[0]
+        y_init = inity[0]
+        z_init = initz[0]
 
-            # get exit position of the particles in mm:
-            exitx = float(rtree_geninfo.GetBranch('ExitX').GetLeaf('ExitX').GetValue(index1))
-            exity = float(rtree_geninfo.GetBranch('ExitY').GetLeaf('ExitY').GetValue(index1))
-            exitz = float(rtree_geninfo.GetBranch('ExitZ').GetLeaf('ExitZ').GetValue(index1))
+        # check if all initial position are equal:
+        for index1 in range(n_par_geninfo):
+            if x_init != initx[index1] or y_init != inity[index1] or z_init != initz[index1]:
+                sys.exit("ERROR: initial positions are not equal for all initial particles (event {0:d}, file {1})"
+                         .format(event, rfile))
 
-            # calculate distance to center for exit position in mm:
-            r_exit = np.sqrt(exitx**2 + exity**2 + exitz**2)
-            r_exit_array = np.append(r_exit_array, r_exit)
+        # smear the initial position with vertex reconstruction:
+        x_reco = NC_background_functions.position_smearing(x_init, qedep_sum)
+        y_reco = NC_background_functions.position_smearing(y_init, qedep_sum)
+        z_reco = NC_background_functions.position_smearing(z_init, qedep_sum)
 
-        for index2 in range(len(r_init_array)):
-            if r_init_array[index2] >= radius_cut:
-                # particle outside of the fiducial volume:
-                flag_init_inside = False
-                break
-            else:
-                # particle inside of fiducial volume -> check next particle position
-                continue
+        # calculate r_init in mm:
+        r_init = np.sqrt(x_init**2 + y_init**2 + z_init**2)
+        # calculate r_reco in mm:
+        r_reco = np.sqrt(x_reco**2 + y_reco**2 + z_reco**2)
 
-        for index3 in range(len(r_exit_array)):
-            if r_exit_array[index3] >= radius_cut:
-                # particle outside of the fiducial volume:
-                flag_exit_inside = False
-                break
-            else:
-                # particle inside of fiducial volume -> check next particle position
-                continue
+        if r_reco < radius_cut:
+            # reco. position inside fiducial volume:
+            n_reco_inside += 1
 
-        # check flags:
-        if flag_init_inside:
-            # all particles of event are inside fiducial volume:
-            number_cut_init_xyz = number_cut_init_xyz + 1
+        if r_init < radius_cut and r_reco >= radius_cut:
+            n_leak_out += 1
 
-        if flag_exit_inside:
-            # all particles of event are inside fiducial volume:
-            number_cut_exit_xyz = number_cut_exit_xyz + 1
+        if r_init >= radius_cut and r_reco < radius_cut:
+            n_leak_in += 1
 
-    return number_events, number_cut_edep_xyz, number_cut_init_xyz, number_cut_exit_xyz
+    return number_events, n_reco_inside, n_leak_out, n_leak_in
 
 
 # get the date and time, when the script was run:
 date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
+# Set cut radius, that defines the fiducial volume, in mm (normally volume cut R < 16 m = 16000 mm):
+Radius_cut = 16000
+
+""" analyze the user_atmoNC_{}.root file from atmospheric Neutral current simulation: """
 # set the path of the input files (filename must be 'user_atmoNC_{}.root'):
 Input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/"
 
@@ -165,61 +146,103 @@ Output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_volume_cut/"
 
 # set the number of the first file and number of the last file that should be read:
 start_number = 0
-stop_number = 99
+stop_number = 999
 # number of entries in the input files:
 Number_entries_input = 100
 
-# Set cut radius, that defines the fiducial volume, in mm (normally volume cut R < 17 m = 17000 mm):
-Radius_cut = 17000
-
 # number of total events, that are analyzed:
 Number_events = 0
-# preallocate number of events INSIDE fiducial volume for edepX, edepY, edepZ:
-Number_cut_edep_xyz = 0
-# preallocate number of events INSIDE fiducial volume for InitX, InitY, InitZ:
-Number_cut_init_xyz = 0
-# preallocate number of events INSIDE fiducial volume for ExitX, ExitYm ExitZ:
-Number_cut_exit_xyz = 0
+# number of events with reconstructed position inside fiducial volume (r_reco < Radius_cut):
+number_reco_inside = 0
+# number of leak-out events (r_init < Radius_cut, but r_reco >= Radius_cut):
+number_leak_out = 0
+# number of leak-in events (r_init >= Radius_cut, but r_reco < Radius_cut):
+number_leak_in = 0
 
 # loop over files:
 for file_num in range(start_number, stop_number+1, 1):
     # path to file:
-    input_file = "user_atmoNC_{0:d}.root".format(file_num)
-    print("Start reading {0} ...".format(input_file))
+    input_file = Input_path + "user_atmoNC_{0:d}.root".format(file_num)
+    # print("Start reading {0} ...".format(input_file))
 
-    num_events, num_cut_edep_xyz, num_cut_init_xyz, num_cut_exit_xyz = check_volume_cut(Input_path, file_num,
-                                                                                        Number_entries_input,
-                                                                                        Radius_cut)
+    num_events, num_reco_inside, num_leak_out, num_leak_in = check_volume_cut(input_file,
+                                                                              Number_entries_input, Radius_cut)
 
     # add values:
-    Number_events = Number_events + num_events
-    Number_cut_edep_xyz = Number_cut_edep_xyz + num_cut_edep_xyz
-    Number_cut_init_xyz = Number_cut_init_xyz + num_cut_init_xyz
-    Number_cut_exit_xyz = Number_cut_exit_xyz + num_cut_exit_xyz
+    Number_events += num_events
+    number_reco_inside += num_reco_inside
+    number_leak_out += num_leak_out
+    number_leak_in += num_leak_in
 
-# calculate the efficiencies in percent (efficiency: events inside fiducial volume / total events):
-efficiency_edep_xyz = float(Number_cut_edep_xyz) / float(Number_events) * 100
-efficiency_init_xyz = float(Number_cut_init_xyz) / float(Number_events) * 100
-efficiency_exit_xyz = float(Number_cut_exit_xyz) / float(Number_events) * 100
+# calculate total volume cut efficiency in percent (efficiency: reco. events inside fiducial volume / total events):
+efficiency_total = float(number_reco_inside) / float(Number_events) * 100.0
 
-# save results in txt file:
-np.savetxt(Output_path + "vol_cut_atmoNC_{0:d}_to_{1:d}.txt".format(start_number, stop_number),
-           np.array([Number_events, Number_cut_edep_xyz, Number_cut_init_xyz, Number_cut_exit_xyz, efficiency_edep_xyz,
-                     efficiency_init_xyz, efficiency_exit_xyz]), fmt='%.3f',
-           header="Results of script check_volume_cut.py ({0}):\n"
-                  "Input-files: user_atmoNC_{1:d}.root to user_atmoNC_{2:d}.root;\n"
-                  "Cut radius = {3:d} mm;\n"
-                  "\n"
-                  "Results:\n"
-                  "Total number of events;\n"
-                  "Number of events inside fid. volume from 'edepXYZ' of 'evt'-tree;\n"
-                  "Number of events inside fid. volume from 'InitXYZ' of 'geninfo'-tree;\n"
-                  "Number of events inside fid. volume from 'ExitXYZ' of 'geninfo'-tree;\n"
-                  "Efficiency of cut on 'edepXYZ' in percent;\n"
-                  "Efficiency of cut on 'InitXYZ' in percent;\n"
-                  "Efficiency of cut on 'ExitXYZ' in percent:".format(now, start_number, stop_number, Radius_cut))
+# calculate leak efficiency in percent ():
+efficiency_leak = 100.0 + float((number_leak_out - number_leak_in)) / float(number_reco_inside) * 100.0
 
+print("NC events:")
+print("total number of events = {0:d}".format(Number_events))
+print("number of reco. events inside fiducial volume = {0:d}".format(number_reco_inside))
+print("total volume cut efficiency = {0:0.4f} %".format(efficiency_total))
+print("")
+print("number of leak out events = {0:d}".format(number_leak_out))
+print("number of leak in events = {0:d}".format(number_leak_in))
+print("leak efficiency (1 - (number leak-out - number leak-in) / number_reco) = {0:.4f} %".format(efficiency_leak))
+print("-------------------")
 
+""" analyze the user_positron_volcut_{}.root file from simulation of positrons with momentum from 10 MeV to 100 MeV 
+    -> represent the prompt signal of real IBD-like events: """
+# set the path of the input files (filename must be 'user_positron_{}.root'):
+Input_path_pos = "/local/scratch1/pipc51/astro/blum/positron_output_volcut/"
+
+# set path, where results should be saved:
+Output_path_pos = "/home/astro/blum/juno/atmoNC/data_NC/output_volume_cut/"
+
+# set the number of the first file and number of the last file that should be read:
+start_number_pos = 0
+stop_number_pos = 99
+# number of entries in the input files:
+Number_entries_input_pos = 1000
+
+# number of total events, that are analyzed:
+Number_events_pos = 0
+# number of events with reconstructed position inside fiducial volume (r_reco < Radius_cut):
+number_reco_inside_pos = 0
+# number of leak-out events (r_init < Radius_cut, but r_reco >= Radius_cut):
+number_leak_out_pos = 0
+# number of leak-in events (r_init >= Radius_cut, but r_reco < Radius_cut):
+number_leak_in_pos = 0
+
+# loop over files:
+for file_num in range(start_number_pos, stop_number_pos+1, 1):
+    # path to file:
+    input_file_pos = Input_path_pos + "user_positron_volcut_{0:d}.root".format(file_num)
+    # print("Start reading {0} ...".format(input_file))
+
+    num_events_pos, num_reco_inside_pos, num_leak_out_pos, num_leak_in_pos = check_volume_cut(input_file_pos,
+                                                                                              Number_entries_input_pos,
+                                                                                              Radius_cut)
+
+    # add values:
+    Number_events_pos += num_events_pos
+    number_reco_inside_pos += num_reco_inside_pos
+    number_leak_out_pos += num_leak_out_pos
+    number_leak_in_pos += num_leak_in_pos
+
+# calculate total volume cut efficiency in percent (efficiency: reco. events inside fiducial volume / total events):
+efficiency_total_pos = float(number_reco_inside_pos) / float(Number_events_pos) * 100.0
+
+# calculate leak efficiency in percent ():
+efficiency_leak_pos = 100.0 + float((number_leak_out_pos - number_leak_in_pos)) / float(number_reco_inside_pos) * 100.0
+
+print("Positron events:")
+print("total number of events = {0:d}".format(Number_events_pos))
+print("number of reco. events inside fiducial volume = {0:d}".format(number_reco_inside_pos))
+print("total volume cut efficiency = {0:0.4f} %".format(efficiency_total_pos))
+print("")
+print("number of leak out events = {0:d}".format(number_leak_out_pos))
+print("number of leak in events = {0:d}".format(number_leak_in_pos))
+print("leak efficiency (1 - (number leak-out - number leak-in) / number_reco) = {0:.4f} %".format(efficiency_leak_pos))
 
 
 

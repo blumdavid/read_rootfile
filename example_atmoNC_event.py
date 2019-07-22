@@ -49,9 +49,9 @@ number_entries_input = 100
 # number_entries_input = 10
 
 # file number:
-file_number = 953
+file_number = 0
 # event number:
-event_number = 26
+event_number = 70
 
 # load the ROOT file:
 rfile = ROOT.TFile(input_path + "user_atmoNC_{0:d}.root".format(file_number))
@@ -123,24 +123,22 @@ for event in range(event_number, event_number + 1, 1):
         # get PMT ID, where photon is absorbed:
         pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
 
-        # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
-        if pmt_id < 25000:
-            # get nPE for this photon:
-            n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
-            # check, if photon produces only 1 PE:
-            if n_pe != 1:
-                print("{1:d} PE for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
+        # all PMTs (20 inch and 3 inch PMTs:
 
-            # add n_pe to number_pe_event:
-            number_pe_event = number_pe_event + n_pe
+        # get nPE for this photon:
+        n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
+        # check, if photon produces only 1 PE:
+        if n_pe != 1:
+            print("{1:d} PE for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
 
-            # get hittime of this photon:
-            hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
-            # append hit_time to hittime_event:
-            hittime_event.append(hit_time)
+        # add n_pe to number_pe_event:
+        number_pe_event = number_pe_event + n_pe
 
-        else:
-            continue
+        # get hittime of this photon:
+        hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
+        # append hit_time to hittime_event:
+        hittime_event.append(hit_time)
+
 
     print("evt {0:d} in file user_atmoNC_{1:d}.root:\n".format(evt_id_evt, file_number))
     print("number of PE = {0:0.1f}\n".format(number_pe_event))
@@ -253,7 +251,7 @@ for event in range(event_number, event_number + 1, 1):
         print("distance = {0:0.2f} m".format(distance))
 
 # Bins = np.arange(0, 1000, 5)
-Bins = np.arange(0, 1000000, 50)
+Bins = np.arange(0, 1000000, 5)
 # Bins = np.arange(1000000, 100000000, 50)
 plt.hist(hittime_event, Bins, align='mid', histtype='step')
 plt.xlabel("hit-time in ns", fontsize=13)

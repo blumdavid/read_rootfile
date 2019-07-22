@@ -1,160 +1,52 @@
-""" Script to get the energy of the prompt signal of preselected events of atmospheric NC neutrino background that are
-    simulated with JUNO detector simulation.
+""" Script to get the energy and hittime distribution of the prompt signal of preselected events of atmospheric
+    NC neutrino background that are simulated with JUNO detector simulation.
 
     1.  read only the preselected events (preselection done with script preselection_detsim_user.py and saved in folder
         /home/astro/blum/juno/atmoNC/data_NC/output_preselection/preselection_detsim/ in files evtID_preselected_{}.txt)
 
-    2.  create histogram with hit-times for these events and analyze two parts of this hittime distribution:
-        2.1:    check, if there is really only one delayed signal from neutron capture
-        2.2:    calculate the number of pe of the prompt signal
+    2.  Calculate hittime distribution (with time-of-flight correction and PMT time resolution) for each event:
+        Procedure to get the hittime distribution with vertex reconstruction and time smearing of PMTs (same procedure
+        like in script hittime_distribution_positron.py):
 
-    3.  do a cut on the prompt signal: use function conversion_npe_to_evis() of atmoNC_spectrum.py and convert the
-        number of pe of the prompt signal to visible energy in MeV and do a cut on the visible energy (10 MeV to 100
-        MeV)
+        2.1.    calculate time of flight:
+            2.1.1   for every photon, that hits a PMT (20inch and 3inch), take the PMT position (via PMT ID from file
+                    PMT_position.root) and calculate the time-of-flight distance with the reconstructed position from
+                    file evtID_preselected_{}.txt
+            2.1.2   with the time-of-flight distance, calculate the time-of-flight of this photon from production to
+                    PMT by considering an effective speed of light in the LS.
 
-    3.  Save number of pe of the prompt signal and number of pe of delayed signal of each event in txt file.
+        2.2.    consider TTS of PMTs:
+            2.2.1   for every photon, that hits a PMT (20inch and 3inch), take the time resolution (sigma) of the PMT
+                    (via PMT ID either from file PmtData.root for the 20inch PMTs or set TTS = 5 ns for 3inch PMTs.)
+            2.2.2   the TTS of the PMT is FWHM. Therefore calculate sigma from TTS (FWHM = 2*sqrt(2*ln(2)) * sigma).
+            2.2.3   smear hittime of detsim with gaussian of sigma (time resolution) around the value of detsim hittime
+                    to get the smeared hittime
+
+        2.3.    for every photon, calculate the 'real' hittime (= smeared hittime - time_of_flight) and store it in
+                array
+
+        2.4.    Do points 2.1 to 2.3 for every photon. Then you get the correct hittime of this event. Build histogram
+                with correct hittimes.
+
+    3.  Take the prompt signal of the corrected hittime histogram and do a cut on the prompt signal:
+        use function conversion_npe_to_evis() and convert the number of pe of the prompt signal to visible energy in
+        MeV and do a cut on the visible energy (10 MeV to 100 MeV).
+        Only analyze events further that pass prompt energy cut.
+
+    4.  Analyze delayed signal:
 
 
-    This txt file can than be analyzed further with script atmoNC_spectrum.py:
+    5.  Save the hittime histogram of the prompt signal to txt file and png file for further analysis with script
+        pulse_shape_analysis.py
 
-    4.  Convert the energy of the prompt signal from number of pe to visible energy in the detector in MeV
-
-    5.  Put all these calculated visible energies into histogram to get the spectrum of atmospheric NC neutrino
-        background as function of the visible energy
-
-    6.  Consider the event rate of NC interactions on C12 inside the detector (calculated with cross-sections and
-        neutrino fluxes) and calculate the 'real' spectrum of atmospheric NC background, JUNO will measure after 10
-        years of data taking
+    6.  Save number of pe of the prompt signal and number of pe of delayed signal of each event in txt file.
 """
 import datetime
 import ROOT
 import sys
+import NC_background_functions
 import numpy as np
 from matplotlib import pyplot as plt
-
-
-def conversion_npe_to_evis(number_photo_electron):
-    """
-    Function to calculate the visible energy in MeV for a given number of p.e. for the prompt signal.
-    This function is the result of linear fit from script check_conversion_npe_mev.py.
-
-    :param number_photo_electron: number of photo-electrons of the prompt signal
-    :return: quenched deposited energy (visible energy in MeV)
-    """
-    # TODO-me: if this function is changed, also change function in atmoNC_spectrum!!!!
-
-    # TODO-me: parameters of the fit has to be checked!!!!!!!!!
-    # first fit parameter (slope) in MeV/nPE:
-    parameter_a = 0.0007872
-
-    energy = parameter_a * number_photo_electron
-
-    return energy
-
-
-def analyze_delayed_signal(npe_per_time, bins_time, first_index, threshold, threshold2, min_pe_delayed, max_pe_delayed,
-                           evt):
-    """
-    function to analyze the time window, where a delayed signal could be. This time window is check for a possible
-    delayed signal (signal has to be greater than 'threshold' and nPE of signal peak must be between 'min_pe_delayed'
-    and 'max_pe_delayed')
-
-    :param npe_per_time: number of pe as function of hittime for time window of delayed signal (array of integer)
-    :param bins_time: array of bins, which contains the information about the hittime in ns (array of float)
-    :param first_index: first index of npe_per_time, that should be analyzed (integer)
-    :param threshold: threshold in nPE per bin, that a delayed signal must have (integer)
-    :param threshold2: threshold in nPE per bin, that specifies the minimal nPE corresponding to a peak
-    :param min_pe_delayed:  minimum number of PE for delayed energy cut of neutron capture on Hydrogen
-                            (values from check_delayed_energy.py)
-    :param max_pe_delayed:  maximum number of PE for delayed energy cut of neutron capture on Hydrogen
-                            (values from check_delayed_energy.py)
-    :param evt: event ID of the event
-
-    :return:
-    """
-    # preallocate number of delayed signal and index_after_peak1 and number of pe in the delayed signal:
-    num_del_signal = 0
-    index_after_peak1 = len(npe_per_time)
-    num_pe_del = 0
-    # preallocate flag, if event is rejected by delayed energy cut or not:
-    flag_rejected_delayed_energy_cut = 0
-
-    # loop over values of the histogram bins of delayed window:
-    for index4 in range(first_index, len(npe_per_time)):
-        # check if number of PE in this bin is above the threshold:
-        if npe_per_time[index4] > threshold:
-            # possible delayed signal (signal in delayed window):
-
-            # check if index4 = first_value -> first value of npe_per_time above threshold -> break from for loop and
-            # return index_after_peak1 = index4 + 1:
-            if index4 == first_index:
-                index_after_peak1 = index4 + 1
-                print("WARNING: npe_per_time[0] > threshold in evtID = {0:d}".format(evt))
-                break
-
-            # calculate number of PEs in this signal peak:
-            # preallocate sum of PE per bin in the signal peak:
-            sum_pe_peak = 0
-
-            # add nPE of npe_per_time[index4] to sum_pe_peak:
-            sum_pe_peak = sum_pe_peak + npe_per_time[index4]
-
-            # check previous bins:
-            for num in range(1, 100, 1):
-                # check if value in previous bins_time[index4 - num] is above threshold2:
-                if npe_per_time[index4 - num] > threshold2:
-                    # add nPE of this bin to sum_pe_peak:
-                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 - num]
-
-                else:
-                    # hittime, when signal peak begins, in ns:
-                    begin_peak = bins_time[index4 - num]
-                    break
-
-            # check following bins:
-            for num in range(1, 1000, 1):
-                # check if index4 + num is in the range of npe_per_time array:
-                if (index4 + num) >= len(npe_per_time):
-                    print("Warning: iteration reaches last index of npe_per_time in evtID = {0:d}".format(evt))
-                    break
-
-                # check if value in following bins_time[index4 + num] is above threshold2:
-                if npe_per_time[index4 + num] > threshold2:
-                    # add nPE of this bin to sum_pe_peak:
-                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 + num]
-
-                else:
-                    # hittime, when signal peak ends, in ns:
-                    end_peak = bins_hittime[index4 + num]
-
-                    # get index, where npe_hittime is below threshold2:
-                    index_after_peak1 = index4 + num
-                    break
-
-            # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
-
-            # set number of pe of delayed signal:
-            num_pe_del = sum_pe_peak
-
-            # first peak is analyzed:
-            # check, if number of PE in this signal peak agree with delayed energy cut:
-            if min_pe_delayed < sum_pe_peak < max_pe_delayed:
-                # PE of signal peak agree with delayed energy cut
-                # set delayed flag:
-                num_del_signal = 1
-            else:
-                flag_rejected_delayed_energy_cut = 1
-                print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
-
-            # after analyzing the first peak, break out of for-loop (possible second delayed signal will be checked
-            # below)
-            break
-        else:
-            # go to next bin:
-            continue
-
-    return num_del_signal, index_after_peak1, num_pe_del, flag_rejected_delayed_energy_cut
-
 
 # get the date and time, when the script was run:
 date = datetime.datetime.now()
@@ -174,7 +66,7 @@ output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/"
 
 """ define time window and bin width: """
 # set time window of whole signal in ns:
-min_time = 0
+min_time = -50
 max_time = 1000000
 # set time in ns, where the prompt signal should be 0:
 time_limit_prompt = 500
@@ -199,15 +91,36 @@ threshold1_del = 50
 # set threshold2 of number of PEs per bin (signal peak is summed as long as nPE is above threshold2):
 threshold2_del = 0
 # min and max number of PE for delayed energy cut (from check_delayed_energy.py):
-min_PE_delayed = 2300.0
-max_PE_delayed = 3600.0
+min_PE_delayed = 2805.53
+max_PE_delayed = 3731.04
 # preallocate number of events that are rejected by delayed energy cut:
 number_rejected_delayed_energy_cut = 0
+# preallocate array, where npe of delayed signal, that wouldn't pass the delayed energy cut are saved:
+number_pe_delayed_rejected_array = np.array([])
+
+""" load position of the PMTs and corresponding PMT ID from file PMT_position.root: """
+file_PMT_position = "/home/astro/blum/juno/atmoNC/PMT_information/PMT_position.root"
+# array with PMT ID and corresponding x, y, z position in mm:
+pmtID_pos_file, x_pos_pmt, y_pos_pmt, z_pos_pmt = NC_background_functions.get_pmt_position(file_PMT_position)
+
+""" load 'time resolution' in ns of the 20 inch PMTs and corresponding PMT ID from file PmtData.root: """
+file_PMT_time = "/home/astro/blum/juno/atmoNC/PMT_information/PmtData.root"
+# array with PMT ID and corresponding sigma in ns:
+pmtID_time_file, sigma_time_20inch = NC_background_functions.get_20inchpmt_tts(file_PMT_time)
+# set TTS (FWHM) of the 3inch PMTs in ns:
+tts_3inch = 5.0
+# calculate time resolution (sigma) for the 3inch PMTs in ns:
+sigma_time_3inch = tts_3inch / (2 * np.sqrt(2 * np.log(2)))
+# set effective speed of light in the liquid scintillator in mm/ns (see page 7 of c_effective_JUNO-doc-3144-v2.pdf in
+# folder /home/astro/blum/PhD/paper/Pulse_Shape_Discrimination/). Effective refraction index in LS n_eff = 1.54.
+# c/n_eff = 299792458 m / 1.54 s ~ 194670427 m/s = 194670427 * 10**(-6) mm/ns ~ 194.67 mm/ns:
+c_effective = 194.67
 
 # loop over the files:
 for index in range(start_number, stop_number+1, 1):
-    # read evtID_preselected_index.txt file:
-    evtID_pre_arr = np.loadtxt(input_path_preselect + "evtID_preselected_{0:d}.txt".format(index))
+    # read evtID_preselected_{}.txt file:
+    evtID_pre_arr, x_reco_arr, y_reco_arr, z_reco_arr = np.loadtxt(input_path_preselect + "evtID_preselected_{0:d}.txt"
+                                                                   .format(index), unpack=True)
 
     # load user_atmoNC_index.root file:
     rfile = ROOT.TFile(input_path_root + "user_atmoNC_{0:d}.root".format(index))
@@ -238,8 +151,10 @@ for index in range(start_number, stop_number+1, 1):
         if evt_id != event_id:
             sys.exit("ERROR: evtID of tree ({0:d}) != evtID of evtID_preselected.txt ({1:d})".format(evt_id, event_id))
 
-        print("\nanalyze event {0:d}".format(evt_id))
+        # print("\nanalyze event {0:d}".format(evt_id))
 
+        """ calculate the real hittime distribution (time of flight correction with reconstructed position and time 
+        smearing with TTS for each hit): """
         # get number of photons of this event:
         n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
 
@@ -249,26 +164,74 @@ for index in range(start_number, stop_number+1, 1):
         # loop over every photon in the event:
         for index2 in range(n_photons):
 
-            # get PMT ID, where photon is absorbed:
-            pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index2))
+            # get nPE for this photon:
+            n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index2))
+            # check, if photon produces only 1 PE:
+            if n_pe != 1:
+                print("{1:d} PE for 1 photon in event {0:d} in file user_atmoNC_{2:d}.root"
+                      .format(event_id, n_pe, index))
 
-            # only 20 inch PMTs (PMT ID of 20 inch PMTs are below 21000, PMT ID of 3 inch PMTs start at 290000):
-            if pmt_id < 25000:
-                # get nPE for this photon:
-                n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index2))
-                # check, if photon produces only 1 PE:
-                if n_pe != 1:
-                    print("{1:d} PE for 1 photon in event {0:d} in file user_atmoNC_{2:d}.root"
-                          .format(event_id, n_pe, index))
+            # get the pmtID of the hit PMT:
+            pmtID = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index2))
 
-                # get hittime of this photon:
-                hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index2))
+            # get hittime of this photon:
+            hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index2))
 
-                # append hittime to array:
-                hittime_array.append(hit_time)
+            # get position of the PMT with specific pmtID (pmtID is ascending number from 0 to 17738 (17739 large PMTs)
+            # and from 300000 to 336571 (36572 small PMTs)).
+            # For large PMTs -> For 20inch PMTs, the pmtID is equal to index of x,y,z_pos_pmt array.
+            # For small PMTs -> For 3inch PMTs, the pmtID - (300000 - 17739) is equal to index of x,y,z_pos_pmt array.
+            # check if PMT is 20 inch or 3inch (pmtID < 50000 means 20inch PMT):
+            if pmtID < 50000:
+                # 20inch PMT:
+                # get PMT position in mm from arrays:
+                x_pmt = x_pos_pmt[pmtID]
+                y_pmt = y_pos_pmt[pmtID]
+                z_pmt = z_pos_pmt[pmtID]
+            else:
+                # 3inch PMT:
+                # calculate index of pos_pmt array that correspond to pmtID of 3inch PMTs (for example:
+                # first small PMT: 300000-282261 = 17739, last small PMT: 336571-282261 = 54310)
+                index_3inch = pmtID - 282261
+                # get PMT position in mm from arrays:
+                x_pmt = x_pos_pmt[index_3inch]
+                y_pmt = y_pos_pmt[index_3inch]
+                z_pmt = z_pos_pmt[index_3inch]
+
+            # calculate distance between reconstructed position of event and position of PMT (in mm):
+            distance_tof = np.sqrt((x_reco_arr[index1] - x_pmt)**2 + (y_reco_arr[index1] - y_pmt)**2 +
+                                   (z_reco_arr[index1] - z_pmt)**2)
+
+            # calculate time of flight in ns:
+            time_of_flight = distance_tof / c_effective
+
+            """ time resolution of PMT: """
+            # get time resolution of PMT with specific pmtID (pmtID is ascending number from 0 to 17738 (17739 large
+            # PMTs)) -> For 20inch PMTs, the pmtID is equal to index of sigma_time_20inch array.
+            # check if PMT is 20 inch or 3inch (pmtID < 50000 means 20inch PMT):
+            if pmtID < 50000:
+                # 20inch PMT:
+                # get time resolution (sigma) of PMT in ns from array:
+                sigma_pmt = sigma_time_20inch[pmtID]
 
             else:
-                continue
+                # 3inch PMT:
+                sigma_pmt = sigma_time_3inch
+
+            # consider time resolution of PMT by generating normal distributed random number with mu = hit_time and
+            # sigma = sigma_pmt (only the hit_time at the PMT must be smeared, not the time-of-flight):
+            hittime_tts = np.random.normal(hit_time, sigma_pmt)
+
+            """ calculate the 'real' hittime of the photon in ns: """
+            hittime_real = hittime_tts - time_of_flight
+            if hittime_real < min_time:
+                print("------")
+                print(hittime_real)
+                print(pmtID)
+                print(sigma_pmt)
+
+            # append hittime to array:
+            hittime_array.append(hittime_real)
 
         """ analyze prompt signal: """
         # build histogram, where hittimes are saved:
@@ -278,20 +241,22 @@ for index in range(start_number, stop_number+1, 1):
         npe_per_hittime, bin_edges_hittime = np.histogram(hittime_array, bins_hittime)
 
         # get index of bins_hittime corresponding to min_time (should be index = 0):
-        index_min_hittime_prompt = int(min_time / binwidth)
+        index_min_hittime_prompt = 0
 
         # Where does prompt signal end?
         # get index of bins_hittime corresponding to time_limit_prompt
-        index_time_limit_prompt = int(time_limit_prompt / binwidth)
-        # check if npe_per_hittime is 0 for this index:
-        if npe_per_hittime[index_time_limit_prompt] == 0:
+        index_time_limit_prompt = int((time_limit_prompt + np.abs(min_time)) / binwidth)
+        # check if npe_per_hittime (and the following two bins) are 0 for this index:
+        if (npe_per_hittime[index_time_limit_prompt] == npe_per_hittime[index_time_limit_prompt+1]
+                == npe_per_hittime[index_time_limit_prompt+2] == 0):
             # prompt signal already 0:
             index_max_hittime_prompt = index_time_limit_prompt
         else:
             # prompt signal not yet 0.
-            # loop over npe_per_hittime from index_time_limit_prompt until npe_per_hittime is 0:
+            # loop over npe_per_hittime from index_time_limit_prompt until npe_per_hittime (and the following two bins)
+            # are 0:
             for index3 in range(index_time_limit_prompt, index_time_limit_prompt+200):
-                if npe_per_hittime[index3] == 0:
+                if npe_per_hittime[index3] == npe_per_hittime[index3+1] == npe_per_hittime[index3+2] == 0:
                     index_max_hittime_prompt = index3
                     break
 
@@ -309,7 +274,7 @@ for index in range(start_number, stop_number+1, 1):
         number_pe_prompt = np.sum(npe_per_hittime_prompt)
 
         # convert the total number of pe to quenched deposited energy in MeV:
-        quenched_deposit_energy = conversion_npe_to_evis(number_pe_prompt)
+        quenched_deposit_energy = NC_background_functions.conversion_npe_to_evis(number_pe_prompt)
 
         # check, if energy is in the correct time window:
         if quenched_deposit_energy < min_energy or quenched_deposit_energy > max_energy:
@@ -331,16 +296,14 @@ for index in range(start_number, stop_number+1, 1):
 
         """ analyze delayed signal: """
         # INFO-me: nPE of delayed signal is only saved as info -> NO cut is applied to delayed signal in this script!
-        print("analyze delayed signal")
-        # get index of bins_hittime corresponding to the end of the prompt signal window:
+        # print("analyze delayed signal")
+        # get index of bin_edges_hittime corresponding to the end of the prompt signal window:
         index_min_hittime_del = index_max_hittime_prompt
-        # get index of bins_hittime corresponding to max_time:
-        index_max_hittime_del = int(max_time / binwidth)
 
-        # calculate nPE as function of hittime only for delayed time window (from min_hittime_del to max_hittime_del+1):
-        npe_per_hittime_del = npe_per_hittime[index_min_hittime_del:index_max_hittime_del+1]
+        # calculate nPE as function of hittime only for delayed time window (from min_hittime_del to end):
+        npe_per_hittime_del = npe_per_hittime[index_min_hittime_del:]
         # bin edges of hittime histogram only for delayed time window:
-        bins_hittime_del = bin_edges_hittime[index_min_hittime_del:index_max_hittime_del+1]
+        bins_hittime_del = bin_edges_hittime[index_min_hittime_del:-1]
 
         # get the minimum and maximum time of the delayed signal time window in ns:
         min_time_delayed = bins_hittime_del[0]
@@ -352,22 +315,25 @@ for index in range(start_number, stop_number+1, 1):
         index_first_del = 0
         # preallocate number of pe of delayed signal:
         number_pe_delayed = 0
-        # preallocate flag, if event is rejected by delayed energy cut (0 means it passes the cut):
-        number_rejected_delayed = 0
 
         # analyze npe_per_hittime_del for possible delayed signals. As long as number_delayed_signal<2 and as long as
         # index has not reached the end of npe_per_hittime_del, check event for possible delayed signals
         while number_delayed_signal < 2 and index_first_del < len(npe_per_hittime_del):
-            number_delayed, index_first_del, num_pe_delayed, number_rejected_delayed = \
-                analyze_delayed_signal(npe_per_hittime_del, bins_hittime_del, index_first_del, threshold1_del,
-                                       threshold2_del, min_PE_delayed, max_PE_delayed, event_id)
 
-            number_delayed_signal = number_delayed_signal + number_delayed
-            number_pe_delayed = number_pe_delayed + num_pe_delayed
+            number_delayed, index_first_del, num_pe_delayed, begin_pulse, end_pulse = \
+                NC_background_functions.analyze_delayed_signal(npe_per_hittime_del, bins_hittime_del, index_first_del,
+                                                               threshold1_del, threshold2_del, min_PE_delayed,
+                                                               max_PE_delayed, event_id)
 
-        # add number_rejected_delayed (0 if event passes delayed energy cut, 1 if event is rejected by delayed energy
-        # cut) to number_rejected_delayed_energy_cut:
-        number_rejected_delayed_energy_cut += number_rejected_delayed
+            number_delayed_signal += number_delayed
+            number_pe_delayed += num_pe_delayed
+
+        if number_delayed_signal != 1:
+            # 0 or more than one delayed signals that pass the delayed energy cut (-> no or more than one neutron
+            # capture on hydrogen):
+            number_rejected_delayed_energy_cut += 1
+            # append npe of delayed signal, that wouldn't pass delayed energy cut to array:
+            number_pe_delayed_rejected_array = np.append(number_pe_delayed_rejected_array, number_pe_delayed)
 
         # append number of pe of delayed signal to array:
         number_pe_total_del = np.append(number_pe_total_del, number_pe_delayed)
@@ -376,7 +342,7 @@ for index in range(start_number, stop_number+1, 1):
         if number_delayed_signal == 0:
             print("---------------ERROR: no delayed signal in event {0:d}".format(event_id))
             h1 = plt.figure(1)
-            plt.step(bins_hittime_del, npe_per_hittime_del, label="nPE of peak = {0:d}".format(number_pe_delayed))
+            plt.step(bins_hittime_del, npe_per_hittime_del, label="nPE of peak = {0:.0f}".format(number_pe_delayed))
             plt.xlabel("hit-time in ns")
             plt.ylabel("number of p.e. per bin (bin-width = {0:0.2f} ns)".format(binwidth))
             plt.title("Hit-time distribution of delayed time window of event {0:d}\nNO delayed signal".format(event_id))
@@ -424,11 +390,12 @@ for index in range(start_number, stop_number+1, 1):
         npe_per_hittime_prompt_save.extend(npe_per_hittime_prompt)
         np.savetxt(output_path + "file{0:d}_evt{1:d}_prompt_signal.txt".format(index, event_id),
                    npe_per_hittime_prompt_save, fmt='%1.2f',
-                   header="Number of pe as function of the hittime of the prompt signal of file user_atmoNC_{0:d}.root,"
+                   header="Number of pe as function of the hittime of the prompt signal (time-of-flight correction "
+                          "and TTS smearing) of file user_atmoNC_{0:d}.root,"
                           "\npreselected event {1:d} (analyzed with script prompt_signal_preselected_evts.py, {2}):"
                           "\ntime window of hittime: from {3:.3f} ns to {4:.3f} ns with bin-width = {5:0.3f} ns,"
                           "\nEnergy cut on prompt signal is applied: {6:0.1f} MeV <= E_vis <= {7:0.1f} MeV,"
-                          "\nConversion function E_vis = 0.0007872 * nPE:"
+                          "\nConversion function E_vis = 0.0007475 * nPE:"
                    .format(index, event_id, now, min_time_prompt, max_time_prompt, binwidth, min_energy, max_energy))
 
     # save array number_pe_total to txt file:
@@ -439,7 +406,7 @@ for index in range(start_number, stop_number+1, 1):
                       "Time window of prompt signal is defined from {2:0.2f} ns to around {3:0.2f} ns (number of events"
                       " = {4:d}).\n"
                       "Energy cut on prompt signal is applied: {5:0.1f} MeV <= E_vis <= {6:0.1f} MeV,\n"
-                      "Conversion function E_vis = 0.0007872 * nPE:"
+                      "Conversion function E_vis = 0.0007475 * nPE:"
                .format(index, now, min_time_prompt, time_limit_prompt, len(number_pe_total), min_energy, max_energy))
 
     # save array number_pe_total_del to txt file:
@@ -459,5 +426,5 @@ print("number of events (of preselect. evts) with nPE of prompt signal < min_ene
       .format(number_rejected_prompt_cut_min))
 print("number of events (of preselect. evts) with nPE of prompt signal > max_energy = {0:d}"
       .format(number_rejected_prompt_cut_max))
-print("number of events (of preselect. evts) rejected by delayed energy cut = {0:d}"
+print("number of events (of preselect. evts), that would be rejected by delayed energy cut = {0:d}"
       .format(number_rejected_delayed_energy_cut))

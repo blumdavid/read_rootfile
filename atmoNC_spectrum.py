@@ -5,22 +5,26 @@
         Read also txt files where the energy of the delayed signals of preselected events are saved.
 
     2.  check, if delayed energy passes delayed energy cut as a cross-check of the preselection (cuts used in script
-        prompt_signal_preselected_evts.py is 2300 nPE < E_delayed < 3600 nPE)
+        prompt_signal_preselected_evts.py is 2785.98 nPE < E_delayed < 3708.98 nPE)
 
-    2.  Convert the energy of the prompt signal from number of pe to visible energy in the detector in MeV
+    3.  Convert the energy of the prompt signal from number of pe to visible energy in the detector in MeV
         This conversion is based on the analysis in script check_conversion_npe_mev.py, where protons and neutrons with
         different kinetic energy are simulated and the visible energy as function of number of PE was plotted. With a
-        linear fit, you get the conversion function E_vis(nPE) = 0.0007872*nPE in MeV.
+        linear fit, you get the conversion function E_vis(nPE) = 0.0007475*nPE in MeV.
         This also define the energy window of the prompt signal:
-        nPE(10 MeV) = 12703.3 nPE
-        nPE(100 MeV) = 127032.5 nPE
+        nPE(10 MeV) = 13377.9 nPE
+        nPE(100 MeV) = 133779.3 nPE
 
-    3.  Put all these calculated visible energies into histogram to get the spectrum of atmospheric NC neutrino
+    4.  Put all these calculated visible energies into histogram to get the spectrum of atmospheric NC neutrino
         background as function of the visible energy
 
-    4.  Consider the event rate of NC interactions on C12 inside the detector (calculated with cross-sections and
+    5.  Consider the event rate of NC interactions on C12 inside the detector (calculated with cross-sections and
         neutrino fluxes) and calculate the 'real' spectrum of atmospheric NC background, JUNO will measure after 10
         years of data taking
+
+    6.  Consider the PSD efficiency calculated with pulse_shape_analysis.py and calculate the spectrum of atmospheric
+        NC background, JUNO will measure after 10 years of data taking, after Pulse Shape Analysis
+
 """
 import datetime
 import sys
@@ -28,30 +32,12 @@ import NC_background_functions
 import numpy as np
 from matplotlib import pyplot as plt
 
-
-def conversion_npe_to_evis(number_photo_electron):
-    """
-    Function to calculate the visible energy in MeV for a given number of p.e. for the prompt signal.
-    This function is the result of linear fit from script check_conversion_npe_mev.py.
-
-    :param number_photo_electron: number of photo-electrons of the prompt signal
-    :return: quenched deposited energy (visible energy in MeV)
-    """
-    # TODO-me: parameters of the fit has to be checked!!!!!!!!!
-    # first fit parameter (slope) in MeV/nPE:
-    parameter_a = 0.0007872
-
-    energy = parameter_a * number_photo_electron
-
-    return energy, parameter_a
-
-
 # get the date and time, when the script was run:
 date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # path, where the txt files with the number of pe of prompt signal are saved:
-input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/"
+input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/old_analysis_r16m/"
 # path, where corresponding evtID is saved:
 input_path_evtID = "/home/astro/blum/juno/atmoNC/data_NC/output_preselection/preselection_detsim/"
 
@@ -83,9 +69,9 @@ number_rejected_prompt_cut_max = 0
 """ delayed energy cut parameters: """
 # minimum energy of delayed signal in nPE:
 # TODO-me: check the values for delayed energy cut!!!!!!!!
-min_nPE_delayed = 2600
+min_nPE_delayed = 2785.98
 # maximum energy of delayed signal in nPE:
-max_nPE_delayed = 3600
+max_nPE_delayed = 3708.98
 # preallocate number of events that are rejected by delayed energy cut:
 number_rejected_del_cut = 0
 # preallocate number of events with nPE=0 for delayed signal:
@@ -97,7 +83,12 @@ number_rejected_del_cut_max = 0
 
 """ Pulse Shape discrimination: """
 # efficiency in percent, of how many NC events are cut away by PSD:
-efficiency_PSD = 95.0
+efficiency_PSD = 90.0
+
+""" cut efficiencies: """
+# TODO-me: include the cut efficiencies!!!!!!!
+# leak efficiency of the volume cut in percent:
+efficiency_volume_cut_leak = 100.054
 
 # radius cut in m:
 r_cut = 16.0
@@ -144,7 +135,7 @@ for index in range(first_file, last_file+1, 1):
     # file name, where evtID of preselected events are saved:
     input_file_evtID = input_path_evtID + "evtID_preselected_{0:d}.txt".format(index)
     # read this file:
-    evtID_preselected = np.loadtxt(input_file_evtID)
+    evtID_preselected, x_reco, y_reco, z_reco = np.loadtxt(input_file_evtID, unpack=True)
 
     # number of preselected events:
     number_preselected = number_preselected + len(number_pe_file)
@@ -152,15 +143,12 @@ for index in range(first_file, last_file+1, 1):
     # loop over all entries in number_pe_file:
     for index1 in range(len(number_pe_file)):
         # convert number_pe to E_vis:
-        e_vis, slope_of_linear_fit = conversion_npe_to_evis(number_pe_file[index1])
+        e_vis = NC_background_functions.conversion_npe_to_evis(number_pe_file[index1])
 
         # check, if energy is in the correct time window:
         if min_energy <= e_vis <= max_energy:
             # add e_vis to default evis histogram:
             e_vis_array += np.histogram(e_vis, bins_evis)[0]
-
-            # get evtID of this event:
-            evtID = evtID_preselected[index1]
 
         else:
             # event is rejected by prompt energy cut:
@@ -182,16 +170,16 @@ for index in range(first_file, last_file+1, 1):
         if number_pe_delayed[index1] == 0:
             # delayed signal lies in prompt signal and is not calculated correctly:
             number_nPE0_delayed += 1
-            # print("nPE=0: file = {0:d}, evt = {1:.0f}".format(index, evtID_preselected[index1]))
 
         elif 0 < number_pe_delayed[index1] < min_nPE_delayed:
             # nPE below min_nPE_delayed:
             number_rejected_del_cut_min += 1
-            # print("nPE<2300: file = {0:d}, evt = {1:.0f}".format(index, evtID_preselected[index1]))
+            # print("------- nPE = {0:.0f} in file {1:d}".format(number_pe_delayed[index1], index))
 
         elif number_pe_delayed[index1] > max_nPE_delayed:
             # nPE above max_nPE_delayed:
             number_rejected_del_cut_max += 1
+            print("++++ nPE = {0:.0f} in file {1:d}".format(number_pe_delayed[index1], index))
 
 # number of NC events in e_vis_array (from simulation):
 number_IBDlike_events_simu = np.sum(e_vis_array)
@@ -304,7 +292,7 @@ np.savetxt(output_path + 'NCatmo_onlyC12_bin{0:.0f}keV.txt'
 np.savetxt(output_path + 'NCatmo_info_onlyC12_bin{0:.0f}keV.txt'
            .format(bin_width_energy * 1000),
            np.array([min_energy, max_energy, bin_width_energy, time_in_years, r_cut, number_NC_events_simu,
-                     number_IBDlike_events_JUNO, event_rate, slope_of_linear_fit]),
+                     number_IBDlike_events_JUNO, event_rate]),
            fmt='%1.9e',
            header='Information to simulation NCatmo_onlyC12_bin{0:.0f}keV.txt (analyzed files: user_atmoNC_{1:d}.root '
                   'to user_atmoNC_{2:d}.root):\n'

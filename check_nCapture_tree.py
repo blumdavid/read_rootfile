@@ -216,7 +216,7 @@ Input_file = Input_path + "user_atmoNC_{0:d}_secAnaMgr.root".format(file_number)
 
 print("Start reading {0} ...".format(Input_file))
 
-# check_n_capture(Input_file, start_number, stop_number)
+check_n_capture(Input_file, start_number, stop_number)
 
 
 

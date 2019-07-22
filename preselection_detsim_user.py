@@ -10,6 +10,7 @@
     Preselection criteria for possible IBD-like events:
     Criteria for IBD signal (from JUNO PhysicsReport page 39):
         1.  fiducial volume cut: r < 16 m (because of fast neutron background reduction)
+            (vertex smearing is applied on the initial position)
         2.  prompt energy cut -> is done later after preselection
         3.  delayed energy cut: only 1 neutron is captured in total 1 ms time-window
                                 (neutron-multiplicity cut with nCapture tree)
@@ -38,6 +39,9 @@ time_cut_min = 500
 time_cut_max = 1000000
 # distance cut between prompt and delayed signal in mm:
 dist_cut_mm = 1500
+# min and max number of PE for delayed energy cut:
+min_PE_delayed = 2500
+max_PE_delayed = 3400
 
 """ set the number of the first file and number of the last file that should be read: """
 start_number = 0
@@ -50,31 +54,19 @@ input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/"
 output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_preselection/preselection_detsim/"
 
 """ parameters to check """
-# event ID of preselected events (array of float):
-event_id_preselected = np.array([])
-# total deposit energy of the event:
-e_dep_total = np.array([])
 # number of events, that pass preselection (float):
 number_preselected = 0
 # number of events, that are rejected (float):
 number_rejected = 0
 # preallocate number of simulated events:
 number_events = 0
-# number of events, that pass volume cut:
+# number of events, that pass volume cut (reconstructed position):
 number_vol_pass = 0
 # number of events, that are rejected by volume cut:
 number_vol_reject = 0
-# number of events that are rejected by volume cut of init_geninfo position:
-number_vol_reject_init_geninfo = 0
-# number of events that are rejected by volume cut of exit_geninfo position:
-# number_vol_reject_exit_geninfo = 0
-# number of events that are rejected by volume cut of edep_prmtrkdep position:
-# number_vol_reject_edep_prmtrkdep = 0
-# number of events that are rejected by volume cut of start_ncap position:
-number_vol_reject_start_ncap = 0
-# number of events that are rejected by volume cut of stop_ncap position:
-number_vol_reject_stop_ncap = 0
-# number of events, that pass energy cut:
+# number of events that pass volume cut (initial position without reconstruction):
+number_vol_pass_initial = 0
+# number of events, that pass prompt energy cut:
 number_e_pass = 0
 # number of events, that are rejected by minimum energy cut:
 number_mine_reject = 0
@@ -104,27 +96,22 @@ for index in range(start_number, stop_number+1):
     print(input_name)
 
     # preselection of detsim events:
-    (num_events, evt_id_preselected, edep_total, num_preselected, num_rejected, num_vol_pass, num_vol_reject,
-     num_vol_reject_init_geninfo, num_vol_reject_start_ncap, num_vol_reject_stop_ncap,
-     num_e_pass, num_mine_reject, num_maxe_reject, num_nmult_pass, num_nmult_reject, num_without_ncap, num_time_pass,
-     num_time_reject, num_dist_pass, num_dist_reject) = \
+    (num_events, evt_id_preselected, edep_total, x_reco, y_reco, z_reco,
+     num_preselected, num_rejected,
+     num_vol_pass, num_vol_reject, num_vol_pass_initial,
+     num_e_pass, num_mine_reject, num_maxe_reject, num_nmult_pass, num_nmult_reject, num_without_ncap,
+     num_time_pass, num_time_reject, num_dist_pass, num_dist_reject) = \
         NC_background_functions.preselect_sample_detsim_user(input_name, R_cut_mm, dep_energy_min, dep_energy_max,
                                                              time_cut_min, time_cut_max, dist_cut_mm,
                                                              Number_entries_input)
 
     # add numbers to parameters:
     number_events += num_events
-    event_id_preselected = np.append(event_id_preselected, evt_id_preselected)
-    e_dep_total = np.append(e_dep_total, edep_total)
     number_preselected += num_preselected
     number_rejected += num_rejected
     number_vol_pass += num_vol_pass
     number_vol_reject += num_vol_reject
-    number_vol_reject_init_geninfo += num_vol_reject_init_geninfo
-    # number_vol_reject_exit_geninfo += num_vol_reject_exit_geninfo
-    # number_vol_reject_edep_prmtrkdep += num_vol_reject_edep_prmtrkdep
-    number_vol_reject_start_ncap += num_vol_reject_start_ncap
-    number_vol_reject_stop_ncap += num_vol_reject_stop_ncap
+    number_vol_pass_initial += num_vol_pass_initial
     number_e_pass += num_e_pass
     number_mine_reject += num_mine_reject
     number_maxe_reject += num_maxe_reject
@@ -136,13 +123,18 @@ for index in range(start_number, stop_number+1):
     number_dist_pass += num_dist_pass
     number_dist_reject += num_dist_reject
 
-    """ save event ID of preselected events to txt file together with information about cut parameters: """
-    np.savetxt(output_path + "evtID_preselected_{0:d}.txt".format(index), evt_id_preselected, fmt='%i',
-               header="event ID's of NC events, that are preselected with script 'preselection_detsim_user.py' ({0})\n"
+    """ save event ID and reconstructed x,y,z position of preselected events to txt file together with information 
+    about cut parameters: """
+    np.savetxt(output_path + "evtID_preselected_{0:d}.txt".format(index),
+               np.c_[evt_id_preselected, x_reco, y_reco, z_reco], fmt='%.3f',
+               header="event ID's and reconstructed x,y,z position (in mm) of NC events, that are preselected with "
+                      "script 'preselection_detsim_user.py' ({0})\n"
+                      "(evtID | recon. x-position in mm | recon. y-position in mm | recon. z-position in mm)\n"
                       "{1:d} events analyzed from file: user_atmoNC_{2:d}.root\n"
                       "{3:d} events pass preselection, {4:d} events rejected by preselection.\n"
                       "Cut Parameters:\n"
-                      "radius cut: {5:d} mm (initial pos. from geninfo-tree, start pos. and stop pos. of n-Capture),\n"
+                      "radius cut: {5:d} mm (from reconstructed position (initial position is smeared by vertex "
+                      "resolution (sigma = 120mm/sqrt(E[MeV])))),\n"
                       "total deposit energy cut: {6:0.1f} MeV <= edep <= {10:0.1f} MeV (edep of total event from "
                       "evt-tree),\n"
                       "time cut between prompt (initial time from geninfo-tree) and delayed signal (capture time from "
@@ -165,13 +157,10 @@ print("number of total events = {0:d}".format(number_events))
 print("number of preselected events = {0:d}".format(number_preselected))
 print("number of rejected events = {0:d}".format(number_rejected))
 print("------------")
-print("number of events, that pass volume cut = {0:d}".format(number_vol_pass))
+print("number of events (reconstructed position), that pass volume cut = {0:d}".format(number_vol_pass))
 print("number of events, that are rejected by volume cut = {0:d}".format(number_vol_reject))
-print("init_geninfo rejection = {0:d}".format(number_vol_reject_init_geninfo))
-# print("exit_geninfo rejection = {0:d}".format(number_vol_reject_exit_geninfo))
-# print("edep_prmtrkdep rejection = {0:d}".format(number_vol_reject_edep_prmtrkdep))
-print("start_ncap rejection = {0:d}".format(number_vol_reject_start_ncap))
-print("stop_ncap rejection = {0:d}".format(number_vol_reject_stop_ncap))
+print("number of events (initial position, without reconstruction), that would pass volume cut = {0:d}"
+      .format(number_vol_pass_initial))
 print("------------")
 print("number of events, that pass energy cut = {0:d}".format(number_e_pass))
 print("number of events, that are rejected by minimum energy cut = {0:d}".format(number_mine_reject))

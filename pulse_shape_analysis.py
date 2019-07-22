@@ -1,9 +1,11 @@
 """ Script to do a pulse shape analysis of atmospheric NC neutrino events that could mimic an IBD signal in JUNO
     detector.
+
     The hittime distribution of the prompt signal of the NC event, which passes all the cuts (and therefore mimics an
     IBD signal), are save in folder output_detsim (the hittime distributions are analyzed with
     prompt_signal_preselected_evts.py).
-    As reference the hittime distribution of prompt positron events are also analyzed for kinetic energy of positrons
+
+    As reference the hittime distribution of positron events are also analyzed for kinetic energy of positrons
     of 10 MeV and 100 MeV.
 
     The hittime distributions of positrons are equal to the hittime distribution of the prompt signal of real IBD events
@@ -20,7 +22,7 @@ def pulse_shape(hittime, npe, tail_start, tail_end):
     """
     function to analyzed the hittime distribution of one event with the tail to total method (charge integration method)
 
-    1. time of flight correction: shift the distribution that is starts at 0 ns
+    1. find the start of the distribution (so there are no values at the beginning with 0 nPE)
     2. normalize the hittime distribution to 1
     3. calculate the 'charge' of the whole distribution
     4. calculate the 'charge' of the tail of the distribution (define by tail_start and tail_end)
@@ -33,7 +35,7 @@ def pulse_shape(hittime, npe, tail_start, tail_end):
     :param tail_end: defines the stop value of the tail in ns
     :return:
     """
-    """ time of flight correction: """
+    """ find start of distribution: """
     # get maximum value of npe:
     maximum_npe = np.max(npe)
     # calculate 10 % of maximum_pe:
@@ -52,7 +54,7 @@ def pulse_shape(hittime, npe, tail_start, tail_end):
     # calculate the integral of the whole hittime distribution:
     integral_npe = np.trapz(npe, hittime)
     # normalize npe distribution to 1:
-    npe_norm = npe/integral_npe
+    npe_norm = npe / integral_npe
 
     """ integral (charge) of total distribution: """
     # should be 1 because of normalization:
@@ -125,7 +127,7 @@ output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_PSD/"
 """ parameters for tail to total method: """
 # INFO-me: parameters should agree with the bin-width of the time window!
 # start of the tail in ns:
-start_tail = 450.0
+start_tail = 50.0
 # end of the tail in ns:
 stop_tail = 500.0
 

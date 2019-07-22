@@ -1,26 +1,57 @@
 import ROOT
 import numpy as np
 from matplotlib import pyplot as plt
+import NC_background_functions
 
-filename = "/local/scratch1/pipc51/astro/blum/detsim_output_data/user_atmoNC_0.root"
+filename = "/home/astro/blum/juno/atmoNC/data_Julia/gntp.101.gst.root"
 
 rfile = ROOT.TFile(filename)
+rtree = rfile.Get("gst")
 
-rtree_evt = rfile.Get("evt")
+num_events = rtree.GetEntries()
+# num_events = 100
 
-rtree_evt.GetEntry(0)
+num = 0
+num_i = 0
+num_f = 0
 
-n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
+for index in range(10000):
+    rtree.GetEntry(index)
 
-hittime = []
+    nc = int(rtree.GetBranch('nc').GetLeaf('nc').GetValue())
 
-for index in range(n_photons):
-    pmt_id = int(rtree_evt.GetBranch('pmtID').GetLeaf('pmtID').GetValue(index))
+    tgt = int(rtree.GetBranch('tgt').GetLeaf('tgt').GetValue())
 
-    if pmt_id == 16085:
-        hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
-        hittime.append(hit_time)
+    if nc == 1 and tgt == 1000060120:
 
-plt.hist(hittime)
-plt.show()
+        # print("------------ event {0:d} ---------".format(index))
+
+        pdgi = []
+        pdgf = []
+        print_i = False
+
+        num += 1
+
+        ni = int(rtree.GetBranch('ni').GetLeaf('ni').GetValue())
+
+        for index1 in range(ni):
+
+            if int(rtree.GetBranch('pdgi').GetLeaf('pdgi').GetValue(index1)) == 1000060120:
+                print_i = True
+
+            pdgi.append(int(rtree.GetBranch('pdgi').GetLeaf('pdgi').GetValue(index1)))
+
+        if print_i:
+            print("pdgi = {0}".format(pdgi))
+
+        nf = int(rtree.GetBranch('nf').GetLeaf('nf').GetValue())
+
+        for index2 in range(nf):
+
+            pdgf.append(int(rtree.GetBranch('pdgf').GetLeaf('pdgf').GetValue(index2)))
+
+        if print_i:
+            print("pdgf = {0}".format(pdgf))
+
+
 

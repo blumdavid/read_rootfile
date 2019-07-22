@@ -40,8 +40,8 @@ threshold2 = 1
 # Set bin-width of hittime histograms in ns:
 binwidth = 5.0
 # min and max number of PE for delayed energy cut (from check_delayed_energy.py):
-min_PE_delayed = 2647.80
-max_PE_delayed = 3524.22
+min_PE_delayed = 2805.53
+max_PE_delayed = 3731.04
 
 # preallocate variables:
 # number of total events, that are analyzed:
