@@ -1,8 +1,8 @@
 """ Script to get the NC interaction channel and particles produced via NC, the deexcitation channel and particles
     produced via deexcitation, and the total (NC + deex.) channels for the NC events, that mimic an IBD-like signal.
 
-    This script is very equal to checkout_NCgen.py, BUT not all events of gen_NC_onlyC12_250000evts_seed1.root are read,
-    but only atmospheric NC events, that can mimic an IBD-like signal in JUNO detector.
+    This script is very similar to checkout_NCgen.py, BUT not all events of gen_NC_onlyC12_250000evts_seed1.root are
+    read, but only atmospheric NC events, that can mimic an IBD-like signal in JUNO detector.
 
     For all IBD-like events (events, that pass all cuts like volume, prompt energy, delayed energy, time, neutron
     multiplicity and distance cut), the evtID and the file number of user_atmoNC_{}.root are stored in folder
@@ -36,10 +36,10 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # set SAVE_FIG, defines if figures are saved:
-SAVE_FIG = False
+SAVE_FIG = True
 
 # set SAVE_TXT, defines if txt files are saved:
-SAVE_TXT = False
+SAVE_TXT = True
 
 # set SHOW_PLOT, defines if the figures are shown:
 SHOW_PLOT = True
@@ -271,7 +271,7 @@ if Number_nu_mu_IN != 0:
              .format(Number_nu_mu_IN, Frac_nu_mu_IN))
 if Number_nu_mu_bar_IN != 0:
     plt.plot(Energy_nu_incoming[:-1], Event_nu_mu_bar_IN, drawstyle='steps', color='r', linestyle='--',
-             label="interactions with $\\bar{\\nu}_\mu$: $N_{events} = $"+"{0:.2f}; fraction = {1:.2f}%"
+             label="interactions with $\\bar{\\nu}_\\mu$: $N_{events} = $"+"{0:.2f}; fraction = {1:.2f}%"
              .format(Number_nu_mu_bar_IN, Frac_nu_mu_bar_IN))
 if Number_nu_tau_IN != 0:
     plt.plot(Energy_nu_incoming[:-1], Event_nu_tau_IN, drawstyle='steps', color='g',
@@ -777,8 +777,8 @@ plt.ylim(ymin=0)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
 plt.ylabel("events per bin (bin-width = {0:.2f} GeV)".format(bin_width_incoming), fontsize=15)
 plt.title("Neutrino energy spectrum for NC interactions on $^{12}C$, that mimic IBD-like signal, "
-          "for different residual isotopes"
-          "\n($\\nu_x$+$^{12}C$ $\\rightarrow$ $\\nu_x$ + ...)", fontsize=20)
+          "\nfor different residual isotopes "
+          "($\\nu_x$+$^{12}C$ $\\rightarrow$ $\\nu_x$ + ...)", fontsize=20)
 plt.legend(fontsize=12)
 
 if SAVE_FIG:

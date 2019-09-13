@@ -3,55 +3,63 @@ import numpy as np
 from matplotlib import pyplot as plt
 import NC_background_functions
 
-filename = "/home/astro/blum/juno/atmoNC/data_Julia/gntp.101.gst.root"
+"""
+efficiency_volume_cut = 100.019
+efficiency_prompt_energy_cut = 98.873
+efficiency_time_cut = 100.004
+efficiency_delayed_energy_cut = 100.087
+efficiency_neutron_multiplicity_cut = 100.0
+efficiency_distance_cut = 100.0
 
-rfile = ROOT.TFile(filename)
-rtree = rfile.Get("gst")
+error_efficiency_volume_cut = 0.368
+error_efficiency_prompt_energy_cut = 2.006
+error_efficiency_time_cut = 0.449
+error_efficiency_delayed_energy_cut = 0.452
+error_efficiency_neutron_multiplicity_cut = 0.454
+error_efficiency_distance_cut = 0.454
 
-num_events = rtree.GetEntries()
-# num_events = 100
+efficiency_muon_veto = 100.00
+error_efficiency_muon_veto = 0.00
 
-num = 0
-num_i = 0
-num_f = 0
+# consider the cut efficiencies for volume, prompt energy, time, delayed energy, multiplicity, distance cut and muon
+# veto cut in percent:
+cut_efficiency = efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 * efficiency_time_cut/100.0 * \
+                 efficiency_delayed_energy_cut/100.0 * efficiency_neutron_multiplicity_cut/100.0 \
+                 * efficiency_distance_cut/100.0 * efficiency_muon_veto/100.0 * 100.0
+# calculate statistical error of cut_efficiency with Gaussian error propagation in percent:
+error_cut_efficiency = (efficiency_prompt_energy_cut/100.0 * efficiency_time_cut/100.0 *
+                        efficiency_delayed_energy_cut/100.0 * efficiency_neutron_multiplicity_cut/100.0 *
+                        efficiency_distance_cut/100.0 * efficiency_muon_veto/100.0 * error_efficiency_volume_cut +
+                        efficiency_volume_cut/100.0 * efficiency_time_cut/100.0 * efficiency_delayed_energy_cut/100.0 *
+                        efficiency_neutron_multiplicity_cut/100.0 * efficiency_distance_cut/100.0 *
+                        efficiency_muon_veto/100.0 * error_efficiency_prompt_energy_cut +
+                        efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 *
+                        efficiency_delayed_energy_cut/100.0 * efficiency_neutron_multiplicity_cut/100.0 *
+                        efficiency_distance_cut/100.0 * efficiency_muon_veto/100.0 * error_efficiency_time_cut +
+                        efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 *
+                        efficiency_time_cut/100.0 * efficiency_neutron_multiplicity_cut/100.0 *
+                        efficiency_distance_cut/100.0 * efficiency_muon_veto/100.0 *
+                        error_efficiency_delayed_energy_cut +
+                        efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 *
+                        efficiency_time_cut/100.0 * efficiency_delayed_energy_cut/100.0 * efficiency_distance_cut/100.0
+                        * efficiency_muon_veto/100.0 * error_efficiency_neutron_multiplicity_cut +
+                        efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 *
+                        efficiency_time_cut/100.0 * efficiency_delayed_energy_cut/100.0 *
+                        efficiency_neutron_multiplicity_cut/100.0 * efficiency_muon_veto/100.0 *
+                        error_efficiency_distance_cut +
+                        efficiency_volume_cut/100.0 * efficiency_prompt_energy_cut/100.0 *
+                        efficiency_time_cut/100.0 * efficiency_delayed_energy_cut/100.0 *
+                        efficiency_neutron_multiplicity_cut/100.0 * efficiency_distance_cut/100.0 *
+                        error_efficiency_muon_veto)
 
-for index in range(10000):
-    rtree.GetEntry(index)
+print("cut_efficiency = {0:.3f} %".format(cut_efficiency))
+print("stat. error of cut efficiency = {0:.3f} %".format(error_cut_efficiency))
+"""
 
-    nc = int(rtree.GetBranch('nc').GetLeaf('nc').GetValue())
 
-    tgt = int(rtree.GetBranch('tgt').GetLeaf('tgt').GetValue())
 
-    if nc == 1 and tgt == 1000060120:
 
-        # print("------------ event {0:d} ---------".format(index))
 
-        pdgi = []
-        pdgf = []
-        print_i = False
-
-        num += 1
-
-        ni = int(rtree.GetBranch('ni').GetLeaf('ni').GetValue())
-
-        for index1 in range(ni):
-
-            if int(rtree.GetBranch('pdgi').GetLeaf('pdgi').GetValue(index1)) == 1000060120:
-                print_i = True
-
-            pdgi.append(int(rtree.GetBranch('pdgi').GetLeaf('pdgi').GetValue(index1)))
-
-        if print_i:
-            print("pdgi = {0}".format(pdgi))
-
-        nf = int(rtree.GetBranch('nf').GetLeaf('nf').GetValue())
-
-        for index2 in range(nf):
-
-            pdgf.append(int(rtree.GetBranch('pdgf').GetLeaf('pdgf').GetValue(index2)))
-
-        if print_i:
-            print("pdgf = {0}".format(pdgf))
 
 
 

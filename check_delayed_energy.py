@@ -1,6 +1,11 @@
 """ Script to check gammas (with energies of 1.9 MeV, 2.2 MeV and 2.5 MeV), which were simulated with tut_detsim.py of
     JUNO offline version J18v2r1-branch.
 
+    !!!!!!!!    DO NOT USE RESULTS OF THIS SCRIPT TO CONVERT THE ENERGY OF A 2.2 MeV GAMMA TO NUMBER OF PE
+                IN THE JUNO DETECTOR.
+    !!!!!!!!!!!!!!!!!!!
+
+
     Results of this script are used to convert the energy of a 2.2 MeV gamma, that is emitted by neutron capture on
     Hydrogen, to number of PE in the JUNO detector.
 

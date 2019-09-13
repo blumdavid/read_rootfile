@@ -52,7 +52,7 @@ output_path = input_path + "results/"
 
 # start file and stop file:
 file_start = 10
-file_end = 109
+file_end = 509
 # file_end = 13
 # number of events per file (for simulation with optical processes):
 number_evts_per_file = 100
@@ -119,6 +119,10 @@ number_timecut_rejected_max = 0
 number_delayed_energy_pass = 0
 # preallocate number of events with NO signal pulse that pass the delayed energy cut in the delayed time window:
 number_delayed_energy_rejected = 0
+# preallocate number of events, where smeared energy pass the cut, but real energy would be rejected:
+number_delayed_energy_toomuch = 0
+# preallocate number of events, where smeared energy is rejected by cut, but real energy would pass the cut:
+number_delayed_energy_tooless = 0
 # preallocate number of events with only 1 signal pulse in delayed time window, that pass delayed energy cut:
 number_n_mult_pass = 0
 # preallocate number of events that do not pass neutron multiplicity cut:
@@ -379,8 +383,8 @@ for filenumber in range(file_start, file_end+1, 1):
         index_max_time_ncap = int((max_time_ncap - min_time) / binwidth)
 
         # take only hittime histogram from index_time_limit to index_max_time_ncap:
-        bin_edges_hittime = bin_edges_hittime_all[index_time_limit:(index_max_time_ncap-1)]
-        npe_per_hittime = npe_per_hittime_all[index_time_limit:]
+        bin_edges_hittime = bin_edges_hittime_all[index_time_limit:(index_max_time_ncap)]
+        npe_per_hittime = npe_per_hittime_all[index_time_limit:(index_max_time_ncap)]
         index_test = 0
 
         ############################################
@@ -389,6 +393,8 @@ for filenumber in range(file_start, file_end+1, 1):
 
         number_nCapture_pass_e_cut = 0
         number_pe_ncapture = 0
+        number_nCapture_pass_e_cut_smeared = 0
+        number_pe_ncapture_smeared = 0
 
         # analyze neutron capture signal (num_n_captures: number of signal with correct energy in event (0 or 1);
         # index_test: index, where analysis of hittime starts;
@@ -403,15 +409,27 @@ for filenumber in range(file_start, file_end+1, 1):
             number_nCapture_pass_e_cut += num_n_captures
             number_pe_ncapture += num_pe_ncapture
 
+        if number_pe_ncapture != 0:
+            # apply energy resolution on the number of pe from ncapture:
+            # get sigma for this certain number of pe:
+            sigma_nPE = NC_background_functions.energy_resolution_pe(number_pe_ncapture)
+            # generate normal distributed random number with mean = number_pe_ncapture and sigma = sigma_nPE:
+            number_pe_ncapture_smeared = np.random.normal(number_pe_ncapture, sigma_nPE)
+            # check if smeared energy would pass the delayed energy cut:
+            if min_PE_delayed < number_pe_ncapture_smeared < max_PE_delayed:
+                number_nCapture_pass_e_cut_smeared = 1
+            else:
+                number_nCapture_pass_e_cut_smeared = 0
+
         # do event pass time cut:
         if flag_pass_timecut:
 
             # check, if there is at least 1 n capture that pass the delayed energy cut in the delayed time window:
-            if number_nCapture_pass_e_cut > 0:
+            if number_nCapture_pass_e_cut_smeared > 0:
                 number_delayed_energy_pass += 1
 
                 # check, if there is only 1 signal pulse in delayed time window, that pass delayed energy cut:
-                if number_nCapture_pass_e_cut == 1:
+                if number_nCapture_pass_e_cut_smeared == 1:
                     # only 1 neutron capture in time window with correct energy:
                     number_n_mult_pass += 1
 
@@ -442,21 +460,28 @@ for filenumber in range(file_start, file_end+1, 1):
             else:
                 number_delayed_energy_rejected += 1
 
-        if 2 < Qedep_capture < 3 and number_pe_ncapture < 2:
+            if number_nCapture_pass_e_cut_smeared == 0 and number_nCapture_pass_e_cut == 1:
+                # smeared energy is rejected, but real energy would pass:
+                number_delayed_energy_tooless += 1
+            elif number_nCapture_pass_e_cut_smeared == 1 and number_nCapture_pass_e_cut == 0:
+                # smeared energy pass, but real energy would be rejected:
+                number_delayed_energy_toomuch += 1
+
+        if 2 < Qedep_capture < 3 and number_pe_ncapture_smeared < 2:
             number_pe0_qedep2 += 1
-        elif 2 < Qedep_capture < 3 and 2000 < number_pe_ncapture < 4000:
+        elif 2 < Qedep_capture < 3 and 2000 < number_pe_ncapture_smeared < 4000:
             number_pe3000_qedep2 += 1
-        elif 4 < Qedep_capture < 6 and number_pe_ncapture < 2:
+        elif 4 < Qedep_capture < 6 and number_pe_ncapture_smeared < 2:
             number_pe0_qedep5 += 1
-        elif 4 < Qedep_capture < 6 and 5000 < number_pe_ncapture < 8000:
+        elif 4 < Qedep_capture < 6 and 5000 < number_pe_ncapture_smeared < 8000:
             number_pe6500_qedep5 += 1
-        elif 8 < Qedep_capture < 12 and 10000 < number_pe_ncapture < 20000:
+        elif 8 < Qedep_capture < 12 and 10000 < number_pe_ncapture_smeared < 20000:
             number_pe15000_qedep11 += 1
         else:
             print("rfile {0}, event = {1:d}".format(rfile, event))
 
         # append number_pe_ncapture to array:
-        array_npe_from_hittime.append(number_pe_ncapture)
+        array_npe_from_hittime.append(number_pe_ncapture_smeared)
         # append values to list:
         array_npe.append(n_photons)
         array_Qedep.append(Qedep_capture)
@@ -469,6 +494,10 @@ print("\nnumber of events that pass time and delayed energy cut (min={1:.0f}, ma
       .format(number_delayed_energy_pass, min_PE_delayed, max_PE_delayed))
 print("number of events that are rejected by delayed energy cut (but pass time cut) = {0:d}"
       .format(number_delayed_energy_rejected))
+print("number of events, that falsely pass the delayed energy cut (counted too much) (smeared energy pass, but real "
+      "energy is rejected) = {0:d}".format(number_delayed_energy_toomuch))
+print("number of events, that are falsely rejected by delayed energy cut (counted too less) (smeared energy rejected, "
+      "but real energy pass) = {0:d}".format(number_delayed_energy_tooless))
 print("\nnumber of events that pass the neutron multiplicity cut (and also time and energy cut) = {0:d}"
       .format(number_n_mult_pass))
 print("number of events that are rejected by neutron multiplicity cut (but pass time and energy cut) = {0:d}"

@@ -40,8 +40,109 @@ from matplotlib import pyplot as plt
 import xml.etree.ElementTree as ET
 
 
+def pulse_shape(hittime, npe, tail_start, tail_end):
+    """
+    function to analyzed the hittime distribution of one event with the tail to total method (charge integration method)
+
+    1. find the start of the distribution (so there are no values at the beginning with 0 nPE)
+    2. normalize the hittime distribution to 1
+    3. calculate the 'charge' of the whole distribution
+    4. calculate the 'charge' of the tail of the distribution (define by tail_start and tail_end)
+    5. calculate the ration between charge of tail and charge of total distribution
+
+
+    :param hittime: hittime array, which defines the time window (array in ns)
+    :param npe: number of pe per bin (corresponds to hittime array) (array)
+    :param tail_start: defines the start value of the tail in ns
+    :param tail_end: defines the stop value of the tail in ns
+    :return:
+    """
+    """ find start of distribution: """
+    # get maximum value of npe:
+    # maximum_npe = np.max(npe)
+    # calculate 10 % of maximum_pe:
+    # start_condition = 0.1 * maximum_npe
+    start_condition = 0
+
+    # loop over npe until one entry is higher than start_condition:
+    for index5 in range(len(npe)):
+        if npe[index5] > start_condition:
+            break
+
+    # do 'time of flight' correction for hittime and npe:
+    hittime = hittime[index5:]
+    npe = npe[index5:]
+
+    """ normalize hittime distribution to 1: """
+    # calculate the integral of the whole hittime distribution:
+    integral_npe = np.trapz(npe, hittime)
+    # normalize npe distribution to 1:
+    npe_norm = npe / integral_npe
+
+    """ integral (charge) of total distribution: """
+    # should be 1 because of normalization:
+    integral_total = np.trapz(npe_norm, hittime)
+
+    """ integral (charge) of the tail of the distribution: """
+    # get the index of hittime, which correspond to tail_start:
+    for index6 in range(len(hittime)):
+        if hittime[index6] == tail_start:
+            index_tail_start = index6
+        elif hittime[index6] == tail_end:
+            index_tail_end = index6
+        else:
+            continue
+
+    # define the time window of the tail of the distribution:
+    hittime_tail = hittime[index_tail_start:index_tail_end+1]
+    # get the corresponding npe_norm array:
+    npe_tail = npe_norm[index_tail_start:index_tail_end+1]
+
+    # integrate the tail of the distribution:
+    integral_tail = np.trapz(npe_tail, hittime_tail)
+
+    """ tail to total ratio: """
+    # calculate the ratio between integral od tail of distribution and of total distribution:
+    tot_ratio = integral_tail / integral_total
+
+    return tot_ratio, npe_norm
+
+
+def tot_efficiency(tot_values_positron, tot_values_nc, eff_nc):
+    """
+    function to get the efficiency, how many positron events are cut away, depending on eff_nc
+    :param tot_values_positron: list/array of all tail-to-total values of positron events
+    :param tot_values_nc: list/array of all tail-to-total values of NC events
+    :param eff_nc: efficiency, how many NC events should be cut away (in percent). For example: eff_nc=99% -> 99% of all
+    NC events are cut away
+    :return:
+    """
+    # calculate the percentile of tot_values_nc defined by (100-eff_nc) (value of tot, where (100-eff_nc) % of all
+    # tot-values are smaller)
+    tot_cut_value = np.percentile(tot_values_nc, 100 - eff_nc)
+
+    # use tot_cut_value to calculate, how many positron events are cut away:
+    num_positron_cut = 0
+    # loop over tot_values_positron:
+    for index in range(len(tot_values_positron)):
+        if tot_values_positron[index] >= tot_cut_value:
+            # positron events is cut away by PSD:
+            num_positron_cut += 1
+        else:
+            continue
+
+    # get total number of positron events:
+    num_pos_total = len(tot_values_positron)
+
+    # calculate efficiency, how many positron events are cut away by PSD based on eff_nc (in percent):
+    eff_positron = float(num_positron_cut) / float(num_pos_total) * 100
+
+    return eff_positron, tot_cut_value
+
+
+
 def energy_resolution(e_vis):
-    """ 'energy resolution' of the JUNO detector (same function like energy_resolution() in
+    """ 'energy resolution' of the JUNO detector for energies given in MeV (same function like energy_resolution() in
         /home/astro/blum/PhD/work/MeVDM_JUNO/source/gen_spectrum_functions.py):
 
         INFO-me: in detail: energy_resolution returns the width sigma of the gaussian distribution.
@@ -49,7 +150,7 @@ def energy_resolution(e_vis):
 
         :param e_vis: visible energy in MeV (float or np.array of float)
 
-        :return sigma/width of the gaussian distribution in no units (float or np.array of float)
+        :return sigma/width of the gaussian distribution in MeV (float or np.array of float)
         """
     # parameters to describe the energy resolution in percent (maximum values of table 13-4, page 196, PhysicsReport):
     # TODO-me: p0, p1 and p2 are determined by the maximum values of the parameters from table 13-4
@@ -61,12 +162,149 @@ def energy_resolution(e_vis):
     p2 = 0.9
     # energy resolution defined as sigma/E_visible in percent, 3-parameter function (page 195, PhysicsReport) (float):
     energy_res = np.sqrt((p0 / np.sqrt(e_vis))**2 + p1**2 + (p2 / e_vis)**2)
-    # sigma or width of the gaussian distribution in percent (float):
+    # sigma or width of the gaussian distribution in MeV * percent (float):
     sigma_resolution = energy_res * e_vis
-    # sigma converted from percent to 'no unit' (float):
+    # sigma in MeV (float):
     sigma_resolution = sigma_resolution / 100
 
     return sigma_resolution
+
+
+def energy_resolution_pe(npe):
+    """ 'energy resolution' of the JUNO detector for energies given in nPE (same function like energy_resolution() in
+        /home/astro/blum/PhD/work/MeVDM_JUNO/source/gen_spectrum_functions.py):
+
+        INFO-me: in detail: energy_resolution returns the width sigma of the gaussian distribution.
+        The real energy of the neutrino is smeared by a gaussian distribution characterized by sigma.
+
+        :param npe: number of photo-electrons (float or np.array of float)
+
+        :return sigma/width of the gaussian distribution in nPE (float or np.array of float)
+        """
+    # parameters to describe the energy resolution in percent (maximum values of table 13-4, page 196, PhysicsReport):
+    # TODO-me: p0, p1 and p2 are determined by the maximum values of the parameters from table 13-4
+    # p0: is the leading term dominated by the photon statistics (in percent):
+    p0 = 2.8
+    # p1 and p2 come from detector effects such as PMT dark noise, variation of the PMT QE and the
+    # reconstructed vertex smearing (in percent):
+    p1 = 0.26
+    p2 = 0.9
+
+    # conversion factor a (E_vis = a * nPE) (units: MeV/PE):
+    # INFO-me: must be same value as in function conversion_npe_to_evis()
+    a = 0.0007483
+
+    # convert p0, p1, p2 to parameters corresponding to nPE:
+    p0_new = p0 / np.sqrt(a)
+    p1_new = p1
+    p2_new = p2 / a
+
+    # sigma (width of the gaussian distribution) defined as sigma = resolution * nPE (page 195, PhysicsReport) in
+    # units of nPE * percent (float):
+    sigma_resolution = np.sqrt((p0_new / np.sqrt(npe)) ** 2 + p1_new ** 2 + (p2_new / npe) ** 2) * npe
+    # sigma in nPE (float):
+    sigma_resolution = sigma_resolution / 100
+
+    return sigma_resolution
+
+
+def analyze_delayed_signal_v2(npe_per_time, bins_time, first_index, threshold, threshold2, min_pe, evt):
+    """
+    function to analyze the time window, where a delayed signal could be. This time window is check for a possible
+    delayed signal (signal has to be greater than 'threshold' and nPE of signal peak must be above min_pe)
+
+    :param npe_per_time: number of pe as function of hittime for time window of delayed signal (array of integer)
+    :param bins_time: array of bins, which contains the information about the hittime in ns (array of float)
+    :param first_index: first index of npe_per_time, that should be analyzed (integer)
+    :param threshold: threshold in nPE per bin, that a delayed signal must have (integer)
+    :param threshold2: threshold in nPE per bin, that specifies the minimal nPE corresponding to a peak
+    :param min_pe: lower threshold of PE for delayed signal
+    :param evt: event ID of the event
+
+    :return:
+    """
+    # preallocate number of delayed signal and index_after_peak1 and number of pe in the delayed signal:
+    num_del_signal = 0
+    index_after_peak1 = len(npe_per_time)
+    num_pe_del = 0
+    begin_peak = 0
+    end_peak = 2000000
+
+    # loop over values of the histogram bins of delayed window:
+    for index4 in range(first_index, len(npe_per_time)):
+        # check if number of PE in this bin is above the threshold:
+        if npe_per_time[index4] > threshold:
+            # possible delayed signal (signal in delayed window):
+
+            # check if index4 = first_value -> first value of npe_per_time above threshold -> break from for loop and
+            # return index_after_peak1 = index4 + 1:
+            if index4 == first_index:
+                index_after_peak1 = index4 + 1
+                print("WARNING: npe_per_time[{1:d}] > threshold in evtID = {0:d}".format(evt, index4))
+                break
+
+            # calculate number of PEs in this signal peak:
+            # preallocate sum of PE per bin in the signal peak:
+            sum_pe_peak = 0
+
+            # add nPE of npe_per_time[index4] to sum_pe_peak:
+            sum_pe_peak = sum_pe_peak + npe_per_time[index4]
+
+            # check previous bins:
+            for num1 in range(1, 100, 1):
+                # check if value in previous bins_time[index4 - num1] is above threshold2:
+                if npe_per_time[index4 - num1] > threshold2:
+                    # add nPE of this bin to sum_pe_peak:
+                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 - num1]
+
+                else:
+                    # hittime, when signal peak begins, in ns:
+                    begin_peak = bins_time[index4 - num1]
+                    break
+
+            # check following bins:
+            for num2 in range(1, 1000, 1):
+                # check if (index4 + num2 + 2) is in the range of npe_per_time array:
+                if (index4 + num2 + 2) >= len(npe_per_time):
+                    print("Warning: iteration reaches last index of npe_per_time in evtID = {0:d}".format(evt))
+                    break
+
+                # check if value bins_time[index4 + num2] is <= threshold2 and if following bins_time[index4 + num2 + 1]
+                # and bins_time[index4 + num2 + 2] are also <= threshold2:
+                if (npe_per_time[index4 + num2] <= threshold2 and npe_per_time[index4 + num2 + 1] <= threshold2 and
+                        npe_per_time[index4 + num2 + 2] <= threshold2):
+                    # get hittime, when delayed signal peak ends, in ns:
+                    end_peak = bins_time[index4 + num2]
+
+                    # get index, where npe_hittime is below threshold2:
+                    index_after_peak1 = index4 + num2
+                    break
+                else:
+                    # npe_per_time[index4 + num2] or npe_per_time[index4 + num2 + 1] are above threshold2:
+                    # add nPE of this bin to sum_pe_peak:
+                    sum_pe_peak = sum_pe_peak + npe_per_time[index4 + num2]
+
+            # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
+
+            # first peak is analyzed:
+            # check, if number of PE in this signal peak is above threshold:
+            if min_pe < sum_pe_peak:
+                # PE of signal peak above threshold:
+                # set delayed flag:
+                num_del_signal = 1
+                # set number of pe of delayed signal:
+                num_pe_del = sum_pe_peak
+            else:
+                num_del_signal = 0
+
+            # after analyzing the first peak, break out of for-loop (possible second delayed signal will be checked
+            # below)
+            break
+        else:
+            # go to next bin:
+            continue
+
+    return num_del_signal, index_after_peak1, num_pe_del, begin_peak, end_peak
 
 
 def analyze_delayed_signal(npe_per_time, bins_time, first_index, threshold, threshold2, min_pe_delayed, max_pe_delayed,
@@ -162,7 +400,7 @@ def analyze_delayed_signal(npe_per_time, bins_time, first_index, threshold, thre
                 # set delayed flag:
                 num_del_signal = 1
             else:
-                lala = 0
+                num_del_signal = 0
                 # print("number of pe in delayed signal = {0:d}".format(sum_pe_peak))
 
             # after analyzing the first peak, break out of for-loop (possible second delayed signal will be checked
