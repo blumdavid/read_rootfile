@@ -1,6 +1,6 @@
 """ Script to do a pulse shape analysis of atmospheric NC neutrino events and of real IBD signals.
 
-    Read already calculated pulse shapes (hittime distribution) of NC and IBD events
+    Read already calculated pulse shapes of prompt signals (hittime distribution) of NC and IBD events
     (calculated with analyze_prompt_delayed_cut_v2.py).
 
     Calculate the TTR (tail-to-total ratio) for a specific tail window (tail start and tail end) for each pulse shape.
@@ -13,8 +13,8 @@
 
 """
 import datetime
-import os
 import numpy as np
+import os
 import sys
 from matplotlib import pyplot as plt
 from NC_background_functions import pulse_shape
@@ -26,21 +26,25 @@ now = date.strftime("%Y-%m-%d %H:%M")
 
 # flag if plots should be create and saved:
 CREATE_PLOTS = True
+# flag if arrays with TTR values should be saved:
+SAVE_ARRAY_TTR = True
 
 """ parameters for tail to total method: """
 # INFO-me: parameters should agree with the bin-width of the time window!
 # start of the tail in ns:
-# start_tail = np.arange(320, 365, 5)
-start_tail = np.array([350])
+# start_tail = np.arange(50, 650, 100)
+start_tail = np.array([225, 275, 325])
 
 # end of the tail in ns:
-# stop_tail = np.arange(400, 720, 20)
-stop_tail = np.array([540])
+stop_tail = np.arange(600, 1200, 200)
+# stop_tail = np.array([1000])
 
 print("start_tail = {0}".format(start_tail))
 print("stop_tail = {0}".format(stop_tail))
 
 """ parameters: """
+# integer to split the analysis:
+analysis_part = 0
 # start of the time window in ns:
 start_time = 0.0
 # end of the time window in ns:
@@ -59,7 +63,7 @@ stop_filenumber_IBD = 199
 num_evts_per_file = 100
 
 # path, where output is saved:
-output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_PSD_v2/"
+output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_PSD_v2/DCR/"
 
 """ preallocate values: """
 # best IBD efficiency for NC efficiency of 90 % and the corresponding tail-to-total value and values of start and
@@ -128,6 +132,8 @@ for index in range(len(start_tail)):
 
         # preallocate array, where tail-to-total ratios are stored:
         array_TTR_IBD = []
+        filenumber_IBD = []
+        evtID_IBD = []
 
         # preallocate array, where a average hittime-distribution of IBD events are stored (number of pe per bin):
         # length of average hittime distribution (number of bins):
@@ -136,15 +142,17 @@ for index in range(len(start_tail)):
 
         # loop over all IBD pulse shapes:
         for filenumber in range(start_filenumber_IBD, stop_filenumber_IBD + 1, 1):
-            print(filenumber)
+            # print(filenumber)
             for event in range(num_evts_per_file):
 
                 # increment num_events_analyzed_IBD:
                 num_events_analyzed_IBD += 1
 
                 # read pulse shape:
-                pulse_shape_data_IBD = np.loadtxt(input_path_IBD + "file{0:d}_evt{1:d}_pulse_shape.txt"
+                pulse_shape_data_IBD = np.loadtxt(input_path_IBD + "file{0:d}_evt{1:d}_prompt_signal_DCR.txt"
                                                   .format(filenumber, event))
+                # pulse_shape_data_IBD = np.loadtxt(input_path_IBD + "file{0:d}_evt{1:d}_prompt_signal.txt"
+                #                                   .format(filenumber, event))
 
                 # 0th entry in pulse_shape_data_IBD is minimum of time window in ns:
                 min_time_IBD = pulse_shape_data_IBD[0]
@@ -172,6 +180,9 @@ for index in range(len(start_tail)):
 
                 # append tail-to-total ratio to array:
                 array_TTR_IBD.append(ttr_IBD)
+                # append filenumber and eventID to arrays:
+                filenumber_IBD.append(filenumber)
+                evtID_IBD.append(event)
 
                 # append zeros to npe_norm_IBD to get a average length of the hittimes:
                 npe_norm_IBD = np.pad(npe_norm_IBD, (0, length_average_hittime - len(npe_norm_IBD)), 'constant',
@@ -196,6 +207,8 @@ for index in range(len(start_tail)):
 
         # preallocate array, where tail-to-total ratios are stored:
         array_TTR_NC = []
+        filenumber_NC = []
+        evtID_NC = []
 
         # preallocate array, where a average hittime-distribution of NC events are stored (number of pe per bin):
         # length of average hittime distribution (number of bins):
@@ -204,15 +217,25 @@ for index in range(len(start_tail)):
 
         # loop over all NC pulse shapes:
         for filenumber in range(start_filenumber_NC, stop_filenumber_NC + 1, 1):
-            print(filenumber)
+            # print(filenumber)
             for event in range(num_evts_per_file):
 
-                # increment num_events_analyzed_NC:
-                num_events_analyzed_NC += 1
+                # check if the file exists:
+                flag_file_exists = os.path.isfile(input_path_NC + "file{0:d}_evt{1:d}_prompt_signal_DCR.txt"
+                                                  .format(filenumber, event))
+                # flag_file_exists = os.path.isfile(input_path_NC + "file{0:d}_evt{1:d}_prompt_signal.txt"
+                #                                   .format(filenumber, event))
 
-                # read pulse shape:
-                pulse_shape_data_NC = np.loadtxt(input_path_NC + "file{0:d}_evt{1:d}_pulse_shape.txt"
-                                                 .format(filenumber, event))
+                if flag_file_exists:
+                    # read pulse shape:
+                    pulse_shape_data_NC = np.loadtxt(input_path_NC + "file{0:d}_evt{1:d}_prompt_signal_DCR.txt"
+                                                     .format(filenumber, event))
+                    # pulse_shape_data_NC = np.loadtxt(input_path_NC + "file{0:d}_evt{1:d}_prompt_signal.txt"
+                    #                                  .format(filenumber, event))
+                else:
+                    # file does not exist (event without initial particles)
+                    # go to next pulse shape
+                    continue
 
                 # 0th entry in pulse_shape_data_NC is minimum of time window in ns:
                 min_time_NC = pulse_shape_data_NC[0]
@@ -230,14 +253,25 @@ for index in range(len(start_tail)):
                 # prompt signal defined by start_time and end_time:
                 nPE_per_bin_NC = pulse_shape_data_NC[3:(int((end_time + binwidth + np.abs(min_time_NC)) / binwidth)+3)]
 
+                # check if nPE_per_bin_NC has entries above 0:
+                if max(nPE_per_bin_NC) < 500:
+                    # only analyze event with max(nPE_per_bin) >= 500 PE
+                    continue
+
                 # set the time window corresponding to nPE_per_bin_NC:
                 time_window_NC = np.arange(min_time_NC, end_time+binwidth, binwidth)
+
+                # increment num_events_analyzed_NC:
+                num_events_analyzed_NC += 1
 
                 # analyze pulse shape of this event:
                 ttr_NC, npe_norm_NC = pulse_shape(time_window_NC, nPE_per_bin_NC, start_tail[index], stop_tail[index1])
 
                 # append tail-to-total ratio to array:
                 array_TTR_NC.append(ttr_NC)
+                # append filenumber and evtID to arrays:
+                filenumber_NC.append(filenumber)
+                evtID_NC.append(event)
 
                 # append zeros to npe_norm_IBD to get a average length of the hittimes:
                 npe_norm_NC = np.pad(npe_norm_NC, (0, length_average_hittime - len(npe_norm_NC)), 'constant',
@@ -274,86 +308,45 @@ for index in range(len(start_tail)):
         efficiency_IBD_95, ttr_cut_value_95 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_95)
         efficiency_IBD_90, ttr_cut_value_90 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_90)
 
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_99 < best_IBD_eff_for_NC_99:
-            best_IBD_eff_for_NC_99 = efficiency_IBD_99
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_99 = ttr_cut_value_99
-            tail_start_99 = start_tail[index]
-            tail_stop_99 = stop_tail[index1]
-            best_array_TTR_NC_99 = array_TTR_NC
-            best_array_TTR_IBD_99 = array_TTR_IBD
-
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_98 < best_IBD_eff_for_NC_98:
-            best_IBD_eff_for_NC_98 = efficiency_IBD_98
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_98 = ttr_cut_value_98
-            tail_start_98 = start_tail[index]
-            tail_stop_98 = stop_tail[index1]
-            best_array_TTR_NC_98 = array_TTR_NC
-            best_array_TTR_IBD_98 = array_TTR_IBD
-
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_97 < best_IBD_eff_for_NC_97:
-            best_IBD_eff_for_NC_97 = efficiency_IBD_97
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_97 = ttr_cut_value_97
-            tail_start_97 = start_tail[index]
-            tail_stop_97 = stop_tail[index1]
-            best_array_TTR_NC_97 = array_TTR_NC
-            best_array_TTR_IBD_97 = array_TTR_IBD
-
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_96 < best_IBD_eff_for_NC_96:
-            best_IBD_eff_for_NC_96 = efficiency_IBD_96
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_96 = ttr_cut_value_96
-            tail_start_96 = start_tail[index]
-            tail_stop_96 = stop_tail[index1]
-            best_array_TTR_NC_96 = array_TTR_NC
-            best_array_TTR_IBD_96 = array_TTR_IBD
-
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_95 < best_IBD_eff_for_NC_95:
-            best_IBD_eff_for_NC_95 = efficiency_IBD_95
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_95 = ttr_cut_value_95
-            tail_start_95 = start_tail[index]
-            tail_stop_95 = stop_tail[index1]
-            best_array_TTR_NC_95 = array_TTR_NC
-            best_array_TTR_IBD_95 = array_TTR_IBD
-
-        # check efficiency_IBD to get the "best" (in this case smallest) value:
-        if efficiency_IBD_90 < best_IBD_eff_for_NC_90:
-            best_IBD_eff_for_NC_90 = efficiency_IBD_90
-            # also store the corresponding tot-value, start and stop time of the tail:
-            ttr_value_90 = ttr_cut_value_90
-            tail_start_90 = start_tail[index]
-            tail_stop_90 = stop_tail[index1]
-            best_array_TTR_NC_90 = array_TTR_NC
-            best_array_TTR_IBD_90 = array_TTR_IBD
-
         print("tail start = {0:.1f} ns".format(start_tail[index]))
         print("tail end = {0:.1f} ns".format(stop_tail[index1]))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_90, efficiency_IBD_90, ttr_cut_value_90))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_95, efficiency_IBD_95, ttr_cut_value_95))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_96, efficiency_IBD_96, ttr_cut_value_96))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_97, efficiency_IBD_97, ttr_cut_value_97))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_98, efficiency_IBD_98, ttr_cut_value_98))
-        print("NC efficiency = {0:.1f} %, IBD efficiency = {1:.2f} %, ttr-value = {2:.5f}"
-              .format(efficiency_NC_99, efficiency_IBD_99, ttr_cut_value_99))
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_90))
+        print(efficiency_IBD_90)
+        print(ttr_cut_value_90)
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_95))
+        print(efficiency_IBD_95)
+        print(ttr_cut_value_95)
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_96))
+        print(efficiency_IBD_96)
+        print(ttr_cut_value_96)
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_97))
+        print(efficiency_IBD_97)
+        print(ttr_cut_value_97)
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_98))
+        print(efficiency_IBD_98)
+        print(ttr_cut_value_98)
+        print("NC efficiency = {0:.1f} %".format(efficiency_NC_99))
+        print(efficiency_IBD_99)
+        print(ttr_cut_value_99)
 
         if CREATE_PLOTS:
+
+            if SAVE_ARRAY_TTR:
+                np.savetxt(output_path + 'TTR_IBD_{0:.0f}ns_{1:.0f}ns_{2:d}.txt'
+                           .format(start_tail[index], stop_tail[index1], analysis_part),
+                           np.c_[filenumber_IBD, evtID_IBD, array_TTR_IBD], fmt='%.5f',
+                           header='filenumber | evtID | TTR values of {0:.0f} IBD events'.format(len(array_TTR_IBD)))
+
+                np.savetxt(output_path + 'TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_{2:d}.txt'
+                           .format(start_tail[index], stop_tail[index1], analysis_part),
+                           np.c_[filenumber_NC, evtID_NC, array_TTR_NC], fmt='%.5f',
+                           header='filenumber | evtID | TTR values of {0:.0f} atmo. NC events'
+                           .format(len(array_TTR_NC)))
+
             """ Display tot ratios in histograms: """
             h1 = plt.figure(1, figsize=(15, 8))
             First_bin = 0.0
-            Last_bin = 0.05
+            Last_bin = maximum_tot_value
             Bin_width = (Last_bin-First_bin) / 200
             Bins = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
 
@@ -376,7 +369,7 @@ for index in range(len(start_tail)):
             """ Display tot ratios in histograms: """
             h2 = plt.figure(2, figsize=(15, 8))
             First_bin = 0.0
-            Last_bin = 0.05
+            Last_bin = maximum_tot_value
             Bin_width = (Last_bin-First_bin) / 200
             Bins = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
             n_pos_1, bins_pos_1, patches_pos_1 = plt.hist(array_TTR_IBD, bins=Bins, histtype="step",
@@ -408,7 +401,7 @@ for index in range(len(start_tail)):
 
 """ Display the average hittime distributions of positrons and IBD-like NC events: """
 h3 = plt.figure(3, figsize=(15, 8))
-bin_edges = np.arange(start_time, end_time+binwidth, binwidth)
+bin_edges = np.arange(start_time, end_time+binwidth+10*binwidth, binwidth)
 plt.semilogy(bin_edges, hittime_average_IBD, linestyle="steps", color="r",
              label="average pulse shape of IBD events")
 plt.semilogy(bin_edges, hittime_average_NC, linestyle="steps", color="b",
@@ -443,232 +436,18 @@ print("NC efficiency = {0:.1f} %, best IBD efficiency = {1:.2f} %, tail start = 
       ", tail-to-total value = {4:.5f}"
       .format(efficiency_NC_99, best_IBD_eff_for_NC_99, tail_start_99, tail_stop_99, ttr_value_99))
 
-""" check best_array_TTR_NC and best_array_TTR_IBD for the 5 efficiencies and save filenumber and evtID of the events
-    that pass PSD defined by TTR cut value to txt file: """
-# check 90 % NC efficiency:
-filenumber_NC_90 = []
-evtID_NC_90 = []
-filenumber_IBD_90 = []
-evtID_IBD_90 = []
-# loop over best_array_TTR_NC_90:
-for index in range(len(best_array_TTR_NC_90)):
-    # check if TTR is below ttr_value_90:
-    if best_array_TTR_NC_90[index] <= ttr_value_90:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_90.append(file_num)
-        evtID_NC_90.append(evt)
+""" save different number of events of PSD cut to txt file: """
+np.savetxt(output_path + "numbers_PSD.txt",
+           np.array([(stop_filenumber_NC-start_filenumber_NC+1)*num_evts_per_file, num_events_analyzed_NC,
+                     (stop_filenumber_IBD-start_filenumber_IBD+1)*num_evts_per_file, num_events_analyzed_IBD]),
+           fmt='%i',
+           header='number of events from analyze_PSD_cut_v2.py ({0}):'
+                  '\nanalyzed atmoNC files: file{1:d}_evt0_pulse_shape.txt to file{2:d}_evt99_pulse_shape.txt,'
+                  '\nanalyzed IBD files: file{3:d}_evt0_pulse_shape.txt to file{4:d}_evt99_pulse_shape.txt,'
+                  '\nValues below:'
+                  '\nnumber of total NC events,'
+                  '\nnumber of analyzed NC events,'
+                  '\nnumber of total IBD events,'
+                  '\nnumber of analyzed IBD events:'
+                  .format(now, start_filenumber_NC, stop_filenumber_NC, start_filenumber_IBD, stop_filenumber_IBD))
 
-# loop over best_array_TTR_IBD_90:
-for index in range(len(best_array_TTR_IBD_90)):
-    # check if TTR is below ttr_value_90:
-    if best_array_TTR_IBD_90[index] <= ttr_value_90:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_90.append(file_num)
-        evtID_IBD_90.append(evt)
-
-# save filenumber_NC_90 and evtID_NC_90 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_90, tail_stop_90, efficiency_NC_90),
-           np.c_[filenumber_NC_90, evtID_NC_90], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_90))
-
-# save filenumber_IBD_90 and evtID_IBD_90 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_90, tail_stop_90, efficiency_NC_90),
-           np.c_[filenumber_IBD_90, evtID_IBD_90], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_90, best_IBD_eff_for_NC_90))
-
-# check 95 % NC efficiency:
-filenumber_NC_95 = []
-evtID_NC_95 = []
-filenumber_IBD_95 = []
-evtID_IBD_95 = []
-# loop over best_array_TTR_NC_95:
-for index in range(len(best_array_TTR_NC_95)):
-    # check if TTR is below ttr_value_95:
-    if best_array_TTR_NC_95[index] <= ttr_value_95:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_95.append(file_num)
-        evtID_NC_95.append(evt)
-
-# loop over best_array_TTR_IBD_95:
-for index in range(len(best_array_TTR_IBD_95)):
-    # check if TTR is below ttr_value_95:
-    if best_array_TTR_IBD_95[index] <= ttr_value_95:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_95.append(file_num)
-        evtID_IBD_95.append(evt)
-
-# save filenumber_NC_95 and evtID_NC_95 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_95, tail_stop_95, efficiency_NC_95),
-           np.c_[filenumber_NC_95, evtID_NC_95], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_95))
-
-# save filenumber_IBD_95 and evtID_IBD_95 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_95, tail_stop_95, efficiency_NC_95),
-           np.c_[filenumber_IBD_95, evtID_IBD_95], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_95, best_IBD_eff_for_NC_95))
-
-# check 96 % NC efficiency:
-filenumber_NC_96 = []
-evtID_NC_96 = []
-filenumber_IBD_96 = []
-evtID_IBD_96 = []
-# loop over best_array_TTR_NC_96:
-for index in range(len(best_array_TTR_NC_96)):
-    # check if TTR is below ttr_value_96:
-    if best_array_TTR_NC_96[index] <= ttr_value_96:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_96.append(file_num)
-        evtID_NC_96.append(evt)
-
-# loop over best_array_TTR_IBD_96:
-for index in range(len(best_array_TTR_IBD_96)):
-    # check if TTR is below ttr_value_96:
-    if best_array_TTR_IBD_96[index] <= ttr_value_96:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_96.append(file_num)
-        evtID_IBD_96.append(evt)
-
-# save filenumber_NC_96 and evtID_NC_96 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_96, tail_stop_96, efficiency_NC_96),
-           np.c_[filenumber_NC_96, evtID_NC_96], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_96))
-
-# save filenumber_IBD_96 and evtID_IBD_96 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_96, tail_stop_96, efficiency_NC_96),
-           np.c_[filenumber_IBD_96, evtID_IBD_96], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_96, best_IBD_eff_for_NC_96))
-
-# check 97 % NC efficiency:
-filenumber_NC_97 = []
-evtID_NC_97 = []
-filenumber_IBD_97 = []
-evtID_IBD_97 = []
-# loop over best_array_TTR_NC_97:
-for index in range(len(best_array_TTR_NC_97)):
-    # check if TTR is below ttr_value_97:
-    if best_array_TTR_NC_97[index] <= ttr_value_97:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_97.append(file_num)
-        evtID_NC_97.append(evt)
-
-# loop over best_array_TTR_IBD_97:
-for index in range(len(best_array_TTR_IBD_97)):
-    # check if TTR is below ttr_value_97:
-    if best_array_TTR_IBD_97[index] <= ttr_value_97:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_97.append(file_num)
-        evtID_IBD_97.append(evt)
-
-# save filenumber_NC_97 and evtID_NC_97 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_97, tail_stop_97, efficiency_NC_97),
-           np.c_[filenumber_NC_97, evtID_NC_97], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_97))
-
-# save filenumber_IBD_97 and evtID_IBD_97 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_97, tail_stop_97, efficiency_NC_97),
-           np.c_[filenumber_IBD_97, evtID_IBD_97], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_97, best_IBD_eff_for_NC_97))
-
-# check 98 % NC efficiency:
-filenumber_NC_98 = []
-evtID_NC_98 = []
-filenumber_IBD_98 = []
-evtID_IBD_98 = []
-# loop over best_array_TTR_NC_98:
-for index in range(len(best_array_TTR_NC_98)):
-    # check if TTR is below ttr_value_98:
-    if best_array_TTR_NC_98[index] <= ttr_value_98:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_98.append(file_num)
-        evtID_NC_98.append(evt)
-
-# loop over best_array_TTR_IBD_98:
-for index in range(len(best_array_TTR_IBD_98)):
-    # check if TTR is below ttr_value_98:
-    if best_array_TTR_IBD_98[index] <= ttr_value_98:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_98.append(file_num)
-        evtID_IBD_98.append(evt)
-
-# save filenumber_NC_98 and evtID_NC_98 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_98, tail_stop_98, efficiency_NC_98),
-           np.c_[filenumber_NC_98, evtID_NC_98], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_98))
-
-# save filenumber_IBD_98 and evtID_IBD_98 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_98, tail_stop_98, efficiency_NC_98),
-           np.c_[filenumber_IBD_98, evtID_IBD_98], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_98, best_IBD_eff_for_NC_98))
-
-# check 99 % NC efficiency:
-filenumber_NC_99 = []
-evtID_NC_99 = []
-filenumber_IBD_99 = []
-evtID_IBD_99 = []
-# loop over best_array_TTR_NC_99:
-for index in range(len(best_array_TTR_NC_99)):
-    # check if TTR is below ttr_value_99:
-    if best_array_TTR_NC_99[index] <= ttr_value_99:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_NC_99.append(file_num)
-        evtID_NC_99.append(evt)
-
-# loop over best_array_TTR_IBD_99:
-for index in range(len(best_array_TTR_IBD_99)):
-    # check if TTR is below ttr_value_99:
-    if best_array_TTR_IBD_99[index] <= ttr_value_99:
-        # event passes PSD cut -> append filenumber and evtID to arrays:
-        file_num = int(index / num_evts_per_file)
-        evt = index - num_evts_per_file*file_num
-        filenumber_IBD_99.append(file_num)
-        evtID_IBD_99.append(evt)
-
-# save filenumber_NC_99 and evtID_NC_99 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_atmoNC_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_99, tail_stop_99, efficiency_NC_99),
-           np.c_[filenumber_NC_99, evtID_NC_99], fmt='%.3f',
-           header='filenumber | evtID of atmoNC events that pass PSD cut (TTR cut = {0:.5f})'.format(ttr_value_99))
-
-# save filenumber_IBD_99 and evtID_IBD_99 to txt file:
-np.savetxt(output_path + 'filenumber_evtID_PSD_IBD_{0:.0f}ns_{1:.0f}ns_eff{2:.0f}.txt'
-           .format(tail_start_99, tail_stop_99, efficiency_NC_99),
-           np.c_[filenumber_IBD_99, evtID_IBD_99], fmt='%.3f',
-           header='filenumber | evtID of IBD events that pass PSD cut (TTR cut = {0:.5f}, IBD eff. = {1:.3f} %)'
-           .format(ttr_value_99, best_IBD_eff_for_NC_99))

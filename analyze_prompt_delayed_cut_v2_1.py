@@ -51,16 +51,16 @@ flag_read_hittime_from_file = True
 
 """ file information: """
 # first file to be read:
-start_number = 0
+start_number = 67
 # last file to be read:
-stop_number = 66
+stop_number = 133
 # number of entries in the input files:
 Number_entries_input = 100
 # set string, that define, if positrons or NC events are analyzed:
 event_type = "IBD"
 # set integer, that defines the number of the analyzed files (hittime analysis needs much time, therefore separate
 # analysis in different parts)
-analysis_part = 0
+analysis_part = 1
 # set the path of the input root files:
 if event_type == "atmoNC":
     input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/user_atmoNC_"

@@ -103,7 +103,7 @@ sigma_time_3inch = tts_3inch / (2 * np.sqrt(2 * np.log(2)))
 # c/n_eff = 299792458 m / 1.54 s ~ 194670427 m/s = 194670427 * 10**(-6) mm/ns ~ 194.67 mm/ns:
 c_effective = 194.67
 
-# loop over root files with positron simulation:
+# loop over root files with neutron simulation:
 for index in range(first_file_neutron, last_file_neutron + 1, 1):
     # load user_positron_{}.root file:
     if index < 100:

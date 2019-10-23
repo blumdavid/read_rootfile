@@ -74,14 +74,14 @@ def pulse_shape(hittime, npe, tail_start, tail_end):
     npe = npe[index5:]
 
     """ normalize hittime distribution to 1: """
-    # calculate the integral of the whole hittime distribution:
-    integral_npe = np.trapz(npe, hittime)
+    # calculate the integral of the whole hittime distribution (sum up npe):
+    integral_npe = np.sum(npe)
     # normalize npe distribution to 1:
     npe_norm = npe / integral_npe
 
     """ integral (charge) of total distribution: """
     # should be 1 because of normalization:
-    integral_total = np.trapz(npe_norm, hittime)
+    integral_total = np.sum(npe_norm)
 
     """ integral (charge) of the tail of the distribution: """
     # get the index of hittime, which correspond to tail_start:
@@ -99,7 +99,7 @@ def pulse_shape(hittime, npe, tail_start, tail_end):
     npe_tail = npe_norm[index_tail_start:index_tail_end+1]
 
     # integrate the tail of the distribution:
-    integral_tail = np.trapz(npe_tail, hittime_tail)
+    integral_tail = np.sum(npe_tail)
 
     """ tail to total ratio: """
     # calculate the ratio between integral od tail of distribution and of total distribution:
@@ -138,7 +138,6 @@ def tot_efficiency(tot_values_positron, tot_values_nc, eff_nc):
     eff_positron = float(num_positron_cut) / float(num_pos_total) * 100
 
     return eff_positron, tot_cut_value
-
 
 
 def energy_resolution(e_vis):
