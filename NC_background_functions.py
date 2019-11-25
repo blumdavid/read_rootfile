@@ -8933,3 +8933,143 @@ def check_nc_qel_from_original_genie_file(rootfile_input):
                 continue
 
     return
+
+
+def convolution_new(energy_neutrino, energy_measured, binning_energy_measured, theo_spectrum,
+                    mass_proton, mass_neutron, mass_positron, event_type):
+    """
+    Copy of the function convolution() from script gen_spectrum_functions.py from
+    /home/astro/blum/PhD/work/MeVDM_JUNO/source/.
+
+    Difference: New input parameter event_type, which specifies the underlying kinematics of the interaction
+    (either IBD (nu_e_bar + proton -> positron + neutron) or on C12 (nu_e_bar + C12 -> positron + B12(e.s.))
+
+    Function to convolve the theoretical spectrum with the gaussian distribution, which is defined by the correlation
+    of measured energy and neutrino energy from IBD and the energy resolution of the detector.
+    1. go through every entry of energy_measured
+    2. then go through every entry of energy_neutrino
+    3. integrate the product of the theo. spectrum (of energy_neutrino[index1]) and gauss (as function of e and
+    depending on corr_vis_neutrino(energy_neutrino[index1]) and sigma(corr_vis_neutrino)) over e from
+    energy_measured[index2]-binning_energy_measured/2 to energy_measured[index2]+binning_energy_measured/2
+    4. do this for every entry in energy_neutrino
+    5. you get then the values of s_measured for one entry of energy_measured as function of energy_neutrino
+    6. then integrate this value over energy_neutrino and divide it by the bin-width of energy-measured to get the value
+    of the spectrum for one entry in energy_measured
+    7. do this for every entry in energy_measured
+
+    :param energy_neutrino: energy corresponding to the neutrino energy in MeV (np.array of float)
+    :param energy_measured: measured energy in the detector in MeV (is equal to the visible energy) (np.array of float)
+    :param binning_energy_measured: bin-width of the measured energy in MeV (np.array of float)
+    :param theo_spectrum: theoretical spectrum as function of the neutrino energy of the signal or background in 1/MeV
+    (np.array of float)
+    :param mass_proton: mass of the proton in MeV (float)
+    :param mass_neutron: mass of the neutron in MeV (float)
+    :param mass_positron: mass of the positron in MeV (float)
+    :param event_type: set event_type (either IBD or on C12) (string)
+
+    :return: spectrum_measured in 1/MeV (spectrum of the signal or background taking into account the detector
+    properties (energy resolution, correlation of visible and neutrino energy of IBD)) (np.array of float)
+    """
+    # Preallocate the measured spectrum array (empty np.array):
+    spectrum_measured = np.array([])
+    # First calculate the function correlation_vis_neutrino and energy_resolution for the given
+    # neutrino energy energy_neutrino (np.arrays of float):
+    # for IBD interaction (nu_e_bar + proton -> positron + neutron):
+    if event_type == "proton":
+        # get positron energy in MeV from function correlation_vis_neutrino():
+        corr_vis_neutrino = correlation_vis_neutrino(energy_neutrino, mass_proton, mass_neutron, mass_positron)
+        sigma = energy_resolution(corr_vis_neutrino)
+    elif event_type == "C12":
+        # interaction channel (nu_e_bar + C12 -> positron + B12*):
+        # positron energy in MeV (very simple kinematics (nu_e_bar + C12 -> positron + B12;
+        # E = E_nu -(m_B12 - m_C12 + m_e)):
+        corr_vis_neutrino = energy_neutrino - (12.01435 * 931.494 - 12.0 * 931.494 + mass_positron)
+        sigma = energy_resolution(corr_vis_neutrino)
+    elif event_type == "n+B11":
+        # interaction channel (nu_e_bar + C12 -> positron + neutron + B11;
+        # most likely channel of nu_e_bar + C12 -> positron + neutron + ...):
+        # positron energy in MeV (very simple kinematics (nu_e_bar + C12 -> positron + neutron + B11;
+        # E = E_nu -(m_B11 + m_n - m_C12 + m_e)), kinetic energy of neutron is neglected:
+        corr_vis_neutrino = energy_neutrino - (11.0093 * 931.494 + mass_neutron - 12.0 * 931.494 + mass_positron)
+        sigma = energy_resolution(corr_vis_neutrino)
+
+    # loop over entries in energy_measured ('for every entry in energy_measured'):
+    for index2 in np.arange(len(energy_measured)):
+        # preallocate array (in the notes defined as S_m^(E_m=1) as function of e_neutrino:
+        s_measured_em1 = np.array([])
+        # for 1 entry in energy_measured, loop over entries in energy_neutrino ('for every entry in e_neutrino'):
+        for index1 in np.arange(len(energy_neutrino)):
+            # define energy e in MeV, e is in the range of energy_measured[index2]-binning_energy_measured/2 and
+            # energy_measured[index2]+binning_energy_measured/2 (np.array of float):
+            # IMPORTANT: use np.linspace and NOT np.arange, because "When using a non-integer step in np.arange,
+            # such as 0.1, the results will often not be consistent". This leads to errors in the convolution.
+            e = np.linspace(energy_measured[index2] - binning_energy_measured/2,
+                            energy_measured[index2] + binning_energy_measured/2,
+                            101)
+            # s_measured of e for the energy energy_neutrino[index1], unit=1/MeV**2 (np.array of float):
+            s_measured_e = (theo_spectrum[index1] * 1 / (np.sqrt(2 * np.pi) * sigma[index1]) *
+                            np.exp(-0.5 * (e - corr_vis_neutrino[index1]) ** 2 / sigma[index1] ** 2))
+            # integrate s_measured_e over e from energy_measured[index2]-binning_energy_measured/2 to
+            # energy_measured[index2]+binning_energy_measured/2
+            # ('integrate over the bin'), unit=1/MeV (float)
+            # (is equal to s_m for one entry in energy_measured and one entry in energy_neutrino):
+            s_measured_em1_en1 = np.array([np.trapz(s_measured_e, e)])
+            # append value for energy_neutrino[index1] to s_measured_em1 to get an array, unit=1/MeV (np.array of float)
+            # (s_measured_em1 is the measured spectrum for energy_measured[index2] as function of energy_neutrino):
+            s_measured_em1 = np.append(s_measured_em1, s_measured_em1_en1)
+
+        # integrate s_measured_em1 over e_neutrino, unit='number of neutrinos' (float) (s_measured is the total measured
+        # spectrum for energy_measured[index2]:
+        s_measured = np.array([np.trapz(s_measured_em1, energy_neutrino)])
+        # to consider the binwidth of e_measured, divide the value of s_measured by the binning of energy_measured,
+        # unit=1/MeV (float):
+        s_measured = s_measured / binning_energy_measured
+        # append s_measured to the array spectrum_measured, unit=1/MeV:
+        spectrum_measured = np.append(spectrum_measured, s_measured)
+
+    return spectrum_measured
+
+
+def correlation_vis_neutrino(energy, mass_proton, mass_neutron, mass_positron):
+    """ Copy of function correlation_vis_neutrino from script gen_spectrum_functions.py from
+        /home/astro/blum/PhD/work/MeVDM_JUNO/source/.
+
+        correlation between E_visible and e_neutrino for Inverse Beta Decay from paper of Strumia/Vissani
+        'Precise quasielastic neutrino/nucleon cross section', 0302055_IBDcrosssection.pdf:
+        (detailed information in folder 'correlation_vis_neutrino' using correlation_vis_neutrino.py)
+
+        The average lepton energy E_positron_Strumia is approximated by the equation 16 in the paper
+        INFO-me: at better than 1 percent below energies of around 100 MeV
+        This is a much better approximation than the usual formula E_positron_Strumia = E_neutrino - DELTA.
+        It permits ('erlaubt') to relate E_positron_Strumia with E_neutrino incorporating ('unter Beruecksichtigung')
+        a large part of the effect due to the recoil of the nucleon.
+        INFO-me: a large part of the effect due to the recoil of the nucleon is incorporated
+        TODO-me: is quenching of the nucleon (proton) considered???
+
+        INFO-me: only the average positron energy corresponding to the incoming neutrino energy is considered.
+        TODO-me: the angle between neutrino and positron is not considered specific, but only on average -> Uncertainty!
+
+        :param energy: energy corresponding to the electron-antineutrino energy in MeV (np.array of float)
+        :param mass_proton: mass of the proton in MeV (float)
+        :param mass_neutron: mass of the neutron in MeV (float)
+        :param mass_positron: mass of the positron in MeV (float)
+
+        :return: prompt visible energy in the detector in MeV (float or np.array of float)
+        """
+    # Correlation between visible and neutrino energy in MeV:
+    # first define some useful terms for the calculation (d=delta from page 3 equ. 12, s from page 3):
+    d = (mass_neutron**2 - mass_proton**2 - mass_positron**2) / (2 * mass_proton)
+    s = 2 * mass_proton * energy + mass_proton**2
+    # neutrino energy in center of mass (cm) frame in MeV, page 4, equ. 13:
+    e_neutrino_cm = (s - mass_proton**2) / (2 * np.sqrt(s))
+    # positron energy in CM frame in MeV, page 4, equ. 13:
+    e_positron_cm = (s - mass_neutron**2 + mass_positron**2) / (2 * np.sqrt(s))
+    # Average lepton energy in MeV, which can be approximated (at better than 1 percent below ~ 100 MeV) by
+    # (page 5, equ. 16):
+    e_positron = energy - d - e_neutrino_cm * e_positron_cm / mass_proton
+    # prompt visible energy in the detector in MeV:
+    corr_vis_neutrino = e_positron + mass_positron
+
+    return corr_vis_neutrino
+
+

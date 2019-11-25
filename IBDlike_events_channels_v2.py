@@ -58,8 +58,12 @@ evt_rate_Genie = 1
 time = 1
 
 """ read filenumber_evtID_pass_all_cuts_wo_PSD.txt to get the filenumber and evtID of IBD-like NC events, that pass all 
-    cuts (PSD is not applied): """
+    cuts (PSD is not applied).
+    Also filenumber_evtID_pass_all_cuts_w_PSD.txt can be read to get the filenumber and evtID of IBD-like NC events, 
+    that pass all cuts (PSD is applied): """
 ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_wo_PSD.txt")
+# INFO-me: Add "_PSD" to the file-names when considering PSD cut!!!
+# ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_w_PSD.txt")
 
 # get the event number that corresponds to t_evtID in gen_NC_onlyC12_250000evts_seed1.root:
 # preallocate array, where the event number is stored:

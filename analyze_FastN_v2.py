@@ -69,13 +69,13 @@ binwidth = 5.0
 
 """ PSD parameter from analyze_PSD_cut_v2.py: """
 # corresponding NC PSD suppression:
-NC_suppression = 95.0
+NC_suppression = 99.0
 # tail_start in ns:
-tail_start = 200.0
+tail_start = 275.0
 # tail stop in ns:
 tail_stop = 600.0
 # TTR value corresponding to the PSD cut:
-TTR_cut = 0.03359
+TTR_cut = 0.01662
 
 """ set cut parameters from analysis of NC events and IBD events: """
 # cut-radius in mm:
@@ -94,7 +94,7 @@ E_delayed_max = 3400.0
 # distance cut in mm:
 distance_cut = 500.0
 # delayed volume cut in mm:
-delayed_volume = 16000.0
+delayed_volume = 17700.0
 
 # path, where root files of positron simulation are saved:
 input_path_neutron = "/local/scratch1/pipc51/astro/blum/conversion_nPE_MeV/neutron_output/"
