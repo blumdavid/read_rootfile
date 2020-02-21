@@ -82,7 +82,7 @@ fractions = np.array([Frac_other, Frac_nu_He5_4p_3n, Frac_nu_B8_p_3n, Frac_nu_C9
 
 
 """ display in bar chart """
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(11, 6))
 horizontal_bars = ax.barh(pos, fractions, align='center', alpha=0.9)
 label_barh(ax, horizontal_bars, "{:.4}", is_inside=False, fontsize=12)
 plt.xticks(fontsize=11)
@@ -122,7 +122,7 @@ fractions_2 = np.array([F_nu_Be10_p_n_piplus, F_nu_C10_p_n_piminus, F_nu_Be8_2p_
                         F_nu_C11_n, F_nu_B11_p])
 
 """ display in bar chart """
-fig2, ax2 = plt.subplots()
+fig2, ax2 = plt.subplots(figsize=(11, 6))
 horizontal_bars_2 = ax2.barh(pos_2, fractions_2, align='center', alpha=0.9)
 label_barh(ax2, horizontal_bars_2, "{:.4}", is_inside=False, fontsize=12)
 plt.xticks(fontsize=11)
@@ -156,7 +156,7 @@ pos_3 = np.arange(len(channels_3))
 fractions_3 = np.array([frac_nu_Be9, frac_nu_B9, frac_nu_C10, frac_nu_Be10, frac_nu_B10, frac_nu_C11, frac_nu_B11])
 
 """ display in bar chart """
-fig3, ax3 = plt.subplots()
+fig3, ax3 = plt.subplots(figsize=(11, 6))
 horizontal_bars_3 = ax3.barh(pos_3, fractions_3, align='center', alpha=0.9)
 label_barh(ax3, horizontal_bars_3, "{:.4}", is_inside=False, fontsize=12)
 plt.xticks(fontsize=11)
@@ -187,7 +187,7 @@ fractions_4 = np.array([frac_nu_Be9_2p_n, frac_nu_B9_p_2n, frac_nu_B11_n_piplus,
                         frac_nu_Be10_2p, frac_nu_B10_p_n, frac_nu_C11_n, frac_nu_B11_p])
 
 """ display in bar chart """
-fig4, ax4 = plt.subplots()
+fig4, ax4 = plt.subplots(figsize=(11, 6))
 horizontal_bars_4 = ax4.barh(pos_4, fractions_4, align='center', alpha=0.9)
 label_barh(ax4, horizontal_bars_4, "{:.4}", is_inside=False, fontsize=12)
 plt.xticks(fontsize=11)
@@ -197,5 +197,42 @@ plt.title('70% of all atmospheric NC neutrino interactions on $^{12}C$\n'
           '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ...)', fontsize=15)
 plt.grid(axis='x')
 
+""" insert the fractions of the different combined channels (NC interaction and deexcitation) from 
+    'combined_channels_250000evts.ods'. These fraction are calculated with checkout_NCgen.py and saved in 
+    file combined_channels_NC_onlyC12_250000evts.txt.
+    """
+# leading fractions in % (sum of these fractions 63 %):
+Frac_nu_B11_p = 14.02
+Frac_nu_C11_n = 12.48
+Frac_nu_B10_p_n = 8.25
+Frac_nu_Be9_2p_n = 5.44
+Frac_nu_B9_p_2n = 4.20
+Frac_nu_Be8_2p_2n = 3.60
+Frac_nu_Be8_p_n_d = 3.34
+Frac_nu_Li6_p_n_alpha = 2.98
+Frac_nu_C11_p_piminus = 2.17
+
+channels_5 = ('$^{11}C$ + $p$ + $\\pi^-$', '$^6Li$ + $p$ + $n$ + $\\alpha$', '$^8Be$ + $p$ + $n$ + $d$',
+              '$^8Be$ + $2p$ + $2n$', '$^9B$ + $p$ + $2n$', '$^9Be$ + $2p$ + $n$', '$^{10}B$ + $p$ + $n$',
+              '$^{11}C$ + $n$', '$^{11}B$ + $p$')
+
+pos_5 = np.arange(len(channels_5))
+
+fractions_5 = np.array([Frac_nu_C11_p_piminus, Frac_nu_Li6_p_n_alpha, Frac_nu_Be8_p_n_d, Frac_nu_Be8_2p_2n,
+                        Frac_nu_B9_p_2n, Frac_nu_Be9_2p_n, Frac_nu_B10_p_n, Frac_nu_C11_n, Frac_nu_B11_p])
+
+sum_5 = np.sum(fractions_5)
+
+""" display in bar chart """
+fig5, ax5 = plt.subplots(figsize=(11, 6))
+horizontal_bars_5 = ax5.barh(pos_5, fractions_5, align='center', alpha=0.9)
+label_barh(ax5, horizontal_bars_5, "{:.4}", is_inside=False, fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(pos_5, channels_5, fontsize=12)
+plt.xlabel('fraction in %', fontsize=12)
+plt.title('{0:.1f} %'.format(sum_5) + ' of all total atmospheric NC neutrino interactions on $^{12}C$\n'
+          '(interaction channels: $\\nu_{x}$ + $^{12}C$ $\\rightarrow$ $\\nu_{x}$ + ..., after deexcitation)'
+          , fontsize=15)
+plt.grid(axis='x')
 
 plt.show()

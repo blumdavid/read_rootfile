@@ -27,7 +27,7 @@ input_file = "/home/astro/blum/juno/atmoNC/data_NC/genie_data_NC.root"
 output_path = "/home/astro/blum/juno/atmoNC/data_NC/"
 
 # bin-width of the array, which represents the incoming neutrino energy (in GeV) (float):
-bin_width_incoming = 0.1
+bin_width_incoming = 0.01
 
 # load the ROOT file:
 rfile = ROOT.TFile(input_file)
@@ -132,16 +132,20 @@ plt.plot([], [], color='w', label="total number of entries = {0:d}".format(numbe
 if n_c12 != 0:
     plt.hist(energy_nu_c12, energy_range, histtype='step', color='b',
              label="interactions on $^{12}$C: "+"fraction = {0:.3f}%".format(fraction_c12))
+    plt.xscale("log")
+    plt.yscale("log")
 
 if n_proton != 0:
     plt.hist(energy_nu_proton, energy_range, histtype='step', color='r',
              label="interaction on protons: fraction = {0:.3f}%".format(fraction_proton))
+    plt.xscale("log")
+    plt.yscale("log")
 
 plt.plot([], [], color='w', label="sum of fractions of $^{14}$N, $^{16}$O, electrons and $^{32}$S = "+"{0:.3f}%"
          .format(fraction_n14+fraction_o16+fraction_electron+fraction_s32))
 
-plt.xlim(xmin=0, xmax=10)
-plt.ylim(ymin=0)
+plt.xlim(xmin=0.013, xmax=10)
+plt.ylim(ymin=10)
 plt.xlabel("Neutrino energy $E_{\\nu}$ in GeV", fontsize=15)
 plt.ylabel("events", fontsize=15)
 plt.title("Neutrino energy spectrum for NC interactions in JUNO liquid scintillator", fontsize=20)

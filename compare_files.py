@@ -1,7 +1,7 @@
 """ compare file and event number of file{}_evt{}_prompt_signal.txt with evtID_IBDlike_{}.txt and Evis_file{}.txt:
 
-    The problem is, that in script IBDlike_events_channels_v1.py 9001 IBD-like events are anaylzed, in script
-    atmoNC_spectrum_v1.py only 8946 events.
+    The problem is, that in script OLD_IBDlike_events_channels_v1.py 9001 IBD-like events are anaylzed, in script
+    OLD_atmoNC_spectrum_v1.py only 8946 events.
 
 """
 

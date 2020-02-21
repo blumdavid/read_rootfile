@@ -51,8 +51,7 @@ def get_info_from_file(start, stop, filename, num_entries, radius_cut):
         # get number of PE per event (array of int), hit-times of the last event in ns (array of float),
         # initial momentum per event in MeV (array of float), deposit energy per event in MeV and quenched deposit
         # energy per event in MeV:
-        num_pe, hittimes, momentum, e, qe = NC_background_functions.conversion_npe_mev(input_file, num_entries,
-                                                                                       radius_cut)
+        num_pe, momentum, e, qe = NC_background_functions.conversion_npe_mev(input_file, num_entries, radius_cut)
 
         # append arrays to array:
         number_pe = np.append(number_pe, num_pe)
@@ -60,7 +59,7 @@ def get_info_from_file(start, stop, filename, num_entries, radius_cut):
         edep = np.append(edep, e)
         qedep = np.append(qedep, qe)
 
-    return number_pe, momentum_init, edep, qedep, hittimes
+    return number_pe, momentum_init, edep, qedep
 
 
 def save_array_to_file(arr, out_path, file_name, number_events):
@@ -114,22 +113,21 @@ max_evis = 120.0
 
 # Set boolean variables:
 PLOT_INITENERGY = False
-PLOT_HITTIME = False
-READ_P_10MEV = False
-READ_N_10MEV = False
-READ_P_100MEV = False
-READ_N_100MEV = False
-READ_N_300MEV = False
-READ_N_500MEV = False
-READ_N_500MEV_2 = False
-READ_N_500MEV_3 = False
-READ_N_500MEV_4 = False
-READ_N_500MEV_5 = False
-READ_N_500MEV_6 = False
-READ_N_500MEV_7 = False
+READ_P_10MEV = True
+READ_N_10MEV = True
+READ_P_100MEV = True
+READ_N_100MEV = True
+READ_N_300MEV = True
+READ_N_500MEV = True
+READ_N_500MEV_2 = True
+READ_N_500MEV_3 = True
+READ_N_500MEV_4 = True
+READ_N_500MEV_5 = True
+READ_N_500MEV_6 = True
+READ_N_500MEV_7 = True
 READ_N_500MEV_8 = True
-READ_P_1GEV = False
-READ_N_1GEV = False
+READ_P_1GEV = True
+READ_N_1GEV = True
 
 """ 10 MeV proton: """
 if READ_P_10MEV:
@@ -137,7 +135,7 @@ if READ_P_10MEV:
     # file name:
     file_p_10MeV = input_proton + "user_proton_10_MeV"
     # read info of all files of 10 MeV protons:
-    number_pe_p_10MeV, momentum_init_p_10MeV, edep_p_10MeV, qedep_p_10MeV, hittime_p_10MeV = \
+    number_pe_p_10MeV, momentum_init_p_10MeV, edep_p_10MeV, qedep_p_10MeV = \
         get_info_from_file(start_number, stop_number_p, file_p_10MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_p_10MeV, output_path, "number_pe_p_10MeV", number_events_p)
@@ -154,7 +152,7 @@ if READ_N_10MEV:
     # file name:
     file_n_10MeV = input_neutron + "user_neutron_10_MeV"
     # read info of all files of 10 MeV neutrons:
-    number_pe_n_10MeV, momentum_init_n_10MeV, edep_n_10MeV, qedep_n_10MeV, hittime_n_10MeV = \
+    number_pe_n_10MeV, momentum_init_n_10MeV, edep_n_10MeV, qedep_n_10MeV = \
         get_info_from_file(start_number, stop_number_n, file_n_10MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_10MeV, output_path, "number_pe_n_10MeV", number_events_n)
@@ -171,7 +169,7 @@ if READ_P_100MEV:
     # file name:
     file_p_100MeV = input_proton + "user_proton_100_MeV"
     # read info of all files of 100 MeV protons:
-    number_pe_p_100MeV, momentum_init_p_100MeV, edep_p_100MeV, qedep_p_100MeV, hittime_p_100MeV = \
+    number_pe_p_100MeV, momentum_init_p_100MeV, edep_p_100MeV, qedep_p_100MeV = \
         get_info_from_file(start_number, stop_number_p, file_p_100MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_p_100MeV, output_path, "number_pe_p_100MeV", number_events_p)
@@ -188,7 +186,7 @@ if READ_N_100MEV:
     # file name:
     file_n_100MeV = input_neutron + "user_neutron_100_MeV"
     # read info of all files of 100 MeV neutrons:
-    number_pe_n_100MeV, momentum_init_n_100MeV, edep_n_100MeV, qedep_n_100MeV, hittime_n_100MeV = \
+    number_pe_n_100MeV, momentum_init_n_100MeV, edep_n_100MeV, qedep_n_100MeV = \
         get_info_from_file(start_number, stop_number_n, file_n_100MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_100MeV, output_path, "number_pe_n_100MeV", number_events_n)
@@ -205,7 +203,7 @@ if READ_N_300MEV:
     # file name:
     file_n_300MeV = input_neutron + "user_neutron_300_MeV"
     # read info of all files of 300 MeV neutrons:
-    number_pe_n_300MeV, momentum_init_n_300MeV, edep_n_300MeV, qedep_n_300MeV, hittime_n_300MeV = \
+    number_pe_n_300MeV, momentum_init_n_300MeV, edep_n_300MeV, qedep_n_300MeV = \
         get_info_from_file(start_number, stop_number_n, file_n_300MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_300MeV, output_path, "number_pe_n_300MeV", number_events_n)
@@ -222,7 +220,7 @@ if READ_N_500MEV:
     # file name:
     file_n_500MeV = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV, momentum_init_n_500MeV, edep_n_500MeV, qedep_n_500MeV, hittime_n_500MeV = \
+    number_pe_n_500MeV, momentum_init_n_500MeV, edep_n_500MeV, qedep_n_500MeV = \
         get_info_from_file(start_number, stop_number_n, file_n_500MeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV, output_path, "number_pe_n_500MeV", number_events_n)
@@ -239,7 +237,7 @@ if READ_N_500MEV_2:
     # file name:
     file_n_500MeV_2 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_2, momentum_init_n_500MeV_2, edep_n_500MeV_2, qedep_n_500MeV_2, hittime_n_500MeV_2 = \
+    number_pe_n_500MeV_2, momentum_init_n_500MeV_2, edep_n_500MeV_2, qedep_n_500MeV_2 = \
         get_info_from_file(start_number+100, stop_number_n+100, file_n_500MeV_2, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_2, output_path, "number_pe_n_500MeV_2", number_events_n)
@@ -256,7 +254,7 @@ if READ_N_500MEV_3:
     # file name:
     file_n_500MeV_3 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_3, momentum_init_n_500MeV_3, edep_n_500MeV_3, qedep_n_500MeV_3, hittime_n_500MeV_3 = \
+    number_pe_n_500MeV_3, momentum_init_n_500MeV_3, edep_n_500MeV_3, qedep_n_500MeV_3 = \
         get_info_from_file(start_number+200, stop_number_n+200, file_n_500MeV_3, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_3, output_path, "number_pe_n_500MeV_3", number_events_n)
@@ -273,7 +271,7 @@ if READ_N_500MEV_4:
     # file name:
     file_n_500MeV_4 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_4, momentum_init_n_500MeV_4, edep_n_500MeV_4, qedep_n_500MeV_4, hittime_n_500MeV_4 = \
+    number_pe_n_500MeV_4, momentum_init_n_500MeV_4, edep_n_500MeV_4, qedep_n_500MeV_4 = \
         get_info_from_file(start_number+300, stop_number_n+300, file_n_500MeV_4, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_4, output_path, "number_pe_n_500MeV_4", number_events_n)
@@ -290,7 +288,7 @@ if READ_N_500MEV_5:
     # file name:
     file_n_500MeV_5 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_5, momentum_init_n_500MeV_5, edep_n_500MeV_5, qedep_n_500MeV_5, hittime_n_500MeV_5 = \
+    number_pe_n_500MeV_5, momentum_init_n_500MeV_5, edep_n_500MeV_5, qedep_n_500MeV_5 = \
         get_info_from_file(start_number+400, stop_number_n+400, file_n_500MeV_5, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_5, output_path, "number_pe_n_500MeV_5", number_events_n)
@@ -307,7 +305,7 @@ if READ_N_500MEV_6:
     # file name:
     file_n_500MeV_6 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_6, momentum_init_n_500MeV_6, edep_n_500MeV_6, qedep_n_500MeV_6, hittime_n_500MeV_6 = \
+    number_pe_n_500MeV_6, momentum_init_n_500MeV_6, edep_n_500MeV_6, qedep_n_500MeV_6 = \
         get_info_from_file(start_number+500, stop_number_n+500, file_n_500MeV_6, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_6, output_path, "number_pe_n_500MeV_6", number_events_n)
@@ -324,7 +322,7 @@ if READ_N_500MEV_7:
     # file name:
     file_n_500MeV_7 = input_neutron + "user_neutron_500_MeV"
     # read info of all files of 500 MeV neutrons:
-    number_pe_n_500MeV_7, momentum_init_n_500MeV_7, edep_n_500MeV_7, qedep_n_500MeV_7, hittime_n_500MeV_7 = \
+    number_pe_n_500MeV_7, momentum_init_n_500MeV_7, edep_n_500MeV_7, qedep_n_500MeV_7 = \
         get_info_from_file(start_number+600, stop_number_n+600, file_n_500MeV_7, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_500MeV_7, output_path, "number_pe_n_500MeV_7", number_events_n)
@@ -341,7 +339,7 @@ else:
 #     # file name:
 #     file_n_500MeV_8 = input_neutron + "user_neutron_500_MeV"
 #     # read info of all files of 500 MeV neutrons:
-#     number_pe_n_500MeV_8, momentum_init_n_500MeV_8, edep_n_500MeV_8, qedep_n_500MeV_8, hittime_n_500MeV_8 = \
+#     number_pe_n_500MeV_8, momentum_init_n_500MeV_8, edep_n_500MeV_8, qedep_n_500MeV_8 = \
 #         get_info_from_file(start_number+700, stop_number_n+700, file_n_500MeV_8, Number_entries_input, r_cut)
 #     # save number of pe to txt file:
 #     save_array_to_file(number_pe_n_500MeV_8, output_path, "number_pe_n_500MeV_8", number_events_n)
@@ -358,7 +356,7 @@ if READ_P_1GEV:
     # file name:
     file_p_1GeV = input_proton + "user_proton_1000_MeV"
     # read info of all files of 1 GeV protons:
-    number_pe_p_1GeV, momentum_init_p_1GeV, edep_p_1GeV, qedep_p_1GeV, hittime_p_1GeV = \
+    number_pe_p_1GeV, momentum_init_p_1GeV, edep_p_1GeV, qedep_p_1GeV = \
         get_info_from_file(start_number, stop_number_p, file_p_1GeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_p_1GeV, output_path, "number_pe_p_1GeV", number_events_p)
@@ -375,7 +373,7 @@ if READ_N_1GEV:
     # file name:
     file_n_1GeV = input_neutron + "user_neutron_1000_MeV"
     # read info of all files of 1 GeV neutrons:
-    number_pe_n_1GeV, momentum_init_n_1GeV, edep_n_1GeV, qedep_n_1GeV, hittime_n_1GeV = \
+    number_pe_n_1GeV, momentum_init_n_1GeV, edep_n_1GeV, qedep_n_1GeV = \
         get_info_from_file(start_number, stop_number_n, file_n_1GeV, Number_entries_input, r_cut)
     # save number of pe to txt file:
     save_array_to_file(number_pe_n_1GeV, output_path, "number_pe_n_1GeV", number_events_n)
@@ -535,30 +533,6 @@ if PLOT_INITENERGY and READ_P_10MEV and READ_N_10MEV and READ_P_100MEV and READ_
     plt.legend()
     plt.grid()
     plt.savefig(output_path + "init_energy.png")
-
-# plot example of hittimes:
-if PLOT_HITTIME and READ_P_10MEV and READ_N_10MEV and READ_P_100MEV and READ_N_100MEV and READ_N_300MEV and \
-        READ_P_1GEV and READ_N_1GEV:
-    h4 = plt.figure(4, figsize=(15, 8))
-    plt.hist(hittime_p_10MeV, bins=1000, align='mid', histtype='step', color='r', label='10 MeV proton')
-    plt.hist(hittime_n_10MeV, bins=1000, align='mid', histtype='step', color='b', label='10 MeV neutron')
-    plt.hist(hittime_p_100MeV, bins=1000, align='mid', histtype='step', color='r', linestyle='--',
-             label='100 MeV proton')
-    plt.hist(hittime_n_100MeV, bins=1000, align='mid', histtype='step', color='b', linestyle='--',
-             label='100 MeV neutron')
-    plt.hist(hittime_n_300MeV, bins=1000, align='mid', histtype='step', color='b', linestyle='-.',
-             label='300 MeV neutron')
-    plt.hist(hittime_p_1GeV, bins=1000, align='mid', histtype='step', color='r', linestyle=':',
-             label='1 GeV proton')
-    plt.hist(hittime_n_1GeV, bins=1000, align='mid', histtype='step', color='b', linestyle=':',
-             label='1 GeV neutron')
-    plt.xlabel("hit-time in ns", fontsize=13)
-    # INFO-me: ylabel is only equal to number of PE, if nPE == 1 for all photons (1 PE each photon)
-    plt.ylabel("number of PE per bin", fontsize=13)
-    plt.title("Example of PMT hit-time distributions", fontsize=18)
-    plt.legend()
-    plt.grid()
-    plt.savefig(output_path + "example_hittime.png")
 
 """ Efficiency of the conversion fit: """
 # the prompt energy cut is defined by min_ecut and max_ecut in MeV:

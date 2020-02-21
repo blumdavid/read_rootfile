@@ -154,12 +154,17 @@ for index in range(len(start_tail)):
                 # pulse_shape_data_IBD = np.loadtxt(input_path_IBD + "file{0:d}_evt{1:d}_prompt_signal.txt"
                 #                                   .format(filenumber, event))
 
+                # get reconstructed positions x, y, z in mm:
+                x_reco_IBD = pulse_shape_data_IBD[0]
+                y_reco_IBD = pulse_shape_data_IBD[1]
+                z_reco_IBD = pulse_shape_data_IBD[2]
+
                 # 0th entry in pulse_shape_data_IBD is minimum of time window in ns:
-                min_time_IBD = pulse_shape_data_IBD[0]
+                min_time_IBD = pulse_shape_data_IBD[3]
                 # 1st entry in pulse_shape_data_IBD is maximum of time window in ns:
-                max_time_IBD = pulse_shape_data_IBD[1]
+                max_time_IBD = pulse_shape_data_IBD[4]
                 # 2nd entry in pulse_shape_data_IBD is bin-width in ns:
-                bin_width_IBD = pulse_shape_data_IBD[2]
+                bin_width_IBD = pulse_shape_data_IBD[5]
 
                 # check if bin_width_IBD is equal to binwidth:
                 if bin_width_IBD != binwidth:
@@ -168,7 +173,7 @@ for index in range(len(start_tail)):
 
                 # the rest of pulse_shape_data_IBD is the hittime distribution histogram in nPE per bin. Take only the
                 # prompt signal defined by start_time and end_time:
-                nPE_per_bin_IBD = pulse_shape_data_IBD[3:
+                nPE_per_bin_IBD = pulse_shape_data_IBD[6:
                                                        (int((end_time + binwidth + np.abs(min_time_IBD)) / binwidth)+3)]
 
                 # set the time window corresponding to nPE_per_bin_IBD:
@@ -237,12 +242,17 @@ for index in range(len(start_tail)):
                     # go to next pulse shape
                     continue
 
+                # get reconstructed positions x, y, z in mm:
+                x_reco_NC = pulse_shape_data_NC[0]
+                y_reco_NC = pulse_shape_data_NC[1]
+                z_reco_NC = pulse_shape_data_NC[2]
+
                 # 0th entry in pulse_shape_data_NC is minimum of time window in ns:
-                min_time_NC = pulse_shape_data_NC[0]
+                min_time_NC = pulse_shape_data_NC[3]
                 # 1st entry in pulse_shape_data_NC is maximum of time window in ns:
-                max_time_NC = pulse_shape_data_NC[1]
+                max_time_NC = pulse_shape_data_NC[4]
                 # 2nd entry in pulse_shape_data_NC is bin-width in ns:
-                bin_width_NC = pulse_shape_data_NC[2]
+                bin_width_NC = pulse_shape_data_NC[5]
 
                 # check if bin_width_NC is equal to binwidth:
                 if bin_width_NC != binwidth:
@@ -251,7 +261,7 @@ for index in range(len(start_tail)):
 
                 # the rest of pulse_shape_data_NC is the hittime distribution histogram in nPE per bin. Take only the
                 # prompt signal defined by start_time and end_time:
-                nPE_per_bin_NC = pulse_shape_data_NC[3:(int((end_time + binwidth + np.abs(min_time_NC)) / binwidth)+3)]
+                nPE_per_bin_NC = pulse_shape_data_NC[6:(int((end_time + binwidth + np.abs(min_time_NC)) / binwidth)+3)]
 
                 # check if nPE_per_bin_NC has entries above 0:
                 if max(nPE_per_bin_NC) < 500:

@@ -111,7 +111,8 @@ def write_info_to_file(out_path, event_type, cut_type, eff_real, stat_eff_real, 
     """
     np.savetxt(out_path + "efficiencies_{0}_{1}.txt".format(event_type, cut_type),
                np.array([eff_real, stat_eff_real, eff_ideal, stat_eff_ideal, alpha, stat_alpha]), fmt='%.5f',
-               header="Efficiencies and alpha of the {0} cut of {1:.0f} {2} events (analyzed with atmoNC_spectrum_v2.py):"
+               header="Efficiencies and alpha of the {0} cut of {1:.0f} {2} events (analyzed with "
+                      "atmoNC_spectrum_v2.py):"
                       "\nefficiency of real data,"
                       "\nstatistical error of efficiency of real data,"
                       "\nefficiency of ideal data,"
@@ -144,7 +145,7 @@ E_min_prompt = 10.0
 E_max_prompt = 100.0
 # alpha_2 (error of the efficiency, if you convert the prompt energy from PE to MeV) (see
 # info_conversion_proton_neutron.odt):
-alpha_E_prompt_cut_2 = 1.0 + (62.0 - 122.0) / 5125.0
+alpha_E_prompt_cut_2 = 1.0 + (65.0 - 129.0) / 5125.0
 # statistical error of alpha_2 (statistical error of the error of the efficiency, if you convert the prompt
 # energy from PE to MeV):
 alpha_stat_E_prompt_cut_2 = np.sqrt(5125.0) / 5125.0
@@ -208,7 +209,8 @@ bin_width_energy = 0.5
 # number of events per root file:
 n_events_per_rootfile = 100.0
 # radius cut in m:
-r_cut = R_cut_prompt / 1000.0
+# INFO-me: take total volume here -> this is only used for event rate calculation
+r_cut = 17.7
 # time exposure in years:
 time_in_years = 10
 # time exposure in seconds:
@@ -1287,7 +1289,8 @@ for index10 in range(len(tail_start)):
                        total_alpha_NC_wo_PSD*100.0, stat_total_alpha_NC_wo_PSD*100.0))
     np.savetxt(output_path + 'NCatmo_info_onlyC12_woPSD_bin{0:.0f}keV.txt'
                .format(bin_width_energy * 1000),
-               np.array([E_min_prompt, E_max_prompt, bin_width_energy, time_in_years, r_cut, number_events_total_NC,
+               np.array([E_min_prompt, E_max_prompt, bin_width_energy, time_in_years, R_cut_prompt,
+                         number_events_total_NC,
                          number_IBDlike_JUNO_wo_PSD, event_rate, total_efficiency_NC_real_wo_PSD,
                          stat_total_efficiency_NC_real_wo_PSD, total_efficiency_NC_ideal_wo_PSD,
                          stat_total_efficiency_NC_ideal_wo_PSD, total_alpha_NC_wo_PSD, stat_total_alpha_NC_wo_PSD]),
@@ -1295,7 +1298,7 @@ for index10 in range(len(tail_start)):
                header='Information to simulation NCatmo_onlyC12_bin{0:.0f}keV.txt (analyzed files: user_atmoNC_0.root '
                       'to user_atmoNC_999.root):\n'
                       'values below: E_visible[0] in MeV, E_visible[-1] in MeV, interval_E_visible in MeV,'
-                      '\nexposure time t_years in years, applied volume cut for radius in meter,'
+                      '\nexposure time t_years in years, applied volume cut for radius in mm,'
                       '\nnumber of simulated NC events, '
                       '\nnumber of IBD-like NC events in spectrum JUNO will measure, '
                       '\ntheoretical NC event rate in JUNO detector in NC events/sec,'
@@ -1335,7 +1338,8 @@ for index10 in range(len(tail_start)):
                        PSD_NC_suppression_real, PSD_IBD_suppression_real))
     np.savetxt(output_path + 'NCatmo_info_onlyC12_wPSD{1:.0f}_bin{0:.0f}keV.txt'
                .format(bin_width_energy * 1000, PSD_NC_suppression*100.0),
-               np.array([E_min_prompt, E_max_prompt, bin_width_energy, time_in_years, r_cut, number_events_total_NC,
+               np.array([E_min_prompt, E_max_prompt, bin_width_energy, time_in_years, R_cut_prompt,
+                         number_events_total_NC,
                          number_IBDlike_JUNO_wo_PSD, number_IBDlike_JUNO_w_PSD, event_rate,
                          total_efficiency_NC_real_w_PSD,
                          stat_total_efficiency_NC_real_w_PSD, total_efficiency_NC_ideal_w_PSD,
@@ -1344,7 +1348,7 @@ for index10 in range(len(tail_start)):
                header='Information to simulation NCatmo_onlyC12_bin{0:.0f}keV.txt (analyzed files: user_atmoNC_0.root '
                       'to user_atmoNC_999.root):\n'
                       'values below: E_visible[0] in MeV, E_visible[-1] in MeV, interval_E_visible in MeV,'
-                      '\nexposure time t_years in years, applied volume cut for radius in meter,'
+                      '\nexposure time t_years in years, applied volume cut for radius in mm,'
                       '\nnumber of simulated NC events, '
                       '\nnumber of IBD-like NC events in spectrum JUNO will measure wo PSD, '
                       '\nnumber of IBD-like events after PSD,'
@@ -1376,6 +1380,9 @@ for index10 in range(len(tail_start)):
     else:
         maximum_tot_value = max(array_TTR_IBDlike)
 
+    maximum_tot_value = 0.07
+
+    # Last_bin = maximum_tot_value
     Last_bin = maximum_tot_value
     Bin_width = (Last_bin-First_bin) / 200
     Bins = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
@@ -1386,7 +1393,7 @@ for index10 in range(len(tail_start)):
     plt.xlim(xmin=0.0, xmax=maximum_tot_value)
     plt.xlabel("tail-to-total ratio")
     plt.ylabel("events")
-    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events before PSD" +
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events" +
               "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start[index10], tail_end[index10]))
     plt.legend()
     plt.grid()
@@ -1410,7 +1417,7 @@ for index10 in range(len(tail_start)):
     plt.xlim(xmin=0.0, xmax=maximum_tot_value)
     plt.xlabel("tail-to-total ratio")
     plt.ylabel("events")
-    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events before PSD" +
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events" +
               "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start[index10], tail_end[index10]))
     plt.legend()
     plt.grid()

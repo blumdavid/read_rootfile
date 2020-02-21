@@ -522,16 +522,16 @@ plt.semilogy(energy_neutrino, sigma, "g-", label="nu_e_bar + p -> positron + n")
 # plt.semilogy(energy_neutrino, xsec_nuebar_1999_gs, "r:", label="paper 1999: nu_e_bar + C12 -> positron + "
 #                                                                "B12 (g.s.)")
 # plt.semilogy(energy_neutrino, xsec_nue_1999_gs, "b:", label="paper 1999: nu_e + C12 -> electron + N12 (g.s.)")
-plt.semilogy(energy_neutrino, xsec_nuebar_1999, "r-.", label="paper 1999: nu_e_bar + C12 -> positron + B12")
-plt.semilogy(energy_neutrino, xsec_nue_1999, "b-.", label="paper 1999: nu_e + C12 -> electron + N12")
-plt.semilogy(energy_neutrino, xsec_nuebar_1999_es, "r--", label="paper 1999: nu_e_bar + C12 -> positron + "
-                                                                "B12 (e.s.)")
-plt.semilogy(energy_neutrino, xsec_nue_1999_es, "b--", label="paper 1999: nu_e + C12 -> electron + N12 (e.s.)")
-plt.semilogy(energy_neutrino, xsec_nuebar_Yoshida, "r-", label="Yoshida: nu_e_bar + C12 -> positron + neutron + ...")
-plt.semilogy(energy_neutrino, xsec_nue_Yoshida, "b-", label="Yoshida: nu_e + C12 -> electron + neutron + ...")
+# plt.semilogy(energy_neutrino, xsec_nuebar_1999, "r-.", label="paper 1999: nu_e_bar + C12 -> positron + B12")
+# plt.semilogy(energy_neutrino, xsec_nue_1999, "b-.", label="paper 1999: nu_e + C12 -> electron + N12")
+# plt.semilogy(energy_neutrino, xsec_nuebar_1999_es, "r--", label="paper 1999: nu_e_bar + C12 -> positron + "
+#                                                                 "B12 (e.s.)")
+# plt.semilogy(energy_neutrino, xsec_nue_1999_es, "b--", label="paper 1999: nu_e + C12 -> electron + N12 (e.s.)")
+plt.semilogy(energy_neutrino, xsec_nuebar_Yoshida, "r-", label="nu_e_bar + C12 -> positron + neutron + X")
+plt.semilogy(energy_neutrino, xsec_nue_Yoshida, "b-", label="nu_e + C12 -> electron + neutron + Y")
 plt.ylim(ymin=1E-44)
 plt.xlabel("neutrino energy in MeV")
-plt.ylabel("cross-section in cm^2")
+plt.ylabel("cross-section in $cm^2$")
 plt.title("cross-section of CC interaction")
 plt.grid()
 plt.legend()
@@ -552,15 +552,15 @@ plt.plot(energy_neutrino, evt_rate_per_energy_proton, "g-",
 # plt.semilogy(energy_neutrino, evt_rate_per_energy_nuebar_1999, "r-.",
 #              label="paper 1999: nu_e_bar + C12 -> positron + B12")
 # plt.semilogy(energy_neutrino, evt_rate_per_energy_nue_1999, "b-.", label="paper 1999: nu_e + C12 -> electron + N12")
-plt.plot(energy_neutrino, evt_rate_per_energy_nuebar_1999_es, "r--",
-         label="paper 1999: nu_e_bar + C12 -> positron + B12 (e.s.),\nN = {0:.2f} evts/(10 yr * 20 kton)"
-         .format(evt_rate_nuebar_1999_es))
-plt.semilogy(energy_neutrino, evt_rate_per_energy_nue_1999_es, "b--",
-             label="paper 1999: nu_e + C12 -> electron + N12 (e.s.)")
+# plt.plot(energy_neutrino, evt_rate_per_energy_nuebar_1999_es, "r--",
+#          label="paper 1999: nu_e_bar + C12 -> positron + B12 (e.s.),\nN = {0:.2f} evts/(10 yr * 20 kton)"
+#          .format(evt_rate_nuebar_1999_es))
+# plt.semilogy(energy_neutrino, evt_rate_per_energy_nue_1999_es, "b--",
+#              label="paper 1999: nu_e + C12 -> electron + N12 (e.s.)")
 plt.semilogy(energy_neutrino, evt_rate_per_energy_nuebar_Yoshida, "r-",
-             label="Yoshida: nu_e_bar + C12 -> positron + neutron + ...")
+             label="Yoshida: nu_e_bar + C12 -> positron + neutron + X")
 plt.semilogy(energy_neutrino, evt_rate_per_energy_nue_Yoshida, "b-",
-             label="Yoshida: nu_e + C12 -> electron + neutron + ... (e.s.)")
+             label="Yoshida: nu_e + C12 -> electron + neutron + Y")
 plt.ylim(ymin=1E-12)
 plt.xlabel("neutrino energy in MeV")
 plt.ylabel("event rate in event/(MeV * s)")

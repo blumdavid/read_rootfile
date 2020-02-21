@@ -1,4 +1,4 @@
-""" script to check the kinematics of IBD based on paper 'angular distribution of neutron inverse beta decay' by
+cosTheta = """ script to check the kinematics of IBD based on paper 'angular distribution of neutron inverse beta decay' by
     Vogel and Beacom (this kinematics is also used in IBD generator of JUNO offline):
 
     With this script you can also produce hep-evt files for one neutrino energy, where the positron momenta and the
@@ -112,7 +112,7 @@ def energy_positron_1(cosinetheta, energy_pos_0, energy_neutrino, velocity_pos_0
 CREATE_HEPFILES = False
 
 # define neutrino energy in MeV:
-E_nu = 60.0
+E_nu = 50.0
 
 # set the number of events, that should be stored in one hepevt file:
 number_events_per_file = 100
@@ -167,11 +167,13 @@ sigma_0 = G_f**2 * cos_theta_c**2 / np.pi * (1 + Delta_R_inner)
 # preallocate array, where differential cross-section is stored in cm^2:
 array_DsigDcosTh = []
 
-# generate neutrino events:
-for theta in theta_axis:
+cosTheta_array = np.arange(-1, 1+0.01, 0.01)
 
+# generate neutrino events:
+#for theta in theta_axis:
+for cosTheta in cosTheta_array:
     # calculate cosine of theta
-    cosTheta = np.cos(np.deg2rad(theta))
+    # cosTheta = np.cos(np.deg2rad(theta))
 
     """ calculate positron energy (equ. 11): """
     E_pos_1 = energy_positron_1(cosTheta, E_pos_0, E_nu, v_pos_0, MASS_PROTON, DELTA, MASS_POSITRON)
@@ -200,10 +202,11 @@ array_DsigDcosTh = array_DsigDcosTh[:-1] / np.sum(array_DsigDcosTh[:-1])
 # set the number of theta values, that should be generated:
 number = 100000
 # generate random values of theta with the differential cross-section as probability function in degree (array):
-theta_pos_random = np.random.choice(theta_axis[:-1], p=array_DsigDcosTh, size=number)
+#theta_pos_random = np.random.choice(theta_axis[:-1], p=array_DsigDcosTh, size=number)
 
 # calculate cosine of these randomly generated theta values (array):
-cosTheta_pos_random = np.cos(np.deg2rad(theta_pos_random))
+#cosTheta_pos_random = np.cos(np.deg2rad(theta_pos_random))
+cosTheta_pos_random = np.random.choice(cosTheta_array[:-1], p=array_DsigDcosTh, size=number)
 
 # calculate positron energy in MeV with this randomly generated theta values (array):
 E_pos_1_random = energy_positron_1(cosTheta_pos_random, E_pos_0, E_nu, v_pos_0, MASS_PROTON, DELTA, MASS_POSITRON)
@@ -218,27 +221,27 @@ phi_pos_random = np.random.uniform(0.0, 360.0, size=number)
 p_neutron_random = E_nu - p_pos_1_random
 # set angle theta of the neutron in degree (neutrino is assumed as vector (E_nu, 0, 0) in spherical coordinates).
 # Therefore theta_neutron = -theta_positron (proton is at rest) (array):
-theta_neutron_random = - theta_pos_random
+#theta_neutron_random = - theta_pos_random
 # set angle phi of the neutron in degree (array):
 phi_neutron_random = - phi_pos_random
 
 # convert total momentum p_pos_1_random to px, py, pz in MeV (array):
-px_pos_random = p_pos_1_random * np.sin(np.deg2rad(theta_pos_random)) * np.cos(np.deg2rad(phi_pos_random))
-py_pos_random = p_pos_1_random * np.sin(np.deg2rad(theta_pos_random)) * np.sin(np.deg2rad(phi_pos_random))
-pz_pos_random = p_pos_1_random * np.cos(np.deg2rad(theta_pos_random))
+#px_pos_random = p_pos_1_random * np.sin(np.deg2rad(theta_pos_random)) * np.cos(np.deg2rad(phi_pos_random))
+#py_pos_random = p_pos_1_random * np.sin(np.deg2rad(theta_pos_random)) * np.sin(np.deg2rad(phi_pos_random))
+#pz_pos_random = p_pos_1_random * np.cos(np.deg2rad(theta_pos_random))
 
 # convert total momentum p_neutron_random to px, py, pz in MeV (array):
-px_neutron_random = p_neutron_random * np.sin(np.deg2rad(theta_neutron_random)) * np.cos(np.deg2rad(phi_neutron_random))
-py_neutron_random = p_neutron_random * np.sin(np.deg2rad(theta_neutron_random)) * np.sin(np.deg2rad(phi_neutron_random))
-pz_neutron_random = p_neutron_random * np.cos(np.deg2rad(theta_neutron_random))
+#px_neutron_random = p_neutron_random * np.sin(np.deg2rad(theta_neutron_random)) * np.cos(np.deg2rad(phi_neutron_random))
+#py_neutron_random = p_neutron_random * np.sin(np.deg2rad(theta_neutron_random)) * np.sin(np.deg2rad(phi_neutron_random))
+#pz_neutron_random = p_neutron_random * np.cos(np.deg2rad(theta_neutron_random))
 
 # momenta must be in GeV for hepevt file input:
-px_pos_random = px_pos_random / 1000.0
-py_pos_random = py_pos_random / 1000.0
-pz_pos_random = pz_pos_random / 1000.0
-px_neutron_random = px_neutron_random / 1000.0
-py_neutron_random = py_neutron_random / 1000.0
-pz_neutron_random = pz_neutron_random / 1000.0
+#px_pos_random = px_pos_random / 1000.0
+#py_pos_random = py_pos_random / 1000.0
+#pz_pos_random = pz_pos_random / 1000.0
+#px_neutron_random = px_neutron_random / 1000.0
+#py_neutron_random = py_neutron_random / 1000.0
+#pz_neutron_random = pz_neutron_random / 1000.0
 
 # masses must be also in GeV for hepevt file input:
 mass_pos_GeV = MASS_POSITRON / 1000.0
@@ -314,12 +317,22 @@ plt.grid()
 # plt.savefig()
 # plt.close()
 
-h2 = plt.figure(2, figsize=(15, 8))
-hist_theta_random, bin_edges = np.histogram(theta_pos_random, bins=theta_axis)
-hist_theta_random = hist_theta_random / float(np.sum(hist_theta_random))
-plt.step(theta_axis[:-1], hist_theta_random, 'r', label='random numbers')
-plt.plot(theta_axis[:-1], array_DsigDcosTh, label="entries = {0:d}".format(len(array_DsigDcosTh)))
-plt.xlabel("theta in degree")
+#h2 = plt.figure(2, figsize=(15, 8))
+#hist_theta_random, bin_edges = np.histogram(theta_pos_random, bins=theta_axis)
+#hist_theta_random = hist_theta_random / float(np.sum(hist_theta_random))
+#plt.step(theta_axis[:-1], hist_theta_random, 'r', label='random numbers')
+#plt.plot(theta_axis[:-1], array_DsigDcosTh, label="entries = {0:d}".format(len(array_DsigDcosTh)))
+#plt.xlabel("theta in degree")
+#plt.ylabel("dSigma / dcosTheta")
+# plt.title("DM mass = {0:.0f} MeV".format(E_nu))
+#plt.legend()
+#plt.grid()
+# plt.savefig()
+# plt.close()
+
+h4 = plt.figure(4, figsize=(15, 8))
+plt.plot(cosTheta_array[:-1], array_DsigDcosTh, label="entries = {0:d}".format(len(array_DsigDcosTh)))
+plt.xlabel("cos(theta)")
 plt.ylabel("dSigma / dcosTheta")
 # plt.title("DM mass = {0:.0f} MeV".format(E_nu))
 plt.legend()
@@ -339,61 +352,61 @@ plt.grid()
 # plt.savefig()
 # plt.close()
 
-# compare E_visible from calculation with the result of check_DMsignal_simulation.py of simulation:
-# load result of simulation:
-Qedep_simu = np.loadtxt("/home/astro/blum/PhD/work/MeVDM_JUNO/gen_spectrum_v2/DM_signal_detsim/"
-                        "DMsignal_{0:.0f}MeV_R0mTo17m_Qedep.txt".format(E_nu))
-# calculate number of analyzed events:
-number_events_simu = np.sum(Qedep_simu)
-
-# preallocate array where smeared Qedep are stored:
-Qedep_simu_smeared = np.loadtxt("/home/astro/blum/PhD/work/MeVDM_JUNO/gen_spectrum_v2/DM_signal_detsim/"
-                                "DMsignal_{0:.0f}MeV_R0mTo17m_Qedep_smeared.txt".format(E_nu))
-
-# normalize spectra to 1:
-E_vis_norm = E_visible_hist / np.sum(E_visible_hist)
-E_vis_smeared_norm = E_visible_hist_smeared / np.sum(E_visible_hist_smeared)
-Qedep_simu_norm = Qedep_simu / number_events_simu
-Qedep_simu_smeared_norm = Qedep_simu_smeared / number_events_simu
-
-# # shift Qedep_simu_norm in a way, that the maximum values of E_vis_norm and Qedep_simu_norm are equal
-# # (correct error of conversion from nPE to MeV):
-# # get index corresponding to last entry in E_vis_norm that differs from zero:
-# index_max_E_vis_norm = np.max(np.nonzero(E_vis_norm))
-# # get index corresponding to last entry in Qedep_simu_norm that differs from zero:
-# index_max_E_vis_simu_norm = np.max(np.nonzero(Qedep_simu_norm))
-# # calculate difference of indices:
-# index_diff = index_max_E_vis_simu_norm - index_max_E_vis_norm
-# # delete first index_diff entries of Qedep_simu_norm:
-# Qedep_simu_norm = np.delete(Qedep_simu_norm, np.arange(index_diff))
-# # append index_diff values of zero to Qedep_simu_norm:
-# Qedep_simu_norm = np.append(Qedep_simu_norm, np.zeros(index_diff))
-
-h4 = plt.figure(4, figsize=(15, 8))
-plt.step(Bins[:-1], E_vis_norm, color="r", linewidth=1.5, where='post',
-         label="E_vis of positron from calculation (entries = {0:.0f})".format(np.sum(E_visible_hist)))
-plt.step(Bins[:-1], Qedep_simu_norm, color="b", linewidth=1.5, where='post',
-         label="Qedep of event from simulation (entries = {0:.0f})".format(number_events_simu))
-plt.xlabel("energy in MeV")
-plt.ylabel("events")
-plt.title("Normalized spectra for DM mass = {0:.0f} MeV".format(E_nu))
-plt.legend()
-plt.grid()
-# plt.savefig()
-# plt.close()
-
-h5 = plt.figure(5, figsize=(15, 8))
-plt.step(Bins[:-1], E_vis_smeared_norm, color="r", linewidth=1.5, where='post',
-         label="smeared E_vis of positron from calculation (entries = {0:.0f})".format(np.sum(E_visible_hist_smeared)))
-plt.step(Bins[:-1], Qedep_simu_smeared_norm, color="b", linewidth=1.5, where='post',
-         label="smeared Qedep of event from simulation (entries = {0:.0f})".format(number_events_simu))
-plt.xlabel("energy in MeV")
-plt.ylabel("events")
-plt.title("Normalized spectra for DM mass = {0:.0f} MeV".format(E_nu))
-plt.legend()
-plt.grid()
-# plt.savefig()
-# plt.close()
+# # compare E_visible from calculation with the result of check_DMsignal_simulation.py of simulation:
+# # load result of simulation:
+# Qedep_simu = np.loadtxt("/home/astro/blum/PhD/work/MeVDM_JUNO/gen_spectrum_v2/DM_signal_detsim/"
+#                         "DMsignal_{0:.0f}MeV_R0mTo17m_Qedep.txt".format(E_nu))
+# # calculate number of analyzed events:
+# number_events_simu = np.sum(Qedep_simu)
+#
+# # preallocate array where smeared Qedep are stored:
+# Qedep_simu_smeared = np.loadtxt("/home/astro/blum/PhD/work/MeVDM_JUNO/gen_spectrum_v2/DM_signal_detsim/"
+#                                 "DMsignal_{0:.0f}MeV_R0mTo17m_Qedep_smeared.txt".format(E_nu))
+#
+# # normalize spectra to 1:
+# E_vis_norm = E_visible_hist / np.sum(E_visible_hist)
+# E_vis_smeared_norm = E_visible_hist_smeared / np.sum(E_visible_hist_smeared)
+# Qedep_simu_norm = Qedep_simu / number_events_simu
+# Qedep_simu_smeared_norm = Qedep_simu_smeared / number_events_simu
+#
+# # # shift Qedep_simu_norm in a way, that the maximum values of E_vis_norm and Qedep_simu_norm are equal
+# # # (correct error of conversion from nPE to MeV):
+# # # get index corresponding to last entry in E_vis_norm that differs from zero:
+# # index_max_E_vis_norm = np.max(np.nonzero(E_vis_norm))
+# # # get index corresponding to last entry in Qedep_simu_norm that differs from zero:
+# # index_max_E_vis_simu_norm = np.max(np.nonzero(Qedep_simu_norm))
+# # # calculate difference of indices:
+# # index_diff = index_max_E_vis_simu_norm - index_max_E_vis_norm
+# # # delete first index_diff entries of Qedep_simu_norm:
+# # Qedep_simu_norm = np.delete(Qedep_simu_norm, np.arange(index_diff))
+# # # append index_diff values of zero to Qedep_simu_norm:
+# # Qedep_simu_norm = np.append(Qedep_simu_norm, np.zeros(index_diff))
+#
+# h4 = plt.figure(4, figsize=(15, 8))
+# plt.step(Bins[:-1], E_vis_norm, color="r", linewidth=1.5, where='post',
+#          label="E_vis of positron from calculation (entries = {0:.0f})".format(np.sum(E_visible_hist)))
+# plt.step(Bins[:-1], Qedep_simu_norm, color="b", linewidth=1.5, where='post',
+#          label="Qedep of event from simulation (entries = {0:.0f})".format(number_events_simu))
+# plt.xlabel("energy in MeV")
+# plt.ylabel("events")
+# plt.title("Normalized spectra for DM mass = {0:.0f} MeV".format(E_nu))
+# plt.legend()
+# plt.grid()
+# # plt.savefig()
+# # plt.close()
+#
+# h5 = plt.figure(5, figsize=(15, 8))
+# plt.step(Bins[:-1], E_vis_smeared_norm, color="r", linewidth=1.5, where='post',
+#          label="smeared E_vis of positron from calculation (entries = {0:.0f})".format(np.sum(E_visible_hist_smeared)))
+# plt.step(Bins[:-1], Qedep_simu_smeared_norm, color="b", linewidth=1.5, where='post',
+#          label="smeared Qedep of event from simulation (entries = {0:.0f})".format(number_events_simu))
+# plt.xlabel("energy in MeV")
+# plt.ylabel("events")
+# plt.title("Normalized spectra for DM mass = {0:.0f} MeV".format(E_nu))
+# plt.legend()
+# plt.grid()
+# # plt.savefig()
+# # plt.close()
 
 plt.show()
 

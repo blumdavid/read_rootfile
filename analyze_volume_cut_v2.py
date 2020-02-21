@@ -177,29 +177,12 @@ for filenumber in range(start_number, stop_number+1):
             # initial position is rejected by cut:
             number_volume_rejected_prompt_init += 1
 
-        # get current event in TTree:
-        rtree_prmtrkdep.GetEntry(event)
-        # get number of initial particles in prmtrkdep:
-        nInitParticles_prmtrkdep = int(rtree_geninfo.GetBranch('nInitParticles').GetLeaf('nInitParticles').GetValue())
-
-        # get quenched deposit energy of all initial particles in MeV:
-        for index in range(nInitParticles_prmtrkdep):
-            Qedep = float(rtree_prmtrkdep.GetBranch('Qedep').GetLeaf('Qedep').GetValue(index))
-            Qedep_sum += Qedep
-
-        # Calculate vertex smeared position.
-        if Qedep_sum != 0:
-            # Smear initial x,y and z position with function position_smearing(). (returns reconstructed position
-            # in mm):
-            x_reconstructed = NC_background_functions.position_smearing(init_x, Qedep_sum)
-            y_reconstructed = NC_background_functions.position_smearing(init_y, Qedep_sum)
-            z_reconstructed = NC_background_functions.position_smearing(init_z, Qedep_sum)
-
-        else:
-            # Qedep_sum = 0, use initial position:
-            x_reconstructed = init_x
-            y_reconstructed = init_y
-            z_reconstructed = init_z
+        # get reconstructed positions x, y, z (in mm) from hit-time txt file:
+        hittime_file = np.loadtxt(output_path + "hittimes/file{0:d}_evt{1:d}_prompt_signal.txt".format(filenumber, event))
+        # reconstructed position in mm:
+        x_reconstructed = hittime_file[0]
+        y_reconstructed = hittime_file[1]
+        z_reconstructed = hittime_file[2]
 
         # calculate reconstructed distance to detector center in mm:
         r_reconstructed = np.sqrt(x_reconstructed**2 + y_reconstructed**2 + z_reconstructed**2)

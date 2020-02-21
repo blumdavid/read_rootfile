@@ -1,6 +1,13 @@
 """ Script to analyze the prompt energy cut and the delayed energy cut (time cut, delayed energy cut, multiplicity cut
     and distance cut) and their efficiencies (either of real IBD events (positron + neutron) or NC events):
 
+    Version 3:
+
+    -   the prompt energy and delayed energy is converted to MeV, but NOT smeared with energy resolution, because
+    the energy resolution is already considered in the number of PE
+
+    -   the delayed energy cut is done on MeV and not on number of PE
+
     Version 2 (v2) means, that:
     -   prompt energy cut is calculated independently of the other cuts
     -   filenumber, evtID and Q_smeared of each event passing the prompt energy cut is stored in file
@@ -75,7 +82,7 @@ Number_entries_input = 100
 event_type = "IBD"
 # set integer, that defines the number of the analyzed files (hittime analysis needs much time, therefore separate
 # analysis in different parts)
-analysis_part = 10
+analysis_part = 0
 # set the path of the input root files:
 if event_type == "atmoNC":
     input_path = "/local/scratch1/pipc51/astro/blum/detsim_output_data/user_atmoNC_"
@@ -138,36 +145,25 @@ number_total_events = (stop_number + 1 - start_number) * Number_entries_input
 number_without_particles = 0
 
 """ prompt energy """
-# number of events, where Q_smeared pass prompt energy cut:
+# number of events, where Q_converted pass prompt energy cut:
 number_prompt_energy_pass_reco = 0
-# number of events, where Q_smeared is rejected by prompt energy cut:
+# number of events, where Q_converted is rejected by prompt energy cut:
 number_prompt_energy_rejected_reco = 0
-# number of events, where Q_smeared is rejected by prompt energy cut (E < prompt_energy_min):
+# number of events, where Q_converted is rejected by prompt energy cut (E < prompt_energy_min):
 number_prompt_energy_rejected_min_reco = 0
-# number of events, where Q_smeared is rejected by prompt energy cut (E > prompt_energy_max):
+# number of events, where Q_converted is rejected by prompt energy cut (E > prompt_energy_max):
 number_prompt_energy_rejected_max_reco = 0
-# number of events, where converted energy pass prompt energy cut:
-number_prompt_energy_pass_converted = 0
-# number of events, where converted energy is rejected by prompt energy cut:
-number_prompt_energy_rejected_converted = 0
-# number of events, where smeared energy pass the cut, but converted energy would be rejected:
-number_prompt_energy_toomuch = 0
-# number of events, where smeared energy is rejected by cut, but converted energy would pass the cut:
-number_prompt_energy_tooless = 0
-# array, where filenumber of events that pass the prompt energy cut (Q_smeared, real) are stored:
+# array, where filenumber of events that pass the prompt energy cut (Q_converted, real) are stored:
 array_filenumber_prompt_energy = []
-# array, where corresponding evtID of events that pass the prompt energy cut (Q_smeared, real) are stored:
+# array, where corresponding evtID of events that pass the prompt energy cut (Q_converted, real) are stored:
 array_evtID_prompt_energy = []
-# array, where corresponding prompt energy of events that pass the prompt energy cut (Q_smeared, real) are stored in
+# array, where corresponding prompt energy of events that pass the prompt energy cut (Q_converted, real) are stored in
 # MeV:
 array_Evis_prompt_energy = []
-# array, where all Q_smeared values are stored to build a histogram:
-array_Q_smeared_prompt_energy = []
-# array, where filenumber of events that pass the prompt energy cut (Q_converted, in principle ideal) are stored:
-array_filenumber_prompt_energy_MCtruth = []
-# array, where corresponding evtID of events that pass the prompt energy cut (Q_converted, in principle ideal)
-# are stored:
-array_evtID_prompt_energy_MCtruth = []
+# array, where all Q_converted values are stored to build a histogram:
+array_Q_converted_prompt_energy = []
+# efficiency of conversion of prompt energy from nPE to MeV (efficiency = N_before_conversion / N_after_conversion):
+efficiency_conversion = 0.9879
 
 """ delayed cut: """
 # number of events that pass the delayed cut:
@@ -224,21 +220,11 @@ number_multiplicity_tooless = 0
 array_multiplicity = []
 
 """ delayed energy """
-# number of events, where Evis_smeared pass delayed energy cut (and time cut and multiplicity cut):
+# number of events, where Evis_converted pass delayed energy cut (and time cut and multiplicity cut):
 number_delayed_energy_pass_reco = 0
-# number of events, where Evis_smeared is rejected by delayed energy cut:
+# number of events, where Evis_converted is rejected by delayed energy cut:
 number_delayed_energy_rejected_reco = 0
-# number of events, where Evis before recon. pass delayed energy cut:
-number_delayed_energy_pass_MC = 0
-# number of events, where Evis before recon. is rejected by delayed energy cut:
-number_delayed_energy_rejected_MC = 0
-# number of events, where smeared energy pass the cut, but real energy would be rejected:
-number_delayed_energy_toomuch = 0
-# number of events, where smeared energy is rejected by cut, but real energy would pass the cut:
-number_delayed_energy_tooless = 0
-# array, where all Evis_smeared values are stored:
-array_Evis_smeared_delayed_energy = []
-# array, where all Evis values (before reconstruction) are stored:
+# array, where all Evis_converted values are stored:
 array_Evis_delayed_energy = []
 
 """ distance """
@@ -553,9 +539,6 @@ for filenumber in range(start_number, stop_number+1):
             # calculate reconstructed distance to detector center in mm:
             r_reconstructed = np.sqrt(x_reconstructed ** 2 + y_reconstructed ** 2 + z_reconstructed ** 2)
 
-            if r_reconstructed > 3000.0:
-                continue
-
             # get min_time_total, max_time_total and binwidth from txt file and compare it with the values set above:
             min_time_total_txt = npe_from_file[3]
             if min_time_total != min_time_total_txt:
@@ -630,20 +613,8 @@ for filenumber in range(start_number, stop_number+1):
         # convert the total number of pe to quenched deposited energy in MeV:
         Qedep_converted = NC_background_functions.conversion_npe_to_evis(number_pe_prompt)
 
-        # TODO-me: delete energy smearing
-        if Qedep_converted == 0:
-            # no prompt signal:
-            # set Qedep_smeared = 0
-            Qedep_smeared = 0.0
-        else:
-            # smear Qedep_real with energy resolution:
-            # get the value of sigma of energy resolution for value of Qedep_real:
-            sigma_energy_resolution = NC_background_functions.energy_resolution(Qedep_converted)
-            # generate normal distributed random number with mean = Qedep_real and sigma = sigma_energy_resolution:
-            Qedep_smeared = np.random.normal(Qedep_converted, sigma_energy_resolution)
-
-        """ store Qedep_smeared in array_Q_smeared_prompt_energy: """
-        array_Q_smeared_prompt_energy.append(Qedep_smeared)
+        """ store Qedep_converted in array_Q_converted_prompt_energy: """
+        array_Q_converted_prompt_energy.append(Qedep_converted)
 
         """ save time distribution/ pulse shape to file: """
         if not flag_read_hittime_from_file:
@@ -664,40 +635,21 @@ for filenumber in range(start_number, stop_number+1):
                        .format(event_type, filenumber, event_id, now, min_time_total, max_time_total, binwidth))
 
         """ do prompt energy cut: """
-        if prompt_energy_min <= Qedep_smeared <= prompt_energy_max:
-            # recon. energy pass the prompt energy cut:
-            number_prompt_energy_pass_reco += 1
-            # append filenumber, evtID and Qedep_smeared to the arrays:
-            array_filenumber_prompt_energy.append(filenumber)
-            array_evtID_prompt_energy.append(event_id)
-            array_Evis_prompt_energy.append(Qedep_smeared)
-        else:
-            # recon. energy is rejected by prompt energy cut:
-            number_prompt_energy_rejected_reco += 1
-
-            if Qedep_smeared < prompt_energy_min:
-                number_prompt_energy_rejected_min_reco += 1
-            elif Qedep_smeared > prompt_energy_max:
-                number_prompt_energy_rejected_max_reco += 1
-
         if prompt_energy_min <= Qedep_converted <= prompt_energy_max:
             # converted energy pass the prompt energy cut:
-            number_prompt_energy_pass_converted += 1
-            # append filenumber, evtID to the arrays:
-            array_filenumber_prompt_energy_MCtruth.append(filenumber)
-            array_evtID_prompt_energy_MCtruth.append(event_id)
+            number_prompt_energy_pass_reco += 1
+            # append filenumber, evtID and Qedep_converted to the arrays:
+            array_filenumber_prompt_energy.append(filenumber)
+            array_evtID_prompt_energy.append(event_id)
+            array_Evis_prompt_energy.append(Qedep_converted)
         else:
             # converted energy is rejected by prompt energy cut:
-            number_prompt_energy_rejected_converted += 1
+            number_prompt_energy_rejected_reco += 1
 
-        if (prompt_energy_min <= Qedep_smeared <= prompt_energy_max and
-                (Qedep_converted < prompt_energy_min or Qedep_converted > prompt_energy_max)):
-            # Q_smeared pass, but Q_converted is rejected:
-            number_prompt_energy_toomuch += 1
-        elif ((Qedep_smeared < prompt_energy_min or Qedep_smeared > prompt_energy_max) and
-              prompt_energy_min <= Qedep_converted <= prompt_energy_max):
-            # Q_smeared is rejected, but Q_converted pass:
-            number_prompt_energy_tooless += 1
+            if Qedep_converted < prompt_energy_min:
+                number_prompt_energy_rejected_min_reco += 1
+            elif Qedep_converted > prompt_energy_max:
+                number_prompt_energy_rejected_max_reco += 1
 
         """ analyze delayed signal: """
         # get index, where delayed time window starts:
@@ -915,39 +867,16 @@ for filenumber in range(start_number, stop_number+1):
                     print("ERROR: 0 or more than 1 signal in delayed time window ----------------file {0:d}, evt {1:d}"
                           .format(filenumber, event_id))
 
-                # get nPE of delayed signal corresponding to index_delayed_signal (nPE before reconstruction):
+                # get nPE of delayed signal corresponding to index_delayed_signal:
                 nPE_del_MC = number_pe_delayed_array[index_delayed_signal]
 
                 """ convert nPE to visible energy in MeV: """
-                Evis_del_MC = NC_background_functions.conversion_npe_to_evis(nPE_del_MC)
-                # get sigma of normal distribution because of energy resolution:
-                sigma_energy_resolution_1 = NC_background_functions.energy_resolution(Evis_del_MC)
-                # smear Evis_del_MC with sigma_energy_resolution_1 to get reconstructed energy:
-                Evis_del_smeared = np.random.normal(Evis_del_MC, sigma_energy_resolution_1)
+                Evis_delayed = NC_background_functions.conversion_npe_to_evis(nPE_del_MC)
 
-                """ store Evis_del_smeared in array_Evis_smeared_delayed_energy and Evis_del_MC 
-                in array_Evis_delayed_energy: """
-                array_Evis_smeared_delayed_energy.append(Evis_del_smeared)
-                array_Evis_delayed_energy.append(Evis_del_MC)
+                """ store Evis_delayed in array_Evis_delayed_energy: """
+                array_Evis_delayed_energy.append(Evis_delayed)
 
-                # check efficiency of delayed energy cut:
-                if (min_PE_delayed_MeV <= Evis_del_smeared <= max_PE_delayed_MeV and
-                        (Evis_del_MC < min_PE_delayed_MeV or Evis_del_MC > max_PE_delayed_MeV)):
-                    # Evis_del_smeared pass cut, but Evis_del_MC is rejected:
-                    number_delayed_energy_toomuch += 1
-                elif ((Evis_del_smeared < min_PE_delayed_MeV or Evis_del_smeared > max_PE_delayed_MeV) and
-                      min_PE_delayed_MeV <= Evis_del_MC <= max_PE_delayed_MeV):
-                    # Evis_del_smeared is rejected, but Evis_del_MC pass cut:
-                    number_delayed_energy_tooless += 1
-
-                if min_PE_delayed_MeV <= Evis_del_MC <= max_PE_delayed_MeV:
-                    # Evis_del_MC pass cut:
-                    number_delayed_energy_pass_MC += 1
-                else:
-                    # Evis_del_MC is rejected:
-                    number_delayed_energy_rejected_MC += 1
-
-                if min_PE_delayed_MeV <= Evis_del_smeared <= max_PE_delayed_MeV:
+                if min_PE_delayed_MeV <= Evis_delayed <= max_PE_delayed_MeV:
                     # Evis_del_smeared pass cut:
                     number_delayed_energy_pass_reco += 1
                 else:
@@ -1183,7 +1112,7 @@ for filenumber in range(start_number, stop_number+1):
 h1 = plt.figure(1, figsize=(11, 6))
 bin_width = 1.0
 bins_prompt_energy = np.arange(0.0, 200+bin_width, bin_width)
-values1, bins1, patches1 = plt.hist(array_Q_smeared_prompt_energy, bins_prompt_energy, align='mid', histtype='step',
+values1, bins1, patches1 = plt.hist(array_Q_converted_prompt_energy, bins_prompt_energy, align='mid', histtype='step',
                                     linewidth='1.5',
                                     label='entries = {0:d},\n'
                                           'events passing cut = {1:d},\n'
@@ -1197,34 +1126,26 @@ plt.vlines(prompt_energy_max, ymin=0.0, ymax=(max(values1)+max(values1)*0.1), co
 plt.xlim(xmin=0.0, xmax=200)
 plt.xlabel("visible energy of prompt signal in MeV")
 plt.ylabel("number of events per bin (bin-width = {0:.1f} MeV)".format(bin_width))
-plt.title("Reconstructed visible energy of prompt signal of {0} events".format(event_type))
+plt.title("Visible energy of prompt signal of {0} events".format(event_type))
 plt.legend()
 plt.grid()
 plt.savefig(output_path_del + "histo_prompt_energy_{0}_{1:.0f}MeV_to_{2:.0f}MeV_{3:d}.png"
             .format(event_type, prompt_energy_min, prompt_energy_max, analysis_part))
 plt.close()
 
-""" save array_filenumber_prompt_energy, array_evtID_prompt_energy and array_Evis_prompt_energy of Q_smeared (real) to 
+""" save array_filenumber_prompt_energy, array_evtID_prompt_energy and array_Evis_prompt_energy of Q_converted (real) to 
 txt file: """
 np.savetxt(output_path_del + 'filenumber_evtID_Evis_prompt_energy_cut_{0}_{1:.0f}MeV_to_{2:.0f}MeV_{3:d}.txt'
            .format(event_type, prompt_energy_min, prompt_energy_max, analysis_part),
            np.c_[array_filenumber_prompt_energy, array_evtID_prompt_energy, array_Evis_prompt_energy], fmt='%.3f',
            header='filenumber | evtID | E_vis in MeV fo events that pass prompt energy cut')
 
-""" save array_filenumber_prompt_energy_MCtruth, array_evtID_prompt_energy_MCtruth of Q_converted (in principle ideal)
- to txt file: """
-np.savetxt(output_path_del + 'filenumber_evtID_prompt_energy_cut_MCtruth_{0}_{1:.0f}MeV_to_{2:.0f}MeV_{3:d}.txt'
-           .format(event_type, prompt_energy_min, prompt_energy_max, analysis_part),
-           np.c_[array_filenumber_prompt_energy_MCtruth, array_evtID_prompt_energy_MCtruth], fmt='%.3f',
-           header='filenumber | evtID')
-
 """ save different number of events of the prompt energy cut to txt file: """
 np.savetxt(output_path_del + "numbers_prompt_energy_cut_{0}_{1:.0f}MeV_to_{2:.0f}MeV_{3:d}.txt"
            .format(event_type, prompt_energy_min, prompt_energy_max, analysis_part),
            np.array([number_total_events, number_without_particles, number_total_events - number_without_particles,
                      number_prompt_energy_pass_reco, number_prompt_energy_rejected_reco,
-                     number_prompt_energy_pass_converted, number_prompt_energy_rejected_converted,
-                     number_prompt_energy_toomuch, number_prompt_energy_tooless,
+                     efficiency_conversion,
                      number_prompt_energy_rejected_min_reco, number_prompt_energy_rejected_max_reco]), fmt='%i',
            header='number of events from analyze_prompt_delayed_cut_v2.py ({0}):'
                   '\nnumber of events of the prompt energy cut.'
@@ -1234,14 +1155,11 @@ np.savetxt(output_path_del + "numbers_prompt_energy_cut_{0}_{1:.0f}MeV_to_{2:.0f
                   '\nnumber of total events,'
                   '\nnumber of events without initial particles,'
                   '\nnumber of events before cut (these events were analyzed),'
-                  '\nnumber of events that pass prompt energy cut on prompt Q_smeared,'
-                  '\nnumber of events that are rejected by prompt energy cut on prompt Q_smeared,'
                   '\nnumber of events that pass prompt energy cut on prompt Q_converted,'
                   '\nnumber of events that are rejected by prompt energy cut on prompt Q_converted,'
-                  '\nnumber of events counted too much (Q_smeared pass, but Q_converted is rejected),'
-                  '\nnumber of events counted too less (Q_smeared is rejected, but Q_converted pass),'
-                  '\nnumber of events that are rejected by prompt energy cut (Q_smeared < E_min),'
-                  '\nnumber of events that are rejected by prompt energy cut (Q_smeared > E_max):'
+                  '\nefficiency of conversion from nPE to MeV (N_before_conversion / N_after_conversion)'
+                  '\nnumber of events that are rejected by prompt energy cut (Q_converted < E_min),'
+                  '\nnumber of events that are rejected by prompt energy cut (Q_converted > E_max):'
                   .format(now, event_type, prompt_energy_min, prompt_energy_max, start_number, stop_number))
 
 """ SAVE INFORMATION ABOUT DELAYED CUT: """
@@ -1265,6 +1183,7 @@ np.savetxt(output_path_del + "numbers_prompt_energy_cut_{0}_{1:.0f}MeV_to_{2:.0f
 #             .format(event_type, time_cut_min, time_cut_max/1000000.0, analysis_part))
 # plt.show()
 # plt.close()
+
 """ build 1D histogram of the begin times of the delayed pulses with x axis in log scale: """
 h7 = plt.figure(7, figsize=(11, 6))
 bin_width = 500.0
@@ -1457,11 +1376,11 @@ np.savetxt(output_path_del + "numbers_multiplicity_cut_{0}_mult{1:d}_{2:d}.txt"
                   'but based on NeutronCaptureT pass):'
                   .format(now, event_type, multiplicity, start_number, stop_number))
 
-""" build histogram from array_Evis_smeared_delayed_energy: """
-h14 = plt.figure(14, figsize=(11, 6))
+""" build histogram from array_Evis_delayed_energy: """
+h13 = plt.figure(13, figsize=(11, 6))
 bin_width = 0.05
 bins_Evis_del = np.arange(0, 13.0+bin_width, bin_width)
-values14, bins14, patches14 = plt.hist(array_Evis_smeared_delayed_energy, bins_Evis_del, align='mid', histtype='step',
+values14, bins14, patches14 = plt.hist(array_Evis_delayed_energy, bins_Evis_del, align='mid', histtype='step',
                                        linewidth='1.5',
                                        label='entries = {0:d},\n'
                                              'events passing cut = {1:d},\n'
@@ -1475,16 +1394,16 @@ plt.vlines(max_PE_delayed_MeV, ymin=0.0, ymax=(max(values14)+max(values14)*0.1),
 plt.xlim(xmin=0.0, xmax=13.0)
 plt.xlabel("visible energy of delayed signal in MeV")
 plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width))
-plt.title("Reconstructed energy of delayed signals of {0} events".format(event_type))
+plt.title("Visible energy of delayed signals of {0} events".format(event_type))
 plt.legend()
 plt.grid()
 plt.savefig(output_path_del + "histo_delayed_energy_{0}_{1:.0f}keV_to_{2:.0f}keV_{3}.png"
             .format(event_type, min_PE_delayed_MeV*1000, max_PE_delayed_MeV*1000, analysis_part))
 plt.close()
 
-""" build histogram from array_Evis_smeared_delayed_energy with Gaussian Fit: """
+""" build histogram from array_Evis_delayed_energy with Gaussian Fit: """
 h4 = plt.figure(4, figsize=(11, 6))
-values4, bins4, patches4 = plt.hist(array_Evis_smeared_delayed_energy, bins_Evis_del, align='mid', histtype='step',
+values4, bins4, patches4 = plt.hist(array_Evis_delayed_energy, bins_Evis_del, align='mid', histtype='step',
                                     linewidth='1.5',
                                     label='entries = {0:d},\n'
                                           'events passing cut = {1:d},\n'
@@ -1504,35 +1423,10 @@ plt.vlines(max_PE_delayed_MeV, ymin=0.0, ymax=(max(values4)+max(values4)*0.1), c
 plt.xlim(xmin=0.0, xmax=13.0)
 plt.xlabel("visible energy of delayed signal in MeV")
 plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width))
-plt.title("Reconstructed energy of delayed signals of {0} events".format(event_type))
+plt.title("Visible energy of delayed signals of {0} events".format(event_type))
 plt.legend()
 plt.grid()
 plt.savefig(output_path_del + "histo_delayed_energy_{0}_{1:.0f}keV_to_{2:.0f}keV_FIT_{3}.png"
-            .format(event_type, min_PE_delayed_MeV*1000, max_PE_delayed_MeV*1000, analysis_part))
-plt.close()
-
-""" build histogram from array_Evis_delayed_energy with Gaussian Fit: """
-h13 = plt.figure(13, figsize=(11, 6))
-values13, bins13, patches13 = plt.hist(array_Evis_delayed_energy, bins_Evis_del, align='mid', histtype='step',
-                                       linewidth='1.5',
-                                       label='entries = {0:d}'.format(len(array_Evis_delayed_energy)))
-# do gaussian fit on the energy:
-popt_13, pcov_13 = curve_fit(gaus, bins13[:-1], values13)
-energy_range = np.arange(0, 13.0+0.01, 0.01)
-plt.plot(energy_range, gaus(energy_range, *popt_13), "r-", label="Gaussian fit: $\\mu$ = {0:.2f} MeV, "
-                                                                 "$\\sigma$ = {1:.2f} MeV"
-         .format(popt_13[1], popt_13[2]))
-plt.vlines(min_PE_delayed_MeV, ymin=0.0, ymax=(max(values13)+max(values13)*0.1), colors='k', linestyles='solid',
-           label='lower edge of delayed energy window = {0:.1f} MeV'.format(min_PE_delayed_MeV))
-plt.vlines(max_PE_delayed_MeV, ymin=0.0, ymax=(max(values13)+max(values13)*0.1), colors='k', linestyles='dashed',
-           label='upper edge of delayed energy window = {0:.1f} MeV'.format(max_PE_delayed_MeV))
-plt.xlim(xmin=0.0, xmax=13.0)
-plt.xlabel("visible energy of delayed signal in MeV")
-plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width))
-plt.title("Energy of delayed signals of {0} events".format(event_type))
-plt.legend()
-plt.grid()
-plt.savefig(output_path_del + "histo_delayed_energy_notSmeared_{0}_{1:.0f}keV_to_{2:.0f}keV_{3}.png"
             .format(event_type, min_PE_delayed_MeV*1000, max_PE_delayed_MeV*1000, analysis_part))
 plt.close()
 
@@ -1541,8 +1435,7 @@ np.savetxt(output_path_del + "numbers_delayed_energy_cut_{0}_{1:.0f}keV_to_{2:.0
            .format(event_type, min_PE_delayed_MeV*1000, max_PE_delayed_MeV*1000, analysis_part),
            np.array([number_total_events, number_without_particles, number_multiplicity_pass_reco,
                      number_delayed_energy_pass_reco, number_delayed_energy_rejected_reco,
-                     number_delayed_energy_pass_MC, number_delayed_energy_rejected_MC,
-                     number_delayed_energy_toomuch, number_delayed_energy_tooless]), fmt='%i',
+                     efficiency_conversion]), fmt='%i',
            header='number of events from analyze_prompt_delayed_cut_v2.py ({0}):'
                   '\nnumber of events of the delayed energy cut.'
                   '\nanalyzed files: user_{1}_{4:d}.root to user_{1}_{5:d}.root'
@@ -1551,12 +1444,9 @@ np.savetxt(output_path_del + "numbers_delayed_energy_cut_{0}_{1:.0f}keV_to_{2:.0
                   '\nnumber of total events,'
                   '\nnumber of events without initial particles,'
                   '\nnumber of events that pass multiplicity cut (these events were analyzed),'
-                  '\nnumber of events that pass delayed energy cut on Evis_smeared,'
-                  '\nnumber of events that are rejected by delayed energy cut on Evis_smeared,'
-                  '\nnumber of events that pass delayed energy cut on Evis_MCtruth,'
-                  '\nnumber of events that are rejected by delayed energy cut on Evis_MCtruth,'
-                  '\nnumber of events counted too much (Evis_smeared pass, but Evis_MCtruth is rejected),'
-                  '\nnumber of events counted too less (Evis_smeared is rejected, but Evis_MCtruth pass):'
+                  '\nnumber of events that pass delayed energy cut on Evis_converted,'
+                  '\nnumber of events that are rejected by delayed energy cut on Evis_converted,'
+                  '\nefficiency of conversion from nPE to MeV (N_before_conversion / N_after_conversion):'
                   .format(now, event_type, min_PE_delayed_MeV, max_PE_delayed_MeV, start_number, stop_number))
 
 """ build histogram from array_distance_reco: """

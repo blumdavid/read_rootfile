@@ -25,6 +25,17 @@ from matplotlib import pyplot as plt
 def calculate_neutron_momentum(mom_positron, theta, mass_p, delta, mass_pos):
     """
     function to calculate the neutron momentum as function of the positron momentum and the angle theta
+
+    from paper "Angular distribution of neutron inverse beta decay" of Beacom and Vogel (PhysRevD.60.053003.pdf),
+    page 7, equation 29.
+
+    In the case of large positron energies (E_pos > 10 MeV): momentum of positron = energy of positron
+    (mass can be neglected) and therefore velocity_positron = momentum / energy = 1.
+
+    For example: mom_pos(E_pos = 10 MeV) = 9.987 MeV,   mom_pos(E_pos = 100 MeV) = 99.9987 MeV
+
+    With this approximation equation 29 of the paper becomes function below.
+
     :param mom_positron: momentum of positron in GeV
     :param theta: angle theta in degree
     :param mass_p: mass of proton in GeV

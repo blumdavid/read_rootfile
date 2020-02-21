@@ -11,7 +11,7 @@
     2.  Efficiency of the delayed energy cut:
         There are some problems with the first investigation of the delayed energy cut (based on 1.9 MeV, 2.2 MeV and
         2.5 MeV gammas), because many delayed signals of NC events have to small nPE compared to the result of the
-        gamma simulation (see script check_delayed_energy.py and folder /output_gamma_2_2_MeV)
+        gamma simulation (see script OLD_check_delayed_energy.py and folder /output_gamma_2_2_MeV)
 
     3.  Efficiency of the neutron multiplicity cut (momentum of 0.001 MeV corresponds to minimum kinetic energy of a
         neutron after inverse beta decay with a neutrino with initial energy of 10 MeV; momentum of 28 MeV corresponds
@@ -51,8 +51,8 @@ input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_neutron_multiplicity/"
 output_path = input_path + "results/"
 
 # start file and stop file:
-file_start = 10
-file_end = 509
+file_start = 0
+file_end = 500
 # file_end = 13
 # number of events per file (for simulation with optical processes):
 number_evts_per_file = 100
@@ -79,7 +79,7 @@ threshold1_del = 50
 threshold2_del = 0
 # min and max number of PE for delayed energy cut (delayed energy cut: 1.9 MeV / 0.0007483 = 2573 PE ~ 2500 PE,
 # 2.5 MeV / 0.0007384 = 3385 PE ~ 3400 PE):
-min_PE_delayed = 2500
+min_PE_delayed = 2400
 max_PE_delayed = 3400
 
 """ load position of the PMTs and corresponding PMT ID from file PMT_position.root: """
@@ -531,9 +531,6 @@ plt.title("Correlation of number of p.e. to energy for captured neutrons in JUNO
           "(within time window between {0:.0f} ns and {1:.0f} ms)".format(time_limit, max_time/1000000))
 plt.grid()
 plt.legend()
-
-plt.show()
-
 
 h2 = plt.figure(2, figsize=(15, 8))
 plt.plot(array_npe_from_hittime, array_Qedep, "xb", label="entries = {0:.0f}".format(number_pe3000_qedep2))

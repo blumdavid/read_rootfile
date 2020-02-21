@@ -56,7 +56,7 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 """ set flag, if hittimes must be calculated or read from file: """
-flag_read_hittime_from_file = True
+flag_read_hittime_from_file = False
 
 """ define time window and bin width: """
 # set time window of whole signal in ns:
@@ -168,6 +168,8 @@ if not flag_read_hittime_from_file:
         else:
             print("--------------------------------- ERROR-------------------")
 
+        print(rfile)
+
         # get the "evt"-TTree from the TFile:
         rtree_evt = rfile.Get("evt")
         # get geninfo tree from TFile:
@@ -233,8 +235,8 @@ if not flag_read_hittime_from_file:
             else:
                 number_analyzed += 1
 
-            """ calculate the real hittime distribution (time of flight correction with reconstructed position and time 
-            smearing with TTS for each hit): """
+            """ calculate the photon emission time distribution (time of flight correction with reconstructed position 
+            and time smearing with TTS for each hit): """
             # get event of 'evt'-tree:
             rtree_evt.GetEntry(event)
             # get evtID of the tree and compare with event:
@@ -245,7 +247,7 @@ if not flag_read_hittime_from_file:
             # get number of photons of this event:
             n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
 
-            # preallocate list, where corrected (real) hittimes are saved:
+            # preallocate list, where corrected (real) hit-times are saved:
             hittime_array = []
 
             # loop over every photon in the event:
@@ -341,7 +343,8 @@ if not flag_read_hittime_from_file:
             # save hittime distribution of the event to txt file:
             # build list, where 0th entry is start-hittime in ns, 1st entry is last-hittime in ns, 2nd entry is
             # binwidth in ns and the following entries are nPE of each hittime-bin of whole signal:
-            npe_per_hittime_save = [min_time, max_time, binwidth]
+            npe_per_hittime_save = [x_reconstructed, y_reconstructed, z_reconstructed]
+            npe_per_hittime_save.extend([min_time, max_time, binwidth])
             npe_per_hittime_save.extend(npe_per_hittime)
             np.savetxt(input_path_hittimes + "hittimes/file{0:d}_evt{1:d}_pulse_shape_R{2:d}.txt"
                        .format(index, event, event_position),
@@ -368,20 +371,25 @@ else:
             # read txt file:
             npe_from_file = np.loadtxt(file_name_neutron)
 
+            # get reconstructed position in mm:
+            x_reconstructed = npe_from_file[0]
+            y_reconstructed = npe_from_file[1]
+            z_reconstructed = npe_from_file[2]
+
             # get min_time, max_time and binwidth from txt file and compare it with the values set above:
-            min_time_total_txt = npe_from_file[0]
+            min_time_total_txt = npe_from_file[3]
             if min_time != min_time_total_txt:
                 sys.exit("ERROR: min_time_total from file differ from the value set in script")
-            max_time_total_txt = npe_from_file[1]
+            max_time_total_txt = npe_from_file[4]
             if max_time != max_time_total_txt:
                 sys.exit("ERROR: max_time_total from file differ from the value set in script")
-            binwidth_txt = npe_from_file[2]
+            binwidth_txt = npe_from_file[5]
             if binwidth != binwidth_txt:
                 sys.exit("ERROR: binwidth from file differ from the value set in script")
 
             # the rest of pulse_shape_data_IBD is the hittime distribution histogram in nPE per bin. Take only the
             # prompt signal defined by start_time and end_time:
-            nPE_per_bin = npe_from_file[3:(int((time_limit_prompt + binwidth + np.abs(min_time)) / binwidth)+3)]
+            nPE_per_bin = npe_from_file[6:(int((time_limit_prompt + binwidth + np.abs(min_time)) / binwidth)+3)]
 
             # set the time window corresponding to nPE_per_bin:
             time_window = np.arange(min_time, time_limit_prompt+binwidth, binwidth)

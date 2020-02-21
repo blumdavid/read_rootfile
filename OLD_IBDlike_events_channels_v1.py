@@ -6,9 +6,7 @@
 
     For all IBD-like events (events, that pass all cuts like volume, prompt energy, delayed energy, time, neutron
     multiplicity and distance cut), the evtID and the file number of user_atmoNC_{}.root are stored in folder
-    /home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/results_16000mm_10MeVto100MeV_500nsto1ms_mult1_
-    2400PEto3400PE_dist500mm_R16000mm_PSD95/ and saved in files filenumber_evtID_pass_all_cuts_wo_PSD.txt and
-    filenumber_evtID_pass_all_cuts_w_PSD.txt
+    /home/astro/blum/juno/atmoNC/data_NC/output_detsim/ in the name of the txt- and png-files of the prompt signals.
 
 """
 import datetime
@@ -18,6 +16,20 @@ import numpy as np
 from matplotlib import pyplot as plt
 import re
 import sys
+
+
+def get_numbers_from_filename(filename):
+    """
+    function to get number as integer out of a string. For example: filename='file235' -> num = 235 of type integer
+
+    :param filename: string of one part of the filename 'file{}_evt{}_prompt_signal.txt'
+    :return:
+    """
+    # get the number out of filename and convert it into integer:
+    num = int(re.search(r'\d+', filename).group(0))
+
+    return num
+
 
 # get the date and time, when the script was run:
 date = datetime.datetime.now()
@@ -38,11 +50,10 @@ input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_generator/"
 input_name = input_path + "gen_NC_onlyC12_250000evts_seed1.root"
 
 # set the path of the folder, where prompt signal of IBD-like signals are stored:
-path_ibdlike_event = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/DCR_results_16000mm_10MeVto100MeV_" \
-                     "500nsto1ms_mult1_2400PEto3400PE_dist500mm_R17700mm_PSD99/"
+path_ibdlike_event = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/"
 
 # set the path, where the outputs are saved:
-output_path = path_ibdlike_event
+output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim/interaction_channels_IBDlike_signal/"
 
 # bin-width of the array, which represents the incoming neutrino energy (in GeV) (float):
 bin_width_incoming = 0.1
@@ -57,36 +68,54 @@ evt_rate_Genie = 1
 # total exposure time. Set time = 1, because the exposure time is not yet included into function get_neutrino_energy():
 time = 1
 
-""" read filenumber_evtID_pass_all_cuts_wo_PSD.txt to get the filenumber and evtID of IBD-like NC events, that pass all 
-    cuts (PSD is not applied).
-    Also filenumber_evtID_pass_all_cuts_w_PSD.txt can be read to get the filenumber and evtID of IBD-like NC events, 
-    that pass all cuts (PSD is applied): """
-ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_wo_PSD.txt")
-# INFO-me: Add "_PSD" to the file-names when considering PSD cut!!!
-# ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_w_PSD.txt")
-
-# get the event number that corresponds to t_evtID in gen_NC_onlyC12_250000evts_seed1.root:
+""" get the evtID and file number of IBD-like events to calculate the event number that corresponds to t_evtID in 
+gen_NC_onlyC12_250000evts_seed1.root: """
 # preallocate array, where the event number is stored:
 event_number = []
-# number of IBD-like events:
-number_ibdlike_events = len(ibdlike_events)
-# loop over ibdlike_events:
-for index in range(number_ibdlike_events):
-    # get filenumber:
-    filenumber = ibdlike_events[index][0]
-    # get evtID:
-    evtID = ibdlike_events[index][1]
+# preallocate number of file, that are read:
+number_of_files_read = 0
+# loop over all files in folder path_ibdlike_event, that start with 'file' and end with '_prompt_signal.txt' (the name
+# of these files contains the file number and evtID):
+for file_ibdlike in os.listdir(path_ibdlike_event):
 
-    # calculate the event_num with file_number, evtID and number_per_user_atmoNC_file:
-    event_num = int(filenumber * number_per_user_atmoNC_file + evtID)
+    if file_ibdlike.startswith("file") and file_ibdlike.endswith("_prompt_signal.txt"):
 
-    # append event_num to event_number array:
-    event_number.append(event_num)
+        # increment number_of_file_read:
+        number_of_files_read += 1
+
+        # split string file_ibdlike into two parts: 1. part: 'file{}', 2. part: 'vt{}_prompt_signal.txt'
+        x = file_ibdlike.split("_e")
+
+        # x[0] is string 'file{}':
+        file_string = x[0]
+        # x[1] is string 'vt{}_prompt_signal.txt':
+        event_string = x[1]
+
+        # get file_number of file_string:
+        file_number = get_numbers_from_filename(file_string)
+        # get evtID of event_string:
+        evtID = get_numbers_from_filename(event_string)
+
+        # calculate the event_num with file_number, evtID and number_per_user_atmoNC_file:
+        event_num = file_number * number_per_user_atmoNC_file + evtID
+
+        # append event_num to event_number array:
+        event_number.append(event_num)
+
+# event numbers in event_number are not sorted. Therefore sort event_number array in ascending:
+event_number.sort()
 
 # read NC generator data only of the IBD-like NC events to arrays:
 (event_ID, projectile_PDG, projectile_E, target_PDG, NC_inter_ch_ID, deexcitation_ID, isotope_PDG, Nparticles,
  final_PDG, final_Px, final_Py, final_Pz) = NC_background_functions.read_nc_data_ibdlike_signal(input_name,
                                                                                                 event_number)
+
+# check, if number_of_files_read is equal to len(event_ID):
+if number_of_files_read != len(event_ID):
+    sys.exit("ERROR: number of files, that are read ({0:d}), is NOT equal to len(event_ID) ({1:d})"
+             .format(number_of_files_read, len(event_ID)))
+else:
+    number_ibdlike_events = number_of_files_read
 
 """ get the number of events as function of the energy of the incoming neutrinos for each neutrino type: """
 (Energy_nu_incoming,
@@ -188,7 +217,7 @@ for index in range(number_ibdlike_events):
  Fraction_rest) = NC_background_functions.get_residual_isotopes_before_deex(projectile_E, isotope_PDG, target_PDG,
                                                                             bin_width_incoming)
 
-""" get the number of events of the different channels, that mimic IBD-like signal. (combine NC interaction channel and 
+""" ge the number of events of the different channels, that mimic IBD-like signal. (combine NC interaction channel and 
     deexcitation channel to get to know, which final particles produce IBD-like signal inside JUNO detector): """
 (num_c12, num_no_c12,
  num_b11, num_b11_n_piplus, num_b11_p,
@@ -946,23 +975,5 @@ if SAVE_TXT:
                       "num_h4_3n_5p,\n"
                       "number event without isotope (only 3n, 4n or 5n as 'isotope'):"
                .format(input_name, now))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -41,15 +41,15 @@ plt.show()
 
 """ without labels: """
 # First Ring (inside)
-fig, ax = plt.subplots(1, figsize=(9, 9))
-ax.axis('equal')
-mypie, _ = ax.pie(group_size, radius=0.8, colors=[a(0.9), b(0.9), c(0.9), d(0.9), e(0.9), f(0.7)])
+fig1, ax1 = plt.subplots(1, figsize=(9, 9))
+ax1.axis('equal')
+mypie, _ = ax1.pie(group_size, radius=0.8, colors=[a(0.9), b(0.9), c(0.9), d(0.9), e(0.9), f(0.7)])
 plt.setp(mypie, width=0.5, edgecolor='white', linewidth=1)
 
 # Second Ring (outside)
-mypie2, _ = ax.pie(subgroup_size, radius=0.8+0.3,
-                   colors=[a(0.8), a(0.7), a(0.6), b(0.8), b(0.7), b(0.6), c(0.8), c(0.7), c(0.6), c(0.5), d(0.8),
-                           d(0.7), d(0.6), e(0.8), e(0.7), e(0.6), f(0.0)])
+mypie2, _ = ax1.pie(subgroup_size, radius=0.8+0.3,
+                    colors=[a(0.8), a(0.7), a(0.6), b(0.8), b(0.7), b(0.6), c(0.8), c(0.7), c(0.6), c(0.5), d(0.8),
+                            d(0.7), d(0.6), e(0.8), e(0.7), e(0.6), f(0.0)])
 plt.setp(mypie2, width=0.3, edgecolor='white', linewidth=0.5)
 
 plt.margins(0, 0)

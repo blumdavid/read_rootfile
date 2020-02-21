@@ -151,14 +151,14 @@ def energy_resolution(e_vis):
 
         :return sigma/width of the gaussian distribution in MeV (float or np.array of float)
         """
-    # parameters to describe the energy resolution in percent (maximum values of table 13-4, page 196, PhysicsReport):
-    # TODO-me: p0, p1 and p2 are determined by the maximum values of the parameters from table 13-4
+    # parameters to describe the energy resolution in percent (parameters from
+    # Energy_reconstruction_status_review_2020Nanning_page34.pdf (reconstructed vertex and Dark Noise):
     # p0: is the leading term dominated by the photon statistics (in percent):
-    p0 = 2.8
+    p0 = 2.976
     # p1 and p2 come from detector effects such as PMT dark noise, variation of the PMT QE and the
     # reconstructed vertex smearing (in percent):
-    p1 = 0.26
-    p2 = 0.9
+    p1 = 0.768
+    p2 = 0.970
     # energy resolution defined as sigma/E_visible in percent, 3-parameter function (page 195, PhysicsReport) (float):
     energy_res = np.sqrt((p0 / np.sqrt(e_vis))**2 + p1**2 + (p2 / e_vis)**2)
     # sigma or width of the gaussian distribution in MeV * percent (float):
@@ -180,14 +180,14 @@ def energy_resolution_pe(npe):
 
         :return sigma/width of the gaussian distribution in nPE (float or np.array of float)
         """
-    # parameters to describe the energy resolution in percent (maximum values of table 13-4, page 196, PhysicsReport):
-    # TODO-me: p0, p1 and p2 are determined by the maximum values of the parameters from table 13-4
+    # parameters to describe the energy resolution in percent (parameters from
+    # Energy_reconstruction_status_review_2020Nanning_page34.pdf (reconstructed vertex and Dark Noise):
     # p0: is the leading term dominated by the photon statistics (in percent):
-    p0 = 2.8
+    p0 = 2.976
     # p1 and p2 come from detector effects such as PMT dark noise, variation of the PMT QE and the
     # reconstructed vertex smearing (in percent):
-    p1 = 0.26
-    p2 = 0.9
+    p1 = 0.768
+    p2 = 0.970
 
     # conversion factor a (E_vis = a * nPE) (units: MeV/PE):
     # INFO-me: must be same value as in function conversion_npe_to_evis()
@@ -319,9 +319,9 @@ def analyze_delayed_signal(npe_per_time, bins_time, first_index, threshold, thre
     :param threshold: threshold in nPE per bin, that a delayed signal must have (integer)
     :param threshold2: threshold in nPE per bin, that specifies the minimal nPE corresponding to a peak
     :param min_pe_delayed:  minimum number of PE for delayed energy cut of neutron capture on Hydrogen
-                            (values from check_delayed_energy.py)
+                            (values from OLD_check_delayed_energy.py)
     :param max_pe_delayed:  maximum number of PE for delayed energy cut of neutron capture on Hydrogen
-                            (values from check_delayed_energy.py)
+                            (values from OLD_check_delayed_energy.py)
     :param evt: event ID of the event
 
     :return:
@@ -423,8 +423,21 @@ def position_smearing(pos_init, e_in_mev):
     """
     # mean of the gaussian equal to initial position in mm:
     mu = pos_init
-    # sigma of the gaussian given by the vertex resolution (sigma = 120 mm / sqrt(E[MeV])) (source YellowBook, p. 157):
-    sigma = 120.0 / np.sqrt(e_in_mev)
+
+    # separate the energy resolution into one part from 1 MeV to 8 MeV and another part from 8 MeV to 100 MeV:
+    if e_in_mev < 8.0:
+        # sigma of the gaussian given by the vertex resolution (sigma = a/sqrt(E))
+        # (20200111_zli_VertexReconstruction_page20.pdf, slide 20):
+        a = 110.16
+        # resolution in mm given by a / sqrt(E):
+        sigma = a / np.sqrt(e_in_mev)
+
+    else:
+        # for energies above 8 MeV assume a flat distribution of the vertex resolution (most conservative approach):
+        # by fitting sigma = a/sqrt(E) to data of 20200111_zli_VertexReconstruction_page20.pdf (dark noise with DN PDF),
+        # you get a value of 38.95 mm for 8 MeV. Therefore use 39 mm for the flat distribution:
+        sigma = 39.0
+
     # generate random number from normal distribution defined by mu and sigma. This represents the reconstructed
     # position in mm:
     pos_recon = np.random.normal(mu, sigma)
@@ -434,15 +447,16 @@ def position_smearing(pos_init, e_in_mev):
 
 def conversion_npe_to_evis(number_photo_electron):
     """
+    UPDATED (20.02.20) !!!
+
     Function to calculate the visible energy in MeV for a given number of p.e. for the prompt signal.
     This function is the result of linear fit from script check_conversion_npe_mev.py.
 
     :param number_photo_electron: number of photo-electrons of the prompt signal
     :return: quenched deposited energy (visible energy in MeV)
     """
-    # TODO-me: parameters of the fit has to be checked!!!!!!!!!
     # first fit parameter (slope) in MeV/nPE:
-    parameter_a = 0.0007483
+    parameter_a = 0.0007484
 
     energy = parameter_a * number_photo_electron
 
@@ -557,8 +571,8 @@ def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hit
     :param threshold: threshold of number of PEs per bin for possible delayed signal
     :param threshold2: threshold2 of number of PEs per bin (signal peak is summed as long as nPE is above threshold2)
     :param binwidth_hittime: bin-width of the hittime histograms in ns
-    :param min_pe_delayed: minimum number of PE for delayed energy cut (values from check_delayed_energy.py)
-    :param max_pe_delayed: maximum number of PE for delayed energy cut (values from check_delayed_energy.py)
+    :param min_pe_delayed: minimum number of PE for delayed energy cut (values from OLD_check_delayed_energy.py)
+    :param max_pe_delayed: maximum number of PE for delayed energy cut (values from OLD_check_delayed_energy.py)
     :param number_entries_input: number of entries, that the input files should have (integer), normally = 100
     :param save_hittime: boolean variable, if True the hittime-histogram is saved
     :return:
@@ -914,6 +928,8 @@ def check_neutron_cut(input_path, number_file, output_path, min_hittime, max_hit
 
 def conversion_npe_mev(rootfile_input, number_entries_input, radius_cut):
     """
+    UPDATED (20.02.20) !!!
+
     function to read user_proton_..._.root files from detsim simulation to convert neutron/proton energy of possible
     prompt signal from number of photo-electron (nPE) to MeV.
 
@@ -1012,33 +1028,11 @@ def conversion_npe_mev(rootfile_input, number_entries_input, radius_cut):
         # get number of photons of this event:
         n_photons = int(rtree_evt.GetBranch('nPhotons').GetLeaf('nPhotons').GetValue())
 
-        """ preallocate variables: """
-        # number of pe in event:
-        number_pe_event = 0
-        # hittime of photons in event in ns:
-        hittime_event = []
-
-        # loop over every photon in the event:
-        for index in range(n_photons):
-
-            # Read all PMTs (20inch AND 3inch):
-
-            # get nPE for this photon:
-            n_pe = int(rtree_evt.GetBranch('nPE').GetLeaf('nPE').GetValue(index))
-            # check, if photon produces only 1 PE:
-            if n_pe != 1:
-                print("{1:d} pe for 1 photon in event {0:d} in file {2}".format(evt_id_evt, n_pe, rootfile_input))
-
-            # add n_pe to number_pe_event:
-            number_pe_event = number_pe_event + n_pe
-
-            # get hittime of this photon:
-            hit_time = float(rtree_evt.GetBranch('hitTime').GetLeaf('hitTime').GetValue(index))
-            # append hit_time to hittime_event:
-            hittime_event.append(hit_time)
+        # get total number of pe in this event:
+        PE_total = int(rtree_evt.GetBranch('totalPE').GetLeaf('totalPE').GetValue())
 
         # append number of PE of this event to number_pe array:
-        number_pe = np.append(number_pe, number_pe_event)
+        number_pe = np.append(number_pe, PE_total)
 
         """ read 'prmtrkdep' tree to check deposit energy and quenched deposit energy: """
         # get the current event in the TTree:
@@ -1063,7 +1057,7 @@ def conversion_npe_mev(rootfile_input, number_entries_input, radius_cut):
                 qedep_value = np.random.normal(qedep_value, sigma_energy)
             qedep = np.append(qedep, qedep_value)
 
-    return number_pe, hittime_event, init_momentum, edep, qedep
+    return number_pe, init_momentum, edep, qedep
 
 
 def read_gamma_delayed_signal(rootfile_input, number_entries_input, radius_cut, x_position_pmt, y_position_pmt,

@@ -73,7 +73,7 @@ frac_final = np.array([Frac_nu_Li7_n_2p_d_final, Frac_nu_He7_n_4p_final, Frac_nu
 
 """ display in bar chart """
 fig, ax = plt.subplots()
-horizontal_bars = ax.barh(pos_final, frac_final, align='center', alpha=0.9, color="b")
+horizontal_bars = ax.barh(pos_final, frac_final, align='center', alpha=0.9)
 label_barh(ax, horizontal_bars, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)
@@ -103,7 +103,7 @@ frac_n = np.array([Frac_4_or_more_neutrons, Frac_3_neutrons, Frac_2_neutrons, Fr
 
 """ display in bar chart """
 fig2, ax2 = plt.subplots()
-horizontal_bars2 = ax2.barh(pos_n, frac_n, align='center', alpha=0.9, color='b')
+horizontal_bars2 = ax2.barh(pos_n, frac_n, align='center', alpha=0.9)
 label_barh(ax2, horizontal_bars2, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)
@@ -149,7 +149,7 @@ frac_final_1 = np.array([Frac_nu_Li7_n_2p_d_final_1, Frac_nu_He7_n_4p_final_1, F
 
 """ display in bar chart """
 fig_1, ax_1 = plt.subplots()
-horizontal_bars_1 = ax_1.barh(pos_final_1, frac_final_1, align='center', alpha=0.9, color='b')
+horizontal_bars_1 = ax_1.barh(pos_final_1, frac_final_1, align='center', alpha=0.9)
 label_barh(ax_1, horizontal_bars_1, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)
@@ -180,7 +180,7 @@ frac_n_1 = np.array([Frac_4_or_more_neutrons_1, Frac_3_neutrons_1, Frac_2_neutro
 
 """ display in bar chart """
 fig2_1, ax2_1 = plt.subplots()
-horizontal_bars2_1 = ax2_1.barh(pos_n_1, frac_n_1, align='center', alpha=0.9, color='b')
+horizontal_bars2_1 = ax2_1.barh(pos_n_1, frac_n_1, align='center', alpha=0.9)
 label_barh(ax2_1, horizontal_bars2_1, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)
@@ -231,7 +231,7 @@ frac_final_PSD = np.array([Frac_nu_Be7_2n_p_d_final_PSD, Frac_nu_Li7_n_2p_d_fina
 
 """ display in bar chart """
 fig_PSD, ax_PSD = plt.subplots()
-horizontal_bars_PSD = ax_PSD.barh(pos_final_PSD, frac_final_PSD, align='center', alpha=0.9, color='b')
+horizontal_bars_PSD = ax_PSD.barh(pos_final_PSD, frac_final_PSD, align='center', alpha=0.9)
 label_barh(ax_PSD, horizontal_bars_PSD, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)
@@ -262,7 +262,7 @@ frac_n_PSD = np.array([Frac_4_or_more_neutrons_PSD, Frac_3_neutrons_PSD, Frac_2_
 
 """ display in bar chart """
 fig2_PSD, ax2_PSD = plt.subplots()
-horizontal_bars2_PSD = ax2_PSD.barh(pos_n_PSD, frac_n_PSD, align='center', alpha=0.9, color='b')
+horizontal_bars2_PSD = ax2_PSD.barh(pos_n_PSD, frac_n_PSD, align='center', alpha=0.9)
 label_barh(ax2_PSD, horizontal_bars2_PSD, "{:.4}", is_inside=False, fontsize=12)
 plt.xlim(xmin=0.0, xmax=100.0)
 plt.xticks(fontsize=11)

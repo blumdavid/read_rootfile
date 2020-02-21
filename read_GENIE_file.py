@@ -73,8 +73,8 @@ output_path = "/home/astro/blum/juno/atmoNC/"
  Frac_C12_Li9_2p_n_piplus, Frac_C12_Li9_3p, Frac_C12_Li9_3p_piminus_piplus, Frac_C12_Li9_2p_n_piminus_2piplus,
  Frac_C12_Li9_p_2n_piminus_3piplus,
  Frac_C12_C8_4n, Frac_C12_He8_4p, Frac_C12_B7_p_4n, Frac_C12_He7_4p_n, Frac_C12_H7_5p, Frac_C12_Be6_2p_4n,
- Frac_C12_Li5_3p_4n, Frac_C12_Li4_3p_5n, Frac_C12_He6_4p_2n, Frac_C12_He5_4p_3n, Frac_C12_He4_4p_4n, Frac_C12_He3_4p_5n,
- Frac_C12_H6_5p_n, Frac_C12_H5_5p_2n, Frac_C12_H4_5p_3n, Frac_C12_H3_5p_4n, Frac_C12_H2_5p_5n,
+ Frac_C12_Li5_3p_4n, Frac_C12_Li4_3p_5n, Frac_C12_He6_4p_2n, Frac_C12_He5_4p_3n, Frac_C12_He4_4p_4n,
+ Frac_C12_He3_4p_5n, Frac_C12_H6_5p_n, Frac_C12_H5_5p_2n, Frac_C12_H4_5p_3n, Frac_C12_H3_5p_4n, Frac_C12_H2_5p_5n,
  Frac_C12_C12, Frac_C12_NoIso,
  Frac_no_C12, Frac_ES_proton_chID, Frac_ES_electron_chID, Frac_ES_O16_chID, Frac_ES_N14_chID, Frac_ES_S32_chID,
  Frac_C12_missing) \

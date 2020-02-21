@@ -62,15 +62,20 @@ def pulse_shape_dcr(pathname, filename, dcr_20inch, n_20inch, dcr_3inch, n_3inch
     # read file:
     pulse_shape = np.loadtxt(pathname + filename)
 
+    # get reconstructed position in mm:
+    x_reco = pulse_shape[0]
+    y_reco = pulse_shape[1]
+    z_reco = pulse_shape[2]
+
     # get start time of pulse shape in ns:
-    time_start = pulse_shape[0]
+    time_start = pulse_shape[3]
     # get end time of pulse shape in ns:
-    time_end = pulse_shape[1]
+    time_end = pulse_shape[4]
     # get bin-width of pulse shape in ns:
-    bin_width = pulse_shape[2]
+    bin_width = pulse_shape[5]
 
     # the rest is the pulse shape:
-    pulse_shape = pulse_shape[3:]
+    pulse_shape = pulse_shape[6:]
 
     # time-window of the pulse shape in ns:
     time_window = time_end - time_start
@@ -91,7 +96,8 @@ def pulse_shape_dcr(pathname, filename, dcr_20inch, n_20inch, dcr_3inch, n_3inch
     pulse_shape_dc = pulse_shape + npe_dc
 
     # save new pulse shape to file:
-    pulse_shape_dc_save = [time_start, time_end, bin_width]
+    pulse_shape_dc_save = [x_reco, y_reco, z_reco]
+    pulse_shape_dc_save.extend([time_start, time_end, bin_width])
     pulse_shape_dc_save.extend(pulse_shape_dc)
     if evt_type == 'fastN':
         np.savetxt(pathname + "/file{0:d}_evt{1:d}_pulse_shape_R{2:d}_DCR.txt".format(file_number, evtid, cut_radius),
