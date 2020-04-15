@@ -1,6 +1,8 @@
 """ Script to read the energy of the IBD-like events of atmospheric NC neutrino background for different cut parameters
     and calculate the spectrum of atmospheric NC neutrino background as function of the visible energy.
 
+    Difference to atmoNC_spectrum_v2.py: PSD depends on energy of prompt signal!!!
+
     1.  Read txt files where the filenumber and evtID of NC events, which pass the specific cut on the real
         (reconstructed) data, are saved. One file each cut: volume cut, prompt energy cut, delayed cut and PSD.
 
@@ -166,21 +168,39 @@ distance_cut = 500.0
 R_cut_delayed = 17700.0
 # values from Pulse Shape Analysis:
 # PSD NC suppression from /output_PSD_v2/:
-# PSD_NC_suppression = 0.99
-PSD_NC_suppression = 0.90
+PSD_NC_suppression = 0.99
 
+# PSD cut parameter for 10 MeV < Evis < 20 MeV:
 # start of tail, where least IBD events are cut away:
-# tail_start = [275.0]
-tail_start = [25.0, 25.0, 25.0, 75.0, 75.0, 75.0, 375.0, 375.0, 375.0, 400.0, 400.0, 400.0]
-
+tail_start_10_20 = [25.0]
 # end of tail, where least IBD events are cut away:
-# tail_end = [600.0]
-tail_end = [600.0, 800.0, 1000.0, 600.0, 800.0, 1000.0, 600.0, 800.0, 1000.0, 600.0, 800.0, 1000.0]
-
+tail_end_10_20 = [600.0]
 # tail to total ratio cut value:
-# TTR_cut_value = [0.01662]
-TTR_cut_value = [0.29019, 0.29438, 0.29654, 0.10727, 0.10901, 0.10977, 0.00431, 0.00544, 0.00588, 0.00347, 0.00460,
-                 0.00503]
+TTR_cut_value_10_20 = [0.27355]
+
+# PSD cut parameter for 20 MeV < Evis < 30 MeV:
+# start of tail, where least IBD events are cut away:
+tail_start_20_30 = [325.0]
+# end of tail, where least IBD events are cut away:
+tail_end_20_30 = [600.0]
+# tail to total ratio cut value:
+TTR_cut_value_20_30 = [0.01125]
+
+# PSD cut parameter for 30 MeV < Evis < 40 MeV:
+# start of tail, where least IBD events are cut away:
+tail_start_30_40 = [325.0]
+# end of tail, where least IBD events are cut away:
+tail_end_30_40 = [600.0]
+# tail to total ratio cut value:
+TTR_cut_value_30_40 = [0.01137]
+
+# PSD cut parameter for 40 MeV < Evis < 100 MeV:
+# start of tail, where least IBD events are cut away:
+tail_start_40_100 = [325.0]
+# end of tail, where least IBD events are cut away:
+tail_end_40_100 = [800.0]
+# tail to total ratio cut value:
+TTR_cut_value_40_100 = [0.01489]
 
 # set variable with the last file to be analyzed:
 last_file_NC = 999
@@ -188,7 +208,7 @@ last_file_IBD = 199
 
 # path, where the output files will be saved:
 output_path = (input_path_NC + "DCR_results_{0:.0f}mm_{1:.0f}MeVto{2:.0f}MeV_{3:.0f}nsto{4:.0f}ms_mult{5:d}_"
-                               "{6:.0f}keVto{7:.0f}keV_dist{8:.0f}mm_R{9:.0f}mm_PSD{10:.0f}/"
+                               "{6:.0f}keVto{7:.0f}keV_dist{8:.0f}mm_R{9:.0f}mm_PSD{10:.0f}/test/"
                .format(R_cut_prompt, E_min_prompt, E_max_prompt, time_cut_min, time_cut_max/1000000.0, multiplicity,
                        E_min_delayed_MeV*1000, E_max_delayed_MeV*1000, distance_cut, R_cut_delayed,
                        PSD_NC_suppression*100.0))
@@ -207,6 +227,8 @@ input_path_IBD_del = (input_path_IBD + "delayed_cut_{0:.0f}nsto{1:.0f}ms_mult{2:
 # bin-width of visible energy for histogram in MeV (must be the same like for DM signal, Reactor, CCatmo and DSNB;
 # 100 keV = 0.1 MeV):
 bin_width_energy = 0.5
+# bin-width of visible energy for IBD events in MeV (used to build histogram to determine PSD efficiency):
+bin_width_energy_IBD = 1.0
 
 # number of events per root file:
 n_events_per_rootfile = 100.0
@@ -569,7 +591,7 @@ write_info_to_file(input_path_IBD_del, event_type_IBD, delayed_volume_cut_IBD, e
                    eff_real_stat_vol_delayed_IBD, eff_ideal_vol_delayed_IBD, eff_ideal_stat_vol_delayed_IBD,
                    alpha_vol_delayed_IBD, alpha_stat_vol_delayed_IBD, number_analyzed_vol_delayed_IBD)
 
-for index10 in range(len(tail_start)):
+for index10 in range(len(tail_start_10_20)):
     """ Analyze NC events (only information from filenumber_evtID_...txt files is needed): """
     # number of IBD-like events from real data before event rate (without PSD suppression and
     # without alpha (MCtruth/real)):
@@ -604,7 +626,10 @@ for index10 in range(len(tail_start)):
     evtID_pass_vol_E_del_PSD = []
     # preallocate array, where TTR values of NC events, that pass volume, prompt energy and delayed cut (before PSD),
     # are stored (this means the TTR value of IBD-like NC events):
-    array_TTR_IBDlike = []
+    array_TTR_IBDlike_10_20 = []
+    array_TTR_IBDlike_20_30 = []
+    array_TTR_IBDlike_30_40 = []
+    array_TTR_IBDlike_40_100 = []
 
     # load files, where filenumber and evtID (and Evis) of events that pass the cut are stored (real/reconstructed
     # data):
@@ -634,8 +659,14 @@ for index10 in range(len(tail_start)):
                                                          E_min_delayed_MeV*1000, E_max_delayed_MeV*1000, distance_cut,
                                                          R_cut_delayed))
     # load file, where filenumber, evtID and TTR values of all NC events are stored:
-    array_TTR_NC = np.loadtxt(input_path_PSD + "TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_0.txt".format(tail_start[index10],
-                                                                                             tail_end[index10]))
+    array_TTR_NC_10_20 = np.loadtxt(input_path_PSD + "TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                    .format(tail_start_10_20[index10], tail_end_10_20[index10]))
+    array_TTR_NC_20_30 = np.loadtxt(input_path_PSD + "TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                    .format(tail_start_20_30[index10], tail_end_20_30[index10]))
+    array_TTR_NC_30_40 = np.loadtxt(input_path_PSD + "TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                    .format(tail_start_30_40[index10], tail_end_30_40[index10]))
+    array_TTR_NC_40_100 = np.loadtxt(input_path_PSD + "TTR_atmoNC_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                     .format(tail_start_40_100[index10], tail_end_40_100[index10]))
 
     # preallocate start indices of the arrays:
     index_volume = 0
@@ -676,6 +707,10 @@ for index10 in range(len(tail_start)):
                     evtID_E_cut = array_pass_E_prompt_cut_real_NC[index2][1]
                     E_vis = array_pass_E_prompt_cut_real_NC[index2][2]
 
+                    # TODO-me: if statement added to check PSD efficiency:
+                    # if E_vis > 30.0:
+                    #     continue
+
                     if filenumber_E_cut > last_file_NC:
                         continue
 
@@ -693,35 +728,127 @@ for index10 in range(len(tail_start)):
                         filenumber_pass_vol_E_del.append(filenumber_E_cut)
                         evtID_pass_vol_E_del.append(evtID_E_cut)
 
-                        # get TTR value of the IBD-like event corresponding to this filenumber and event:
-                        # loop over array_TTR_NC:
-                        for index4 in range(index_TTR, len(array_TTR_NC), 1):
-                            filenumber_TTR = array_TTR_NC[index4][0]
-                            evtID_TTR = array_TTR_NC[index4][1]
-                            if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
-                                # get TTR value of this event:
-                                TTR_value_NC = array_TTR_NC[index4][2]
-                                # store TTR value to array_TTR_IBDlike:
-                                array_TTR_IBDlike.append(TTR_value_NC)
-                                # set index_TTR = index4 -> start loop for next event at index_TTR:
-                                index_TTR = index4
-                                break
-                            else:
-                                continue
+                        # get TTR value of the IBD-like event corresponding to this filenumber and event DEPENDING on
+                        # energy:
+                        if E_vis <= 20.0:
+                            # loop over array_TTR_NC_10_20:
+                            for index4 in range(index_TTR, len(array_TTR_NC_10_20), 1):
+                                filenumber_TTR = array_TTR_NC_10_20[index4][0]
+                                evtID_TTR = array_TTR_NC_10_20[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_10_20[index4][2]
+                                    # store TTR value to array_TTR_IBDlike:
+                                    array_TTR_IBDlike_10_20.append(TTR_value_NC)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
 
-                        # Check if event also passes PSD cut:
-                        if TTR_value_NC <= TTR_cut_value[index10]:
-                            # TTR value of the event is smaller than TTR cut value:
-                            # -> event passes PSD cut!
+                            # Check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_10_20[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
 
-                            # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
-                            number_IBDlike_real_simu_w_PSD_wo_alpha += 1
-                            # append E_vis to Evis_array_real_w_PSD_wo_alpha:
-                            Evis_array_real_w_PSD_wo_alpha.append(E_vis)
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha:
+                                Evis_array_real_w_PSD_wo_alpha.append(E_vis)
 
-                            # append filenumber and evtID of event that pass the cuts to array:
-                            filenumber_pass_vol_E_del_PSD.append(filenumber_E_cut)
-                            evtID_pass_vol_E_del_PSD.append(evtID_E_cut)
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD.append(evtID_E_cut)
+
+                        elif 20.0 < E_vis <= 30.0:
+                            # loop over array_TTR_NC_20_30:
+                            for index4 in range(index_TTR, len(array_TTR_NC_20_30), 1):
+                                filenumber_TTR = array_TTR_NC_20_30[index4][0]
+                                evtID_TTR = array_TTR_NC_20_30[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_20_30[index4][2]
+                                    # store TTR value to array_TTR_IBDlike:
+                                    array_TTR_IBDlike_20_30.append(TTR_value_NC)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # Check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_20_30[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha:
+                                Evis_array_real_w_PSD_wo_alpha.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD.append(evtID_E_cut)
+
+                        elif 30.0 < E_vis <= 40.0:
+                            # loop over array_TTR_NC_30_40:
+                            for index4 in range(index_TTR, len(array_TTR_NC_30_40), 1):
+                                filenumber_TTR = array_TTR_NC_30_40[index4][0]
+                                evtID_TTR = array_TTR_NC_30_40[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_30_40[index4][2]
+                                    # store TTR value to array_TTR_IBDlike:
+                                    array_TTR_IBDlike_30_40.append(TTR_value_NC)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # Check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_30_40[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha:
+                                Evis_array_real_w_PSD_wo_alpha.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD.append(evtID_E_cut)
+
+                        else:
+                            # loop over array_TTR_NC_40_100:
+                            for index4 in range(index_TTR, len(array_TTR_NC_40_100), 1):
+                                filenumber_TTR = array_TTR_NC_40_100[index4][0]
+                                evtID_TTR = array_TTR_NC_40_100[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_40_100[index4][2]
+                                    # store TTR value to array_TTR_IBDlike:
+                                    array_TTR_IBDlike_40_100.append(TTR_value_NC)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # Check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_40_100[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha:
+                                Evis_array_real_w_PSD_wo_alpha.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD.append(evtID_E_cut)
 
                         # set index_E_prompt = index2 -> start loop for next event at index_E_prompt:
                         index_E_prompt = index2
@@ -780,6 +907,10 @@ for index10 in range(len(tail_start)):
                     evtID_E_cut = array_pass_E_prompt_cut_ideal_NC[index2][1]
                     E_vis = array_pass_E_prompt_cut_ideal_NC[index2][2]
 
+                    # TODO-me: if statement added to check PSD efficiency:
+                    # if E_vis > 30.0:
+                    #     continue
+
                     if filenumber_E_cut > last_file_NC:
                         continue
 
@@ -791,27 +922,95 @@ for index10 in range(len(tail_start)):
                         # increment number_IBDlike_ideal_simu_wo_PSD_wo_alpha:
                         number_IBDlike_ideal_simu_wo_PSD_wo_alpha += 1
 
-                        # get TTR value of the IBD-like event corresponding to this filenumber and event:
-                        # loop over array_TTR_NC:
-                        for index4 in range(index_TTR, len(array_TTR_NC), 1):
-                            filenumber_TTR = array_TTR_NC[index4][0]
-                            evtID_TTR = array_TTR_NC[index4][1]
-                            if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
-                                # get TTR value of this event:
-                                TTR_value_NC = array_TTR_NC[index4][2]
-                                # set index_TTR = index4 -> start loop for next event at index_TTR:
-                                index_TTR = index4
-                                break
-                            else:
-                                continue
+                        # get TTR value of the IBD-like event corresponding to this filenumber and event DEPENDING on
+                        # energy:
+                        if E_vis <= 20.0:
+                            # loop over array_TTR_NC_10_20:
+                            for index4 in range(index_TTR, len(array_TTR_NC_10_20), 1):
+                                filenumber_TTR = array_TTR_NC_10_20[index4][0]
+                                evtID_TTR = array_TTR_NC_10_20[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_10_20[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
 
-                        # check if event also passes PSD cut:
-                        if TTR_value_NC <= TTR_cut_value[index10]:
-                            # TTR value of the event is smaller than TTR cut value:
-                            # -> event passes PSD cut!
+                            # check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_10_20[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
 
-                            # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
-                            number_IBDlike_ideal_simu_w_PSD_wo_alpha += 1
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_ideal_simu_w_PSD_wo_alpha += 1
+
+                        elif 20.0 < E_vis <= 30.0:
+                            # loop over array_TTR_NC_20_30:
+                            for index4 in range(index_TTR, len(array_TTR_NC_20_30), 1):
+                                filenumber_TTR = array_TTR_NC_20_30[index4][0]
+                                evtID_TTR = array_TTR_NC_20_30[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_20_30[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_20_30[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_ideal_simu_w_PSD_wo_alpha += 1
+
+                        elif 30.0 < E_vis <= 40.0:
+                            # loop over array_TTR_NC_30_40:
+                            for index4 in range(index_TTR, len(array_TTR_NC_30_40), 1):
+                                filenumber_TTR = array_TTR_NC_30_40[index4][0]
+                                evtID_TTR = array_TTR_NC_30_40[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_30_40[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_30_40[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_ideal_simu_w_PSD_wo_alpha += 1
+
+                        else:
+                            # loop over array_TTR_NC_40_100:
+                            for index4 in range(index_TTR, len(array_TTR_NC_40_100), 1):
+                                filenumber_TTR = array_TTR_NC_40_100[index4][0]
+                                evtID_TTR = array_TTR_NC_40_100[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_NC = array_TTR_NC_40_100[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also passes PSD cut:
+                            if TTR_value_NC <= TTR_cut_value_40_100[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBDlike_real_simu_w_PSD_wo_alpha:
+                                number_IBDlike_ideal_simu_w_PSD_wo_alpha += 1
 
                         # set index_E_prompt = index2 -> start loop for next event at index_E_prompt:
                         index_E_prompt = index2
@@ -947,7 +1146,10 @@ for index10 in range(len(tail_start)):
     # preallocate array, where TTR values of IBD events, that pass volume, prompt energy and delayed cut
     # (before PSD), are
     # stored:
-    array_TTR_IBD_beforePSD = []
+    array_TTR_IBD_beforePSD_10_20 = []
+    array_TTR_IBD_beforePSD_20_30 = []
+    array_TTR_IBD_beforePSD_30_40 = []
+    array_TTR_IBD_beforePSD_40_100 = []
 
     # load files, where filenumber and evtID of events that pass the cut are stored (real/reconstructed data):
     array_pass_volume_cut_real_IBD = np.loadtxt(input_path_IBD + "filenumber_evtID_volume_cut_IBD_{0:.0f}mm.txt"
@@ -977,8 +1179,14 @@ for index10 in range(len(tail_start)):
                                                           E_min_delayed_MeV*1000, E_max_delayed_MeV*1000, distance_cut,
                                                           R_cut_delayed))
     # load file, where filenumber, evtID and TTR values of all IBD events are stored:
-    array_TTR_IBD = np.loadtxt(input_path_PSD + "TTR_IBD_{0:.0f}ns_{1:.0f}ns_0.txt".format(tail_start[index10],
-                                                                                           tail_end[index10]))
+    array_TTR_IBD_10_20 = np.loadtxt(input_path_PSD + "TTR_IBD_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                     .format(tail_start_10_20[index10], tail_end_10_20[index10]))
+    array_TTR_IBD_20_30 = np.loadtxt(input_path_PSD + "TTR_IBD_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                     .format(tail_start_20_30[index10], tail_end_20_30[index10]))
+    array_TTR_IBD_30_40 = np.loadtxt(input_path_PSD + "TTR_IBD_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                     .format(tail_start_30_40[index10], tail_end_30_40[index10]))
+    array_TTR_IBD_40_100 = np.loadtxt(input_path_PSD + "TTR_IBD_{0:.0f}ns_{1:.0f}ns_0.txt"
+                                      .format(tail_start_40_100[index10], tail_end_40_100[index10]))
 
     # preallocate start indices of the arrays:
     index_volume = 0
@@ -1019,6 +1227,10 @@ for index10 in range(len(tail_start)):
                     evtID_E_cut = array_pass_E_prompt_cut_real_IBD[index2][1]
                     E_vis = array_pass_E_prompt_cut_real_IBD[index2][2]
 
+                    # TODO-me: if statement added to check PSD efficiency:
+                    # if E_vis > 30.0:
+                    #     continue
+
                     if filenumber_E_cut > last_file_IBD:
                         continue
 
@@ -1036,35 +1248,127 @@ for index10 in range(len(tail_start)):
                         filenumber_pass_vol_E_del_IBD.append(filenumber_E_cut)
                         evtID_pass_vol_E_del_IBD.append(evtID_E_cut)
 
-                        # get TTR value of the IBD event corresponding to this filenumber and event:
-                        # loop over array_TTR_IBD:
-                        for index4 in range(index_TTR, len(array_TTR_IBD), 1):
-                            filenumber_TTR = array_TTR_IBD[index4][0]
-                            evtID_TTR = array_TTR_IBD[index4][1]
-                            if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
-                                # get TTR value of this event:
-                                TTR_value_IBD = array_TTR_IBD[index4][2]
-                                # store TTR value to array_TTR_IBD_beforePSD:
-                                array_TTR_IBD_beforePSD.append(TTR_value_IBD)
-                                # set index_TTR = index4 -> start loop for next event at index_TTR:
-                                index_TTR = index4
-                                break
-                            else:
-                                continue
+                        # get TTR value of the IBD-like event corresponding to this filenumber and event DEPENDING on
+                        # energy:
+                        if E_vis <= 20.0:
+                            # loop over array_TTR_IBD_10_20:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_10_20), 1):
+                                filenumber_TTR = array_TTR_IBD_10_20[index4][0]
+                                evtID_TTR = array_TTR_IBD_10_20[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_10_20[index4][2]
+                                    # store TTR value to array_TTR_IBD_beforePSD:
+                                    array_TTR_IBD_beforePSD_10_20.append(TTR_value_IBD)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
 
-                        # check if event also pass PSD cut:
-                        if TTR_value_IBD <= TTR_cut_value[index10]:
-                            # TTR value of the event is smaller than TTR cut value:
-                            # -> event passes PSD cut!
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_10_20[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
 
-                            # increment number_IBD_real_simu_w_PSD_wo_alpha:
-                            number_IBD_real_simu_w_PSD_wo_alpha += 1
-                            # append E_vis to Evis_array_real_w_PSD_wo_alpha_IBD:
-                            Evis_array_real_w_PSD_wo_alpha_IBD.append(E_vis)
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha_IBD:
+                                Evis_array_real_w_PSD_wo_alpha_IBD.append(E_vis)
 
-                            # append filenumber and evtID of event that pass the cuts to array:
-                            filenumber_pass_vol_E_del_PSD_IBD.append(filenumber_E_cut)
-                            evtID_pass_vol_E_del_PSD_IBD.append(evtID_E_cut)
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD_IBD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD_IBD.append(evtID_E_cut)
+
+                        elif 20.0 < E_vis <= 30.0:
+                            # loop over array_TTR_IBD_20_30:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_20_30), 1):
+                                filenumber_TTR = array_TTR_IBD_20_30[index4][0]
+                                evtID_TTR = array_TTR_IBD_20_30[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_20_30[index4][2]
+                                    # store TTR value to array_TTR_IBD_beforePSD:
+                                    array_TTR_IBD_beforePSD_20_30.append(TTR_value_IBD)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_20_30[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha_IBD:
+                                Evis_array_real_w_PSD_wo_alpha_IBD.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD_IBD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD_IBD.append(evtID_E_cut)
+
+                        elif 30.0 < E_vis <= 40.0:
+                            # loop over array_TTR_IBD_30_40:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_30_40), 1):
+                                filenumber_TTR = array_TTR_IBD_30_40[index4][0]
+                                evtID_TTR = array_TTR_IBD_30_40[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_30_40[index4][2]
+                                    # store TTR value to array_TTR_IBD_beforePSD:
+                                    array_TTR_IBD_beforePSD_30_40.append(TTR_value_IBD)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_30_40[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha_IBD:
+                                Evis_array_real_w_PSD_wo_alpha_IBD.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD_IBD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD_IBD.append(evtID_E_cut)
+
+                        else:
+                            # loop over array_TTR_IBD_40_100:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_40_100), 1):
+                                filenumber_TTR = array_TTR_IBD_40_100[index4][0]
+                                evtID_TTR = array_TTR_IBD_40_100[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_40_100[index4][2]
+                                    # store TTR value to array_TTR_IBD_beforePSD:
+                                    array_TTR_IBD_beforePSD_40_100.append(TTR_value_IBD)
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_40_100[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_real_simu_w_PSD_wo_alpha += 1
+                                # append E_vis to Evis_array_real_w_PSD_wo_alpha_IBD:
+                                Evis_array_real_w_PSD_wo_alpha_IBD.append(E_vis)
+
+                                # append filenumber and evtID of event that pass the cuts to array:
+                                filenumber_pass_vol_E_del_PSD_IBD.append(filenumber_E_cut)
+                                evtID_pass_vol_E_del_PSD_IBD.append(evtID_E_cut)
 
                         # set index_E_prompt = index2 -> start loop for next event at index_E_prompt:
                         index_E_prompt = index2
@@ -1123,6 +1427,10 @@ for index10 in range(len(tail_start)):
                     evtID_E_cut = array_pass_E_prompt_cut_ideal_IBD[index2][1]
                     E_vis = array_pass_E_prompt_cut_ideal_IBD[index2][2]
 
+                    # TODO-me: if statement added to check PSD efficiency:
+                    # if E_vis > 30.0:
+                    #     continue
+
                     if filenumber_E_cut > last_file_IBD:
                         continue
 
@@ -1134,27 +1442,95 @@ for index10 in range(len(tail_start)):
                         # increment number_IBD_ideal_simu_wo_PSD_wo_alpha:
                         number_IBD_ideal_simu_wo_PSD_wo_alpha += 1
 
-                        # get TTR value of the IBD event corresponding to this filenumber and event:
-                        # loop over array_TTR_IBD:
-                        for index4 in range(index_TTR, len(array_TTR_IBD), 1):
-                            filenumber_TTR = array_TTR_IBD[index4][0]
-                            evtID_TTR = array_TTR_IBD[index4][1]
-                            if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
-                                # get TTR value of this event:
-                                TTR_value_IBD = array_TTR_IBD[index4][2]
-                                # set index_TTR = index4 -> start loop for next event at index_TTR:
-                                index_TTR = index4
-                                break
-                            else:
-                                continue
+                        # get TTR value of the IBD-like event corresponding to this filenumber and event DEPENDING on
+                        # energy:
+                        if E_vis <= 20.0:
+                            # loop over array_TTR_IBD:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_10_20), 1):
+                                filenumber_TTR = array_TTR_IBD_10_20[index4][0]
+                                evtID_TTR = array_TTR_IBD_10_20[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_10_20[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
 
-                        # check if event also pass PSD cut:
-                        if TTR_value_IBD <= TTR_cut_value[index10]:
-                            # TTR value of the event is smaller than TTR cut value:
-                            # -> event passes PSD cut!
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_10_20[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
 
-                            # increment number_IBD_real_simu_w_PSD_wo_alpha:
-                            number_IBD_ideal_simu_w_PSD_wo_alpha += 1
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_ideal_simu_w_PSD_wo_alpha += 1
+
+                        elif 20.0 < E_vis <= 30.0:
+                            # loop over array_TTR_IBD:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_20_30), 1):
+                                filenumber_TTR = array_TTR_IBD_20_30[index4][0]
+                                evtID_TTR = array_TTR_IBD_20_30[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_20_30[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_20_30[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_ideal_simu_w_PSD_wo_alpha += 1
+
+                        elif 30.0 < E_vis <= 40.0:
+                            # loop over array_TTR_IBD:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_30_40), 1):
+                                filenumber_TTR = array_TTR_IBD_30_40[index4][0]
+                                evtID_TTR = array_TTR_IBD_30_40[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_30_40[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_30_40[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_ideal_simu_w_PSD_wo_alpha += 1
+
+                        else:
+                            # loop over array_TTR_IBD:
+                            for index4 in range(index_TTR, len(array_TTR_IBD_40_100), 1):
+                                filenumber_TTR = array_TTR_IBD_40_100[index4][0]
+                                evtID_TTR = array_TTR_IBD_40_100[index4][1]
+                                if filenumber_TTR == filenumber_E_cut and evtID_TTR == evtID_E_cut:
+                                    # get TTR value of this event:
+                                    TTR_value_IBD = array_TTR_IBD_40_100[index4][2]
+                                    # set index_TTR = index4 -> start loop for next event at index_TTR:
+                                    index_TTR = index4
+                                    break
+                                else:
+                                    continue
+
+                            # check if event also pass PSD cut:
+                            if TTR_value_IBD <= TTR_cut_value_40_100[index10]:
+                                # TTR value of the event is smaller than TTR cut value:
+                                # -> event passes PSD cut!
+
+                                # increment number_IBD_real_simu_w_PSD_wo_alpha:
+                                number_IBD_ideal_simu_w_PSD_wo_alpha += 1
 
                         # set index_E_prompt = index2 -> start loop for next event at index_E_prompt:
                         index_E_prompt = index2
@@ -1224,12 +1600,16 @@ for index10 in range(len(tail_start)):
                                           total_efficiency_IBD_ideal_w_PSD) ** 2)
 
     """ Build histograms from E_vis_arrays: """
+    # set bin-edges of e_vis histogram in MeV:
+    bins_evis_IBD = np.arange(E_min_prompt, E_max_prompt + 2 * bin_width_energy_IBD, bin_width_energy_IBD)
+
     # build histogram from Evis_array_real_wo_PSD_wo_alpha_IBD (without PSD suppression and alpha):
-    histo_Evis_wo_PSD_wo_alpha_IBD, bin_edges_evis = np.histogram(Evis_array_real_wo_PSD_wo_alpha_IBD, bins_evis)
+    histo_Evis_wo_PSD_wo_alpha_IBD, bin_edges_evis_IBD = np.histogram(Evis_array_real_wo_PSD_wo_alpha_IBD,
+                                                                      bins_evis_IBD)
 
     # build histogram from Evis_array_real_w_PSD_wo_alpha_IBD (with PSD suppression, but without alpha
     # (IBD cuts and PSD)):
-    histo_Evis_w_PSD_wo_alpha_IBD, bin_edges_evis = np.histogram(Evis_array_real_w_PSD_wo_alpha_IBD, bins_evis)
+    histo_Evis_w_PSD_wo_alpha_IBD, bin_edges_evis_IBD = np.histogram(Evis_array_real_w_PSD_wo_alpha_IBD, bins_evis_IBD)
 
     """ save information about total efficiencies and total alphas to txt file: """
     np.savetxt(output_path + "total_efficiencies_atmoNC_wo_PSD.txt",
@@ -1301,8 +1681,6 @@ for index10 in range(len(tail_start)):
                       "\nnumber of analyzed IBD events:".format(number_events_total_IBD))
 
     print("PSD NC suppression = {0:.2f}".format(PSD_NC_suppression))
-    print("tail {0:.0f} ns to {1:.0f} ns, TTR = {2:.5f}".format(tail_start[index10], tail_end[index10],
-                                                                TTR_cut_value[index10]))
     print("NC events:")
     print(number_IBDlike_real_simu_wo_PSD_wo_alpha)
     print(number_IBDlike_real_simu_w_PSD_wo_alpha)
@@ -1421,7 +1799,7 @@ for index10 in range(len(tail_start)):
                    "%)"
              .format(number_IBDlike_real_simu_wo_PSD_wo_alpha, total_alpha_NC_wo_PSD * 100.0,
                      stat_total_alpha_NC_wo_PSD * 100.0))
-    plt.plot(bins_evis[:-1], histo_Evis_wo_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
+    plt.plot(bins_evis_IBD[:-1], histo_Evis_wo_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
              label="IBD signal: number of events = {0:.0f},\ncut efficiency = {1:.1f} % $\\pm$ {2:.1f} "
                    "%)"
              .format(number_IBD_real_simu_wo_PSD_wo_alpha, total_alpha_IBD_wo_PSD * 100.0,
@@ -1429,7 +1807,7 @@ for index10 in range(len(tail_start)):
     plt.xlim(xmin=E_min_prompt, xmax=E_max_prompt)
     plt.ylim(ymin=0.0)
     plt.xlabel("visible energy of prompt signal in MeV")
-    plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width_energy))
+    plt.ylabel("number of events per bin")
     plt.title("Simulated spectra of IBD and atmospheric NC events that pass the IBD selection criteria")
     plt.legend()
     plt.grid()
@@ -1442,13 +1820,13 @@ for index10 in range(len(tail_start)):
     plt.plot(bins_evis[:-1], histo_Evis_w_PSD_wo_alpha, drawstyle="steps", linestyle="-", color="orange",
              label="atmospheric NC background: number of events = {0:.0f},\nPSD suppression of atmo. NC = {1:.2f} %)"
              .format(number_IBDlike_real_simu_w_PSD_wo_alpha, PSD_NC_suppression_real))
-    plt.plot(bins_evis[:-1], histo_Evis_w_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
+    plt.plot(bins_evis_IBD[:-1], histo_Evis_w_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
              label="IBD signal: number of events = {0:.0f},\nPSD suppression of real IBD = {1:.2f} %)"
              .format(number_IBD_real_simu_w_PSD_wo_alpha, PSD_IBD_suppression_real))
     plt.xlim(xmin=E_min_prompt, xmax=E_max_prompt)
     plt.ylim(ymin=0.0)
     plt.xlabel("visible energy of prompt signal in MeV")
-    plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width_energy))
+    plt.ylabel("number of events per bin")
     plt.title("Simulated spectra of IBD and atmospheric NC events that pass the IBD selection criteria\n"
               "(after Pulse Shape Discrimination)")
     plt.legend()
@@ -1460,22 +1838,22 @@ for index10 in range(len(tail_start)):
 
     """ display simulated IBD spectrum without and with PSD: """
     h10 = plt.figure(10, figsize=(11, 6))
-    plt.plot(bins_evis[:-1], histo_Evis_wo_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="--", color="blue",
+    plt.plot(bins_evis_IBD[:-1], histo_Evis_wo_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="--", color="blue",
              label="without PSD: number of events = {0:.0f}"
              .format(number_IBD_real_simu_wo_PSD_wo_alpha))
-    plt.plot(bins_evis[:-1], histo_Evis_w_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
+    plt.plot(bins_evis_IBD[:-1], histo_Evis_w_PSD_wo_alpha_IBD, drawstyle="steps", linestyle="-", color="blue",
              label="with PSD: number of events = {0:.0f},\nPSD suppression of real IBD = {1:.2f} %"
              .format(number_IBD_real_simu_w_PSD_wo_alpha, PSD_IBD_suppression_real))
     plt.xlim(xmin=E_min_prompt, xmax=E_max_prompt)
     plt.ylim(ymin=0.0)
     plt.xlabel("visible energy of prompt signal in MeV")
-    plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width_energy))
+    plt.ylabel("number of events per bin (bin-width = {0:.2f} MeV)".format(bin_width_energy_IBD))
     plt.title("Simulated spectra of IBD events that pass the IBD selection criteria\n"
               "(before and after Pulse Shape Discrimination)")
     plt.legend()
     plt.grid()
-    plt.savefig(output_path + "IBD_spectrum_simu_wo_wPSD{1:.0f}_bins{0:.0f}keV.png"
-                .format(bin_width_energy * 1000, PSD_NC_suppression * 100))
+    plt.savefig(output_path + "IBD_spectrum_simu_wo_wPSD_bins{0:.0f}keV.png"
+                .format(bin_width_energy_IBD * 1000))
     # plt.show()
     plt.close()
 
@@ -1574,6 +1952,29 @@ for index10 in range(len(tail_start)):
                       '\nstatistical error of total alpha for NC events w PSD:'
                .format(bin_width_energy * 1000))
 
+    """ save histo_Evis_wo_PSD_wo_alpha_IBD and histo_Evis_wo_PSD_wo_alpha_IBD to txt file """
+    # save IBD spectrum to txt-spectrum-file:
+    np.savetxt(output_path + 'IBDspectrum_woPSD_bin{0:.0f}keV.txt'
+               .format(bin_width_energy_IBD * 1000), histo_Evis_wo_PSD_wo_alpha_IBD, fmt='%1.5e',
+               header='Spectrum in events/bin of IBD events that pass all IBD selection criteria '
+                      'without PSD (calculated with atmoNC_spectrum_v3.py, {0}):'
+                      '\n{1:.0f} IBD events are simulated with JUNO detector software (tut_detsim.py).'
+                      '\n{2:.0f} IBD events pass all cuts,'
+                      '\nbinning of E_visible = {3:.3f} MeV,'
+                      '\ntotal cut efficiency = {4:.2f} %,'
+                      '\nstatistical error of total cut efficiency = {5:.2f} %:'
+               .format(now, number_events_total_IBD, number_IBD_real_simu_wo_PSD_wo_alpha, bin_width_energy_IBD,
+                       total_alpha_IBD_wo_PSD * 100.0, stat_total_alpha_IBD_wo_PSD * 100.0))
+    # save IBD spectrum after PSD to txt-spectrum-file:
+    np.savetxt(output_path + 'IBDspectrum_wPSD_bin{0:.0f}keV.txt'
+               .format(bin_width_energy_IBD * 1000), histo_Evis_w_PSD_wo_alpha_IBD, fmt='%1.5e',
+               header='Spectrum in events/bin of IBD events that pass all IBD selection criteria '
+                      'with PSD (calculated with atmoNC_spectrum_v3.py, {0}):'
+                      '\n{1:.0f} IBD events are simulated with JUNO detector software (tut_detsim.py).'
+                      '\n{2:.0f} IBD events pass all cuts,'
+                      '\nbinning of E_visible = {3:.3f} MeV:'
+               .format(now, number_events_total_IBD, number_IBD_real_simu_w_PSD_wo_alpha, bin_width_energy_IBD))
+
     """ save filenumber_pass_vol_E_del, evtID_pass_vol_E_del and Evis_array_real_wo_PSD_wo_alpha to txt file: """
     np.savetxt(output_path + 'atmoNC_filenumber_evtID_Evis_pass_all_cuts_wo_PSD.txt',
                np.c_[filenumber_pass_vol_E_del, evtID_pass_vol_E_del, Evis_array_real_wo_PSD_wo_alpha], fmt='%i',
@@ -1598,103 +1999,488 @@ for index10 in range(len(tail_start)):
                      Evis_array_real_w_PSD_wo_alpha_IBD], fmt='%i',
                header='filenumber | evtID | E_vis in MeV of events that pass all cuts (with PSD)')
 
+    # calculate PSD suppressions for the different energies:
+    # IBDlike events: 10 MeV < E_vis <= 20.0 MeV:
+    events_IBDlike_total_PSD_10_20 = len(array_TTR_IBDlike_10_20)
+    events_IBDlike_pass_PSD_10_20 = 0
+    for index3 in range(events_IBDlike_total_PSD_10_20):
+        if array_TTR_IBDlike_10_20[index3] < TTR_cut_value_10_20[index10]:
+            events_IBDlike_pass_PSD_10_20 += 1
+
+    # IBD events: 10 MeV < E_vis <= 20.0 MeV:
+    events_IBD_total_PSD_10_20 = len(array_TTR_IBD_beforePSD_10_20)
+    events_IBD_pass_PSD_10_20 = 0
+    for index3 in range(events_IBD_total_PSD_10_20):
+        if array_TTR_IBD_beforePSD_10_20[index3] < TTR_cut_value_10_20[index10]:
+            events_IBD_pass_PSD_10_20 += 1
+
+    # PSD suppression for 10 MeV < E_vis <= 20 MeV in %:
+    PSD_NC_suppression_10_20 = (100.0 -
+                                float(events_IBDlike_pass_PSD_10_20) / float(events_IBDlike_total_PSD_10_20) * 100.0)
+    PSD_IBD_suppression_10_20 = (100.0 -
+                                 float(events_IBD_pass_PSD_10_20) / float(events_IBD_total_PSD_10_20) * 100.0)
+
+    print("10 MeV < E_vis <= 20 MeV")
+    print("tail {0:.0f} ns to {1:.0f} ns, TTR = {2:.5f}".format(tail_start_10_20[index10], tail_end_10_20[index10],
+                                                                TTR_cut_value_10_20[index10]))
+    print("NC events:")
+    print(events_IBDlike_total_PSD_10_20)
+    print(events_IBDlike_pass_PSD_10_20)
+    print(PSD_NC_suppression_10_20)
+    print("IBD events:")
+    print(events_IBD_total_PSD_10_20)
+    print(events_IBD_pass_PSD_10_20)
+    print(PSD_IBD_suppression_10_20)
+    print("")
+
+    # IBDlike events: 20 MeV < E_vis <= 30.0 MeV:
+    events_IBDlike_total_PSD_20_30 = len(array_TTR_IBDlike_20_30)
+    events_IBDlike_pass_PSD_20_30 = 0
+    for index3 in range(events_IBDlike_total_PSD_20_30):
+        if array_TTR_IBDlike_20_30[index3] < TTR_cut_value_20_30[index10]:
+            events_IBDlike_pass_PSD_20_30 += 1
+
+    # IBD events: 20 MeV < E_vis <= 30.0 MeV:
+    events_IBD_total_PSD_20_30 = len(array_TTR_IBD_beforePSD_20_30)
+    events_IBD_pass_PSD_20_30 = 0
+    for index3 in range(events_IBD_total_PSD_20_30):
+        if array_TTR_IBD_beforePSD_20_30[index3] < TTR_cut_value_20_30[index10]:
+            events_IBD_pass_PSD_20_30 += 1
+
+    # PSD suppression for 20 MeV < E_vis <= 30 MeV in %:
+    PSD_NC_suppression_20_30 = (100.0 -
+                                float(events_IBDlike_pass_PSD_20_30) / float(events_IBDlike_total_PSD_20_30) * 100.0)
+    PSD_IBD_suppression_20_30 = (100.0 -
+                                 float(events_IBD_pass_PSD_20_30) / float(events_IBD_total_PSD_20_30) * 100.0)
+
+    print("20 MeV < E_vis <= 30 MeV")
+    print("tail {0:.0f} ns to {1:.0f} ns, TTR = {2:.5f}".format(tail_start_20_30[index10], tail_end_20_30[index10],
+                                                                TTR_cut_value_20_30[index10]))
+    print("NC events:")
+    print(events_IBDlike_total_PSD_20_30)
+    print(events_IBDlike_pass_PSD_20_30)
+    print(PSD_NC_suppression_20_30)
+    print("IBD events:")
+    print(events_IBD_total_PSD_20_30)
+    print(events_IBD_pass_PSD_20_30)
+    print(PSD_IBD_suppression_20_30)
+    print("")
+
+    # IBDlike events: 30 MeV < E_vis <= 40.0 MeV:
+    events_IBDlike_total_PSD_30_40 = len(array_TTR_IBDlike_30_40)
+    events_IBDlike_pass_PSD_30_40 = 0
+    for index3 in range(events_IBDlike_total_PSD_30_40):
+        if array_TTR_IBDlike_30_40[index3] < TTR_cut_value_30_40[index10]:
+            events_IBDlike_pass_PSD_30_40 += 1
+
+    # IBD events: 30 MeV < E_vis <= 40.0 MeV:
+    events_IBD_total_PSD_30_40 = len(array_TTR_IBD_beforePSD_30_40)
+    events_IBD_pass_PSD_30_40 = 0
+    for index3 in range(events_IBD_total_PSD_30_40):
+        if array_TTR_IBD_beforePSD_30_40[index3] < TTR_cut_value_30_40[index10]:
+            events_IBD_pass_PSD_30_40 += 1
+
+    # PSD suppression for 30 MeV < E_vis <= 40 MeV in %:
+    PSD_NC_suppression_30_40 = (100.0 -
+                                float(events_IBDlike_pass_PSD_30_40) / float(events_IBDlike_total_PSD_30_40) * 100.0)
+    PSD_IBD_suppression_30_40 = (100.0 -
+                                 float(events_IBD_pass_PSD_30_40) / float(events_IBD_total_PSD_30_40) * 100.0)
+
+    print("30 MeV < E_vis <= 40 MeV")
+    print("tail {0:.0f} ns to {1:.0f} ns, TTR = {2:.5f}".format(tail_start_30_40[index10], tail_end_30_40[index10],
+                                                                TTR_cut_value_30_40[index10]))
+    print("NC events:")
+    print(events_IBDlike_total_PSD_30_40)
+    print(events_IBDlike_pass_PSD_30_40)
+    print(PSD_NC_suppression_30_40)
+    print("IBD events:")
+    print(events_IBD_total_PSD_30_40)
+    print(events_IBD_pass_PSD_30_40)
+    print(PSD_IBD_suppression_30_40)
+    print("")
+
+    # IBDlike events: 40 MeV < E_vis <= 100.0 MeV:
+    events_IBDlike_total_PSD_40_100 = len(array_TTR_IBDlike_40_100)
+    events_IBDlike_pass_PSD_40_100 = 0
+    for index3 in range(events_IBDlike_total_PSD_40_100):
+        if array_TTR_IBDlike_40_100[index3] < TTR_cut_value_40_100[index10]:
+            events_IBDlike_pass_PSD_40_100 += 1
+
+    # IBD events: 40 MeV < E_vis <= 100.0 MeV:
+    events_IBD_total_PSD_40_100 = len(array_TTR_IBD_beforePSD_40_100)
+    events_IBD_pass_PSD_40_100 = 0
+    for index3 in range(events_IBD_total_PSD_40_100):
+        if array_TTR_IBD_beforePSD_40_100[index3] < TTR_cut_value_40_100[index10]:
+            events_IBD_pass_PSD_40_100 += 1
+
+    # PSD suppression for 40 MeV < E_vis <= 100 MeV in %:
+    PSD_NC_suppression_40_100 = (100.0 -
+                                 float(events_IBDlike_pass_PSD_40_100) / float(events_IBDlike_total_PSD_40_100) * 100.0)
+    PSD_IBD_suppression_40_100 = (100.0 -
+                                  float(events_IBD_pass_PSD_40_100) / float(events_IBD_total_PSD_40_100) * 100.0)
+
+    print("40 MeV < E_vis <= 100 MeV")
+    print("tail {0:.0f} ns to {1:.0f} ns, TTR = {2:.5f}".format(tail_start_40_100[index10], tail_end_40_100[index10],
+                                                                TTR_cut_value_40_100[index10]))
+    print("NC events:")
+    print(events_IBDlike_total_PSD_40_100)
+    print(events_IBDlike_pass_PSD_40_100)
+    print(PSD_NC_suppression_40_100)
+    print("IBD events:")
+    print(events_IBD_total_PSD_40_100)
+    print(events_IBD_pass_PSD_40_100)
+    print(PSD_IBD_suppression_40_100)
+
+    Evis_array_real_wo_PSD_wo_alpha_IBD_10_20 = []
+    Evis_array_real_wo_PSD_wo_alpha_IBD_20_30 = []
+    Evis_array_real_wo_PSD_wo_alpha_IBD_30_40 = []
+    Evis_array_real_wo_PSD_wo_alpha_IBD_40_100 = []
+    # separate energies of Evis_array_real_wo_PSD_wo_alpha_IBD in 10 to 20 MeV, 20 to 30 MeV, 30 to 40 MeV and
+    # 40 MeV to 100 MeV:
+    for index5 in range(len(Evis_array_real_wo_PSD_wo_alpha_IBD)):
+        if Evis_array_real_wo_PSD_wo_alpha_IBD[index5] <= 20.0:
+            Evis_array_real_wo_PSD_wo_alpha_IBD_10_20.append(Evis_array_real_wo_PSD_wo_alpha_IBD[index5])
+        elif 20.0 < Evis_array_real_wo_PSD_wo_alpha_IBD[index5] <= 30.0:
+            Evis_array_real_wo_PSD_wo_alpha_IBD_20_30.append(Evis_array_real_wo_PSD_wo_alpha_IBD[index5])
+        elif 30.0 < Evis_array_real_wo_PSD_wo_alpha_IBD[index5] <= 40.0:
+            Evis_array_real_wo_PSD_wo_alpha_IBD_30_40.append(Evis_array_real_wo_PSD_wo_alpha_IBD[index5])
+        else:
+            Evis_array_real_wo_PSD_wo_alpha_IBD_40_100.append(Evis_array_real_wo_PSD_wo_alpha_IBD[index5])
+
+    Evis_array_real_wo_PSD_wo_alpha_10_20 = []
+    Evis_array_real_wo_PSD_wo_alpha_20_30 = []
+    Evis_array_real_wo_PSD_wo_alpha_30_40 = []
+    Evis_array_real_wo_PSD_wo_alpha_40_100 = []
+    # separate energies of Evis_array_real_wo_PSD_wo_alpha in 10 to 20 MeV, 20 to 30 MeV, 30 to 40 MeV and
+    # 40 to 100 MeV:
+    for index5 in range(len(Evis_array_real_wo_PSD_wo_alpha)):
+        if Evis_array_real_wo_PSD_wo_alpha[index5] <= 20.0:
+            Evis_array_real_wo_PSD_wo_alpha_10_20.append(Evis_array_real_wo_PSD_wo_alpha[index5])
+        elif 20.0 < Evis_array_real_wo_PSD_wo_alpha[index5] <= 30.0:
+            Evis_array_real_wo_PSD_wo_alpha_20_30.append(Evis_array_real_wo_PSD_wo_alpha[index5])
+        elif 30.0 < Evis_array_real_wo_PSD_wo_alpha[index5] <= 40.0:
+            Evis_array_real_wo_PSD_wo_alpha_30_40.append(Evis_array_real_wo_PSD_wo_alpha[index5])
+        else:
+            Evis_array_real_wo_PSD_wo_alpha_40_100.append(Evis_array_real_wo_PSD_wo_alpha[index5])
+
     """ display TTR value of events, that pass volume, prompt energy and delayed cut (before PSD) in histogram: """
+    # with efficiency:
     h7 = plt.figure(7, figsize=(11, 6))
     First_bin = 0.0
-
-    if max(array_TTR_IBD_beforePSD) >= max(array_TTR_IBDlike):
-        maximum_tot_value = max(array_TTR_IBD_beforePSD)
-    else:
-        maximum_tot_value = max(array_TTR_IBDlike)
-
-    maximum_tot_value = 0.07
-
-    # Last_bin = maximum_tot_value
+    maximum_tot_value = max(array_TTR_IBDlike_10_20)
     Last_bin = maximum_tot_value
     Bin_width = (Last_bin-First_bin) / 200
-    Bins = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
-    plt.hist(array_TTR_IBD_beforePSD, bins=Bins, histtype="step", align='mid', color="r", linewidth=1.5,
-             label="prompt signal of IBD events (entries = {0:d})".format(len(array_TTR_IBD_beforePSD)))
-    plt.hist(array_TTR_IBDlike, bins=Bins, histtype="step", align='mid', color="b", linewidth=1.5,
-             label="prompt signal of IBD-like NC events (entries = {0:d})".format(len(array_TTR_IBDlike)))
-    plt.xlim(xmin=0.0, xmax=maximum_tot_value)
+    Bins_1 = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
+    n_1, bins_1, patches_1 = plt.hist(array_TTR_IBD_beforePSD_10_20, bins=Bins_1, histtype="step", align='mid',
+                                      color="r",
+                                      linewidth=1.5, label="prompt signal of IBD events (entries = {0:d})"
+                                      .format(len(array_TTR_IBD_beforePSD_10_20)))
+    n_2, bins_2, patches_2 = plt.hist(array_TTR_IBDlike_10_20, bins=Bins_1, histtype="step", align='mid', color="b",
+                                      linewidth=1.5,
+                                      label="prompt signal of IBD-like NC events (entries = {0:d})"
+                                      .format(len(array_TTR_IBDlike_10_20)))
+    plt.vlines(TTR_cut_value_10_20[index10], 0.0, max(n_1)+max(n_1)/10, colors="k", linestyles="-",
+               label="$\\epsilon_{NC}$ = "+"{0:0.2f} %\n".format(PSD_NC_suppression_10_20) +
+                     "$\\epsilon_{IBD}$"+" = {0:0.2f} %\n".format(PSD_IBD_suppression_10_20) +
+                     "ttr cut value = {0:.5f}".format(TTR_cut_value_10_20[index10]))
     plt.xlabel("tail-to-total ratio")
     plt.ylabel("events")
-    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events" +
-              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start[index10], tail_end[index10]))
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events with 10 MeV < E < 20 MeV" +
+              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start_10_20[index10], tail_end_10_20[index10]))
     plt.legend()
     plt.grid()
-    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns.png".format(tail_start[index10],
-                                                                                  tail_end[index10]))
+    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns_10_20.png".format(tail_start_10_20[index10],
+                                                                                        tail_end_10_20[index10]))
     plt.close()
+
+    # save TTR value of IBDlike NC events to txt file:
+    np.savetxt(output_path + "TTR_IBDlike_{0:.0f}ns_to_{1:.0f}ns_10_20.txt".format(tail_start_10_20[index10],
+                                                                                   tail_end_10_20[index10]),
+               array_TTR_IBDlike_10_20, fmt="%.5f",
+               header="TTR values for IBDlike NC events (pass all IBD cuts) for energies between 10 MeV and 20 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_10_20[index10 ], tail_end_10_20[index10], TTR_cut_value_10_20[index10]))
+    # save TTR value of IBD events to txt file:
+    np.savetxt(output_path + "TTR_IBD_{0:.0f}ns_to_{1:.0f}ns_10_20.txt".format(tail_start_10_20[index10],
+                                                                               tail_end_10_20[index10]),
+               array_TTR_IBD_beforePSD_10_20, fmt="%.5f",
+               header="TTR values for IBD events (pass all IBD cuts) for energies between 10 MeV and 20 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_10_20[index10], tail_end_10_20[index10], TTR_cut_value_10_20[index10]))
 
     # with efficiency:
     h8 = plt.figure(8, figsize=(11, 6))
-    n_1, bins_1, patches_1 = plt.hist(array_TTR_IBD_beforePSD, bins=Bins, histtype="step", align='mid', color="r",
+    First_bin = 0.0
+    maximum_tot_value = max(array_TTR_IBDlike_20_30)
+    Last_bin = maximum_tot_value
+    Bin_width = (Last_bin-First_bin) / 200
+    Bins_2 = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
+    n_1, bins_1, patches_1 = plt.hist(array_TTR_IBD_beforePSD_20_30, bins=Bins_2, histtype="step", align='mid',
+                                      color="r",
                                       linewidth=1.5, label="prompt signal of IBD events (entries = {0:d})"
-                                      .format(len(array_TTR_IBD_beforePSD)))
-    n_2, bins_2, patches_2 = plt.hist(array_TTR_IBDlike, bins=Bins, histtype="step", align='mid', color="b",
+                                      .format(len(array_TTR_IBD_beforePSD_20_30)))
+    n_2, bins_2, patches_2 = plt.hist(array_TTR_IBDlike_20_30, bins=Bins_2, histtype="step", align='mid', color="b",
                                       linewidth=1.5,
                                       label="prompt signal of IBD-like NC events (entries = {0:d})"
-                                      .format(len(array_TTR_IBDlike)))
-    plt.vlines(TTR_cut_value[index10], 0.0, max(n_1)+max(n_1)/10, colors="k", linestyles="-",
-               label="$\\epsilon_{NC}$ = "+"{0:0.2f} %\n".format(PSD_NC_suppression_real) +
-                     "$\\epsilon_{IBD}$"+" = {0:0.2f} %\n".format(PSD_IBD_suppression_real) +
-                     "ttr cut value = {0:.5f}".format(TTR_cut_value[index10]))
-    plt.xlim(xmin=0.0, xmax=maximum_tot_value)
+                                      .format(len(array_TTR_IBDlike_20_30)))
+    plt.vlines(TTR_cut_value_20_30[index10], 0.0, max(n_1)+max(n_1)/10, colors="k", linestyles="-",
+               label="$\\epsilon_{NC}$ = "+"{0:0.2f} %\n".format(PSD_NC_suppression_20_30) +
+                     "$\\epsilon_{IBD}$"+" = {0:0.2f} %\n".format(PSD_IBD_suppression_20_30) +
+                     "ttr cut value = {0:.5f}".format(TTR_cut_value_20_30[index10]))
     plt.xlabel("tail-to-total ratio")
     plt.ylabel("events")
-    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events" +
-              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start[index10], tail_end[index10]))
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events with 20 MeV < E < 30 MeV" +
+              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start_20_30[index10], tail_end_20_30[index10]))
     plt.legend()
     plt.grid()
-    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns_with_Eff.png".format(tail_start[index10],
-                                                                                           tail_end[index10]))
+    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns_20_30.png".format(tail_start_20_30[index10],
+                                                                                        tail_end_20_30[index10]))
     plt.close()
 
-    """ save TTR values of NC events and IBD events that pass all cuts (before PSD) to txt file: """
-    np.savetxt(output_path + "TTR_IBDlike_NCevents_{0:.0f}ns_to_{1:.0f}ns.txt".format(tail_start[index10],
-                                                                                      tail_end[index10]),
-               array_TTR_IBDlike, fmt='%.5f',
-               header="TTR values of {0:d} IBDlike NC events (NC events that pass all cuts):"
-               .format(len(array_TTR_IBDlike)))
+    # save TTR value of IBDlike NC events to txt file:
+    np.savetxt(output_path + "TTR_IBDlike_{0:.0f}ns_to_{1:.0f}ns_20_30.txt".format(tail_start_20_30[index10],
+                                                                                   tail_end_20_30[index10]),
+               array_TTR_IBDlike_20_30, fmt="%.5f",
+               header="TTR values for IBDlike NC events (pass all IBD cuts) for energies between 20 MeV and 30 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_20_30[index10], tail_end_20_30[index10], TTR_cut_value_20_30[index10]))
+    # save TTR value of IBD events to txt file:
+    np.savetxt(output_path + "TTR_IBD_{0:.0f}ns_to_{1:.0f}ns_20_30.txt".format(tail_start_20_30[index10],
+                                                                               tail_end_20_30[index10]),
+               array_TTR_IBD_beforePSD_20_30, fmt="%.5f",
+               header="TTR values for IBD events (pass all IBD cuts) for energies between 20 MeV and 30 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_20_30[index10], tail_end_20_30[index10], TTR_cut_value_20_30[index10]))
 
-    np.savetxt(output_path + "TTR_beforePSD_IBDevents_{0:.0f}ns_to_{1:.0f}ns.txt".format(tail_start[index10],
-                                                                                         tail_end[index10]),
-               array_TTR_IBD_beforePSD, fmt='%.5f',
-               header="TTR values of {0:d} IBD events, that pass all cuts (before PSD):"
-               .format(len(array_TTR_IBD_beforePSD)))
+    # with efficiency:
+    h18 = plt.figure(18, figsize=(11, 6))
+    First_bin = 0.0
+    maximum_tot_value = max(array_TTR_IBDlike_30_40)
+    Last_bin = maximum_tot_value
+    Bin_width = (Last_bin - First_bin) / 200
+    Bins_4 = np.arange(First_bin, Last_bin + Bin_width, Bin_width)
+    n_1, bins_1, patches_1 = plt.hist(array_TTR_IBD_beforePSD_30_40, bins=Bins_4, histtype="step", align='mid',
+                                      color="r",
+                                      linewidth=1.5, label="prompt signal of IBD events (entries = {0:d})"
+                                      .format(len(array_TTR_IBD_beforePSD_30_40)))
+    n_2, bins_2, patches_2 = plt.hist(array_TTR_IBDlike_30_40, bins=Bins_4, histtype="step", align='mid', color="b",
+                                      linewidth=1.5,
+                                      label="prompt signal of IBD-like NC events (entries = {0:d})"
+                                      .format(len(array_TTR_IBDlike_30_40)))
+    plt.vlines(TTR_cut_value_30_40[index10], 0.0, max(n_1) + max(n_1) / 10, colors="k", linestyles="-",
+               label="$\\epsilon_{NC}$ = " + "{0:0.2f} %\n".format(PSD_NC_suppression_30_40) +
+                     "$\\epsilon_{IBD}$" + " = {0:0.2f} %\n".format(PSD_IBD_suppression_30_40) +
+                     "ttr cut value = {0:.5f}".format(TTR_cut_value_30_40[index10]))
+    plt.xlabel("tail-to-total ratio")
+    plt.ylabel("events")
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events with 30 MeV < E < 40 MeV" +
+              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start_30_40[index10], tail_end_30_40[index10]))
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns_30_40.png".format(tail_start_30_40[index10],
+                                                                                        tail_end_30_40[index10]))
+    plt.close()
 
-    """ 2D histogram with TTR values and Evis for IBD events before PSD: """
+    # save TTR value of IBDlike NC events to txt file:
+    np.savetxt(output_path + "TTR_IBDlike_{0:.0f}ns_to_{1:.0f}ns_30_40.txt".format(tail_start_30_40[index10],
+                                                                                   tail_end_30_40[index10]),
+               array_TTR_IBDlike_30_40, fmt="%.5f",
+               header="TTR values for IBDlike NC events (pass all IBD cuts) for energies between 30 MeV and 40 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_30_40[index10], tail_end_30_40[index10], TTR_cut_value_30_40[index10]))
+    # save TTR value of IBD events to txt file:
+    np.savetxt(output_path + "TTR_IBD_{0:.0f}ns_to_{1:.0f}ns_30_40.txt".format(tail_start_30_40[index10],
+                                                                               tail_end_30_40[index10]),
+               array_TTR_IBD_beforePSD_30_40, fmt="%.5f",
+               header="TTR values for IBD events (pass all IBD cuts) for energies between 30 MeV and 40 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_30_40[index10], tail_end_30_40[index10], TTR_cut_value_30_40[index10]))
+
+    # with efficiency:
+    h13 = plt.figure(13, figsize=(11, 6))
+    First_bin = 0.0
+    maximum_tot_value = max(array_TTR_IBDlike_40_100)
+    Last_bin = 0.1
+    Bin_width = (Last_bin-First_bin) / 200
+    Bins_3 = np.arange(First_bin, Last_bin+Bin_width, Bin_width)
+    n_1, bins_1, patches_1 = plt.hist(array_TTR_IBD_beforePSD_40_100, bins=Bins_3, histtype="step", align='mid',
+                                      color="r",
+                                      linewidth=1.5, label="prompt signal of IBD events (entries = {0:d})"
+                                      .format(len(array_TTR_IBD_beforePSD_40_100)))
+    n_2, bins_2, patches_2 = plt.hist(array_TTR_IBDlike_40_100, bins=Bins_3, histtype="step", align='mid', color="b",
+                                      linewidth=1.5,
+                                      label="prompt signal of IBD-like NC events (entries = {0:d})"
+                                      .format(len(array_TTR_IBDlike_40_100)))
+    plt.vlines(TTR_cut_value_40_100[index10], 0.0, max(n_1)+max(n_1)/10, colors="k", linestyles="-",
+               label="$\\epsilon_{NC}$ = "+"{0:0.2f} %\n".format(PSD_NC_suppression_40_100) +
+                     "$\\epsilon_{IBD}$"+" = {0:0.2f} %\n".format(PSD_IBD_suppression_40_100) +
+                     "ttr cut value = {0:.5f}".format(TTR_cut_value_40_100[index10]))
+    plt.xlabel("tail-to-total ratio")
+    plt.ylabel("events")
+    plt.title("Tail-to-total ratio of prompt signals of IBD and NC events with 40 MeV < E < 100 MeV" +
+              "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start_40_100[index10],
+                                                                  tail_end_40_100[index10]))
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "TTR_beforePSD_{0:0.0f}ns_to_{1:0.0f}ns_40_100.png".format(tail_start_40_100[index10],
+                                                                                         tail_end_40_100[index10]))
+    plt.close()
+
+    # save TTR value of IBDlike NC events to txt file:
+    np.savetxt(output_path + "TTR_IBDlike_{0:.0f}ns_to_{1:.0f}ns_40_100.txt".format(tail_start_40_100[index10],
+                                                                                    tail_end_40_100[index10]),
+               array_TTR_IBDlike_40_100, fmt="%.5f",
+               header="TTR values for IBDlike NC events (pass all IBD cuts) for energies between 40 MeV and 100 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_40_100[index10], tail_end_40_100[index10], TTR_cut_value_40_100[index10]))
+    # save TTR value of IBD events to txt file:
+    np.savetxt(output_path + "TTR_IBD_{0:.0f}ns_to_{1:.0f}ns_40_100.txt".format(tail_start_40_100[index10],
+                                                                                tail_end_40_100[index10]),
+               array_TTR_IBD_beforePSD_40_100, fmt="%.5f",
+               header="TTR values for IBD events (pass all IBD cuts) for energies between 40 MeV and 100 MeV,\n"
+                      "tail window between {0:.0f} ns to {1:.0f} ns and TTR cut value of {2:.5f}\n"
+                      "(analyzed with atmoNC_spectrum_v3.py):"
+               .format(tail_start_40_100[index10], tail_end_40_100[index10], TTR_cut_value_40_100[index10]))
+
+    """ 2D histogram with TTR values and Evis for IBD events before PSD for 10 MeV < Evis < 20 MeV: """
     h11 = plt.figure(11)
-    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_IBD, array_TTR_IBD_beforePSD, [bins_evis, Bins])
-    plt.hlines(TTR_cut_value[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha_IBD),
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_IBD_10_20, array_TTR_IBD_beforePSD_10_20, [bins_evis, Bins_1])
+    plt.hlines(TTR_cut_value_10_20[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha_IBD),
                xmax=max(Evis_array_real_wo_PSD_wo_alpha_IBD), colors="k", linestyles="-",
-               label="TTR cut value = {0:.5f}".format(TTR_cut_value[index10]))
-    plt.ylim(ymin=0.0, ymax=maximum_tot_value)
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_10_20[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_1))
     plt.xlabel("visible energy in MeV")
-    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start[index10], tail_end[index10]))
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_10_20[index10],
+                                                                              tail_end_10_20[index10]))
     plt.title("TTR vs visible energy of IBD events that pass IBD selection criteria")
     plt.legend()
     plt.grid()
-    plt.savefig(output_path + "2D_IBD_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns.png".format(tail_start[index10],
-                                                                                       tail_end[index10]))
+    plt.savefig(output_path + "2D_IBD_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_10_20.png".format(tail_start_10_20[index10],
+                                                                                             tail_end_10_20[index10]))
     plt.close()
 
-    """ 2D histogram with TTR values and Evis for IBD events before PSD: """
+    """ 2D histogram with TTR values and Evis for NC events before PSD: """
     h12 = plt.figure(12)
-    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha, array_TTR_IBDlike, [bins_evis, Bins])
-    plt.hlines(TTR_cut_value[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha),
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_10_20, array_TTR_IBDlike_10_20, [bins_evis, Bins_1])
+    plt.hlines(TTR_cut_value_10_20[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha),
                xmax=max(Evis_array_real_wo_PSD_wo_alpha), colors="k", linestyles="-",
-               label="TTR cut value = {0:.5f}".format(TTR_cut_value[index10]))
-    plt.ylim(ymin=0.0, ymax=maximum_tot_value)
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_10_20[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_1))
     plt.xlabel("visible energy in MeV")
-    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start[index10], tail_end[index10]))
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_10_20[index10],
+                                                                              tail_end_10_20[index10]))
     plt.title("TTR vs visible energy of IBD-like atmospheric NC events")
     plt.legend()
     plt.grid()
-    plt.savefig(output_path + "2D_atmoNC_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns.png".format(tail_start[index10],
-                                                                                          tail_end[index10]))
+    plt.savefig(output_path + "2D_atmoNC_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_10_20.png"
+                .format(tail_start_10_20[index10], tail_end_10_20[index10]))
     plt.close()
 
+    """ 2D histogram with TTR values and Evis for IBD events before PSD for 20 MeV < Evis < 30 MeV: """
+    h14 = plt.figure(14)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_IBD_20_30, array_TTR_IBD_beforePSD_20_30, [bins_evis, Bins_2])
+    plt.hlines(TTR_cut_value_20_30[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha_IBD),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha_IBD), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_20_30[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_2))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_20_30[index10],
+                                                                              tail_end_20_30[index10]))
+    plt.title("TTR vs visible energy of IBD events that pass IBD selection criteria")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_IBD_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_20_30.png".format(tail_start_20_30[index10],
+                                                                                             tail_end_20_30[index10]))
+    plt.close()
 
+    """ 2D histogram with TTR values and Evis for NC events before PSD: """
+    h15 = plt.figure(15)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_20_30, array_TTR_IBDlike_20_30, [bins_evis, Bins_2])
+    plt.hlines(TTR_cut_value_20_30[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_20_30[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_2))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_20_30[index10],
+                                                                              tail_end_20_30[index10]))
+    plt.title("TTR vs visible energy of IBD-like atmospheric NC events")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_atmoNC_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_20_30.png"
+                .format(tail_start_20_30[index10], tail_end_20_30[index10]))
+    plt.close()
+
+    """ 2D histogram with TTR values and Evis for IBD events before PSD for 30 MeV < Evis < 40 MeV: """
+    h19 = plt.figure(19)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_IBD_30_40, array_TTR_IBD_beforePSD_30_40, [bins_evis, Bins_4])
+    plt.hlines(TTR_cut_value_30_40[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha_IBD),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha_IBD), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_30_40[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_4))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_30_40[index10],
+                                                                              tail_end_30_40[index10]))
+    plt.title("TTR vs visible energy of IBD events that pass IBD selection criteria")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_IBD_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_30_40.png".format(tail_start_30_40[index10],
+                                                                                             tail_end_30_40[index10]))
+    plt.close()
+
+    """ 2D histogram with TTR values and Evis for NC events before PSD: """
+    h20 = plt.figure(20)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_30_40, array_TTR_IBDlike_30_40, [bins_evis, Bins_4])
+    plt.hlines(TTR_cut_value_30_40[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_30_40[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_4))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_30_40[index10],
+                                                                              tail_end_30_40[index10]))
+    plt.title("TTR vs visible energy of IBD-like atmospheric NC events")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_atmoNC_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_30_40.png"
+                .format(tail_start_30_40[index10], tail_end_30_40[index10]))
+    plt.close()
+
+    """ 2D histogram with TTR values and Evis for IBD events before PSD for 40 MeV < Evis < 100 MeV: """
+    h16 = plt.figure(16)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_IBD_40_100, array_TTR_IBD_beforePSD_40_100, [bins_evis, Bins_3])
+    plt.hlines(TTR_cut_value_40_100[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha_IBD),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha_IBD), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_40_100[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_3))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_40_100[index10],
+                                                                              tail_end_40_100[index10]))
+    plt.title("TTR vs visible energy of IBD events that pass IBD selection criteria")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_IBD_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_40_100.png"
+                .format(tail_start_40_100[index10], tail_end_40_100[index10]))
+    plt.close()
+
+    """ 2D histogram with TTR values and Evis for NC events before PSD: """
+    h17 = plt.figure(17)
+    plt.hist2d(Evis_array_real_wo_PSD_wo_alpha_40_100, array_TTR_IBDlike_40_100, [bins_evis, Bins_3])
+    plt.hlines(TTR_cut_value_40_100[index10], xmin=min(Evis_array_real_wo_PSD_wo_alpha),
+               xmax=max(Evis_array_real_wo_PSD_wo_alpha), colors="k", linestyles="-",
+               label="TTR cut value = {0:.5f}".format(TTR_cut_value_40_100[index10]))
+    plt.ylim(ymin=0.0, ymax=max(Bins_3))
+    plt.xlabel("visible energy in MeV")
+    plt.ylabel("TTR values for tail window from {0:.0f} ns to {1:.0f}".format(tail_start_40_100[index10],
+                                                                              tail_end_40_100[index10]))
+    plt.title("TTR vs visible energy of IBD-like atmospheric NC events")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path + "2D_atmoNC_TTR_vs_Evis_{0:0.0f}ns_to_{1:0.0f}ns_40_100.png"
+                .format(tail_start_40_100[index10], tail_end_40_100[index10]))
+    plt.close()

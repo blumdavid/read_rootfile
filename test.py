@@ -141,5 +141,30 @@ import NC_background_functions
 # plt.show()
 
 
+# pet = np.loadtxt("/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/hittimes/file0_evt1_prompt_signal.txt")
+# pet_1 = np.loadtxt("/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/hittimes/file0_evt8_prompt_signal.txt")
+#
+# time = np.arange(-50.0, 1020.0, 5)
+#
+# plt.plot(time, pet[3:], "r", label="inside 17 m")
+# plt.plot(time, pet_1[3:], "b", label="outside 17 m")
+# plt.xlabel("photon emission time in ns")
+# plt.grid()
+# plt.legend()
+# plt.show()
+
+# input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/DCR_results_16000mm_10MeVto100MeV_1000nsto1ms_" \
+#              "mult1_1800keVto2550keV_dist500mm_R17700mm_PSD90/"
+# TTR_IBD = np.loadtxt(input_path + "TTR_beforePSD_IBDevents_325ns_to_600ns.txt")
+
+# IBD_array = np.loadtxt(input_path + "IBD_filenumber_evtID_Evis_pass_all_cuts_wo_PSD.txt")
+# Evis = IBD_array[:, 2]
+
+# plt.hist2d(Evis, TTR_IBD, bins=100)
+# plt.hlines(0.01125, 0, 100)
+# plt.show()
+
+
+
 
 

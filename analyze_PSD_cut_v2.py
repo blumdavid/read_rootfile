@@ -25,19 +25,19 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # flag if plots should be create and saved:
-CREATE_PLOTS = True
+CREATE_PLOTS = False
 # flag if arrays with TTR values should be saved:
-SAVE_ARRAY_TTR = True
+SAVE_ARRAY_TTR = False
 
 """ parameters for tail to total method: """
 # INFO-me: parameters should agree with the bin-width of the time window!
 # start of the tail in ns:
-# start_tail = np.arange(50, 650, 100)
-start_tail = np.array([225, 275, 325])
+start_tail = [325.0]
+# start_tail = np.array([225, 275, 325])
 
 # end of the tail in ns:
-stop_tail = np.arange(600, 1200, 200)
-# stop_tail = np.array([1000])
+# stop_tail = np.arange(600, 1200, 200)
+stop_tail = np.array([800])
 
 print("start_tail = {0}".format(start_tail))
 print("stop_tail = {0}".format(stop_tail))
@@ -66,14 +66,6 @@ num_evts_per_file = 100
 output_path = "/home/astro/blum/juno/atmoNC/data_NC/output_PSD_v2/DCR/"
 
 """ preallocate values: """
-# best IBD efficiency for NC efficiency of 90 % and the corresponding tail-to-total value and values of start and
-# stop of tail:
-best_IBD_eff_for_NC_90 = 100.0
-ttr_value_90 = 0.0
-tail_start_90 = 0.0
-tail_stop_90 = 0.0
-best_array_TTR_NC_90 = []
-best_array_TTR_IBD_90 = []
 # best IBD efficiency for NC efficiency of 95 % and the corresponding tail-to-total value and values of start and
 # stop of tail:
 best_IBD_eff_for_NC_95 = 100.0
@@ -82,14 +74,6 @@ tail_start_95 = 0.0
 tail_stop_95 = 0.0
 best_array_TTR_NC_95 = []
 best_array_TTR_IBD_95 = []
-# best IBD efficiency for NC efficiency of 96 % and the corresponding tail-to-total value and values of start and
-# stop of tail:
-best_IBD_eff_for_NC_96 = 100.0
-ttr_value_96 = 0.0
-tail_start_96 = 0.0
-tail_stop_96 = 0.0
-best_array_TTR_NC_96 = []
-best_array_TTR_IBD_96 = []
 # best IBD efficiency for NC efficiency of 97 % and the corresponding tail-to-total value and values of start and
 # stop of tail:
 best_IBD_eff_for_NC_97 = 100.0
@@ -306,29 +290,19 @@ for index in range(len(start_tail)):
         efficiency_NC_99 = 99.0
         efficiency_NC_98 = 98.0
         efficiency_NC_97 = 97.0
-        efficiency_NC_96 = 96.0
         efficiency_NC_95 = 95.0
-        efficiency_NC_90 = 90.0
 
         # calculate the cut-efficiencies for positrons depending of efficiency_NC:
         efficiency_IBD_99, ttr_cut_value_99 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_99)
         efficiency_IBD_98, ttr_cut_value_98 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_98)
         efficiency_IBD_97, ttr_cut_value_97 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_97)
-        efficiency_IBD_96, ttr_cut_value_96 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_96)
         efficiency_IBD_95, ttr_cut_value_95 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_95)
-        efficiency_IBD_90, ttr_cut_value_90 = tot_efficiency(array_TTR_IBD, array_TTR_NC, efficiency_NC_90)
 
         print("tail start = {0:.1f} ns".format(start_tail[index]))
         print("tail end = {0:.1f} ns".format(stop_tail[index1]))
-        print("NC efficiency = {0:.1f} %".format(efficiency_NC_90))
-        print(efficiency_IBD_90)
-        print(ttr_cut_value_90)
         print("NC efficiency = {0:.1f} %".format(efficiency_NC_95))
         print(efficiency_IBD_95)
         print(ttr_cut_value_95)
-        print("NC efficiency = {0:.1f} %".format(efficiency_NC_96))
-        print(efficiency_IBD_96)
-        print(ttr_cut_value_96)
         print("NC efficiency = {0:.1f} %".format(efficiency_NC_97))
         print(efficiency_IBD_97)
         print(ttr_cut_value_97)
@@ -410,13 +384,13 @@ for index in range(len(start_tail)):
             plt.close()
 
 """ Display the average hittime distributions of positrons and IBD-like NC events: """
-h3 = plt.figure(3, figsize=(15, 8))
+h3 = plt.figure(3, figsize=(11, 6))
 bin_edges = np.arange(start_time, end_time+binwidth+10*binwidth, binwidth)
 plt.semilogy(bin_edges, hittime_average_IBD, linestyle="steps", color="r",
              label="average pulse shape of IBD events")
 plt.semilogy(bin_edges, hittime_average_NC, linestyle="steps", color="b",
              label="average pulse shape of NC events")
-plt.xlabel("hittime in ns")
+plt.xlabel("photon emission time in ns")
 plt.ylabel("probability per bin (bin-width = {0:0.1f} ns)".format(binwidth))
 plt.xlim(xmin=start_time, xmax=end_time)
 plt.ylim(ymin=1e-4, ymax=2.0)
@@ -429,13 +403,7 @@ plt.close()
 """ print the best IBD efficiencies with the corresponding start and stop time of the tail for each NC efficiency: """
 print("NC efficiency = {0:.1f} %, best IBD efficiency = {1:.2f} %, tail start = {2:.1f} ns, tail end = {3:.1f} ns"
       ", tail-to-total value = {4:.5f}"
-      .format(efficiency_NC_90, best_IBD_eff_for_NC_90, tail_start_90, tail_stop_90, ttr_value_90))
-print("NC efficiency = {0:.1f} %, best IBD efficiency = {1:.2f} %, tail start = {2:.1f} ns, tail end = {3:.1f} ns"
-      ", tail-to-total value = {4:.5f}"
       .format(efficiency_NC_95, best_IBD_eff_for_NC_95, tail_start_95, tail_stop_95, ttr_value_95))
-print("NC efficiency = {0:.1f} %, best IBD efficiency = {1:.2f} %, tail start = {2:.1f} ns, tail end = {3:.1f} ns"
-      ", tail-to-total value = {4:.5f}"
-      .format(efficiency_NC_96, best_IBD_eff_for_NC_96, tail_start_96, tail_stop_96, ttr_value_96))
 print("NC efficiency = {0:.1f} %, best IBD efficiency = {1:.2f} %, tail start = {2:.1f} ns, tail end = {3:.1f} ns"
       ", tail-to-total value = {4:.5f}"
       .format(efficiency_NC_97, best_IBD_eff_for_NC_97, tail_start_97, tail_stop_97, ttr_value_97))

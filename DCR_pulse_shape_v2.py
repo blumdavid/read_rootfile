@@ -155,20 +155,20 @@ DCR_MCP = 46100.0
 DCR_3inch = 550.0
 
 """ loop over pulse shapes of prompt signals of atmo. NC events: """
-print("atmo NC events...")
-for file_NC in os.listdir(path_NC):
-    # read only files that start with 'file' and end with 'prompt_signal.txt'
-    if file_NC.startswith("file") and file_NC.endswith("prompt_signal.txt"):
-
-        pulse_shape_dcr(path_NC, file_NC, DCR_20inch, number_20inchPMT, DCR_3inch, number_3inchPMT, "atmoNC")
+# print("atmo NC events...")
+# for file_NC in os.listdir(path_NC):
+#     # read only files that start with 'file' and end with 'prompt_signal.txt'
+#     if file_NC.startswith("file") and file_NC.endswith("prompt_signal.txt"):
+#
+#         pulse_shape_dcr(path_NC, file_NC, DCR_20inch, number_20inchPMT, DCR_3inch, number_3inchPMT, "atmoNC")
 
 """ loop over pulse shapes of prompt signals of IBD events: """
-print("IBD events...")
-for file_IBD in os.listdir(path_IBD):
-    # read only files that start with 'file' and end with 'prompt_signal.txt'
-    if file_IBD.startswith("file") and file_IBD.endswith("prompt_signal.txt"):
-
-        pulse_shape_dcr(path_IBD, file_IBD, DCR_20inch, number_20inchPMT, DCR_3inch, number_3inchPMT, "IBD")
+# print("IBD events...")
+# for file_IBD in os.listdir(path_IBD):
+#     # read only files that start with 'file' and end with 'prompt_signal.txt'
+#     if file_IBD.startswith("file") and file_IBD.endswith("prompt_signal.txt"):
+#
+#         pulse_shape_dcr(path_IBD, file_IBD, DCR_20inch, number_20inchPMT, DCR_3inch, number_3inchPMT, "IBD")
 
 """ loop over pulse shapes of prompt signals of fast neutron events: """
 print("fastN events...")

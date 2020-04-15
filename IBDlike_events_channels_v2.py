@@ -6,8 +6,8 @@
 
     For all IBD-like events (events, that pass all cuts like volume, prompt energy, delayed energy, time, neutron
     multiplicity and distance cut), the evtID and the file number of user_atmoNC_{}.root are stored in folder
-    /home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/results_16000mm_10MeVto100MeV_500nsto1ms_mult1_
-    2400PEto3400PE_dist500mm_R16000mm_PSD95/ and saved in files filenumber_evtID_pass_all_cuts_wo_PSD.txt and
+    /home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/results_16000mm_10MeVto100MeV_1000nsto1ms_mult1_
+    1800keVto2550keV_dist500mm_R17700mm_PSD99/ and saved in files filenumber_evtID_pass_all_cuts_wo_PSD.txt and
     filenumber_evtID_pass_all_cuts_w_PSD.txt
 
 """
@@ -24,13 +24,13 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 # set SAVE_FIG, defines if figures are saved:
-SAVE_FIG = True
+SAVE_FIG = False
 
 # set SAVE_TXT, defines if txt files are saved:
-SAVE_TXT = True
+SAVE_TXT = False
 
 # set SHOW_PLOT, defines if the figures are shown:
-SHOW_PLOT = True
+SHOW_PLOT = False
 
 # set the path of the input root file:
 input_path = "/home/astro/blum/juno/atmoNC/data_NC/output_generator/"
@@ -39,7 +39,8 @@ input_name = input_path + "gen_NC_onlyC12_250000evts_seed1.root"
 
 # set the path of the folder, where prompt signal of IBD-like signals are stored:
 path_ibdlike_event = "/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/DCR_results_16000mm_10MeVto100MeV_" \
-                     "500nsto1ms_mult1_2400PEto3400PE_dist500mm_R17700mm_PSD99/"
+                     "1000nsto1ms_mult1_1800keVto2550keV_dist500mm_R17700mm_PSD99/" \
+                     "test_10to20_20to30_30to40_40to100_final/"
 
 # set the path, where the outputs are saved:
 output_path = path_ibdlike_event
@@ -61,13 +62,15 @@ time = 1
     cuts (PSD is not applied).
     Also filenumber_evtID_pass_all_cuts_w_PSD.txt can be read to get the filenumber and evtID of IBD-like NC events, 
     that pass all cuts (PSD is applied): """
-ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_wo_PSD.txt")
+ibdlike_events = np.loadtxt(path_ibdlike_event + "atmoNC_filenumber_evtID_Evis_pass_all_cuts_wo_PSD.txt")
 # INFO-me: Add "_PSD" to the file-names when considering PSD cut!!!
-# ibdlike_events = np.loadtxt(path_ibdlike_event + "filenumber_evtID_pass_all_cuts_w_PSD.txt")
+# ibdlike_events = np.loadtxt(path_ibdlike_event + "atmoNC_filenumber_evtID_pass_all_cuts_w_PSD.txt")
 
 # get the event number that corresponds to t_evtID in gen_NC_onlyC12_250000evts_seed1.root:
 # preallocate array, where the event number is stored:
 event_number = []
+# preallocate array, where Evis is stored:
+Evis_array = []
 # number of IBD-like events:
 number_ibdlike_events = len(ibdlike_events)
 # loop over ibdlike_events:
@@ -76,6 +79,8 @@ for index in range(number_ibdlike_events):
     filenumber = ibdlike_events[index][0]
     # get evtID:
     evtID = ibdlike_events[index][1]
+    # get Evis of events:
+    Evis_array.append(ibdlike_events[index][2])
 
     # calculate the event_num with file_number, evtID and number_per_user_atmoNC_file:
     event_num = int(filenumber * number_per_user_atmoNC_file + evtID)
@@ -87,6 +92,151 @@ for index in range(number_ibdlike_events):
 (event_ID, projectile_PDG, projectile_E, target_PDG, NC_inter_ch_ID, deexcitation_ID, isotope_PDG, Nparticles,
  final_PDG, final_Px, final_Py, final_Pz) = NC_background_functions.read_nc_data_ibdlike_signal(input_name,
                                                                                                 event_number)
+
+""" analyze the final particles (final_PDG) to get the content of different particles as function of energy: """
+# preallocate array, where the total number of particles are stored as function of the energy (bin = 1 MeV):
+number_total = np.zeros(91)
+# preallocate array, where the number of gammas is stored as function of the energy (bin = 1 MeV):
+number_gamma = np.zeros(91)
+# preallocate array, where the number of neutrons is stored as function of the energy (bin = 1 MeV):
+number_neutron = np.zeros(91)
+# preallocate array, where the number of protons is stored as function of the energy (bin = 1 MeV):
+number_proton = np.zeros(91)
+# preallocate array, where the number of alphas is stored as function of the energy (bin = 1 MeV):
+number_alpha = np.zeros(91)
+# preallocate array, where the number of deutrons is stored as function of the energy (bin = 1 MeV):
+number_deuteron = np.zeros(91)
+# preallocate array, where the number of He3 is stored as function of the energy (bin = 1 MeV):
+number_He3 = np.zeros(91)
+# preallocate array, where the number of tritons is stored as function of the energy (bin = 1 MeV):
+number_triton = np.zeros(91)
+
+# loop over the number of events:
+for index1 in range(len(Evis_array)):
+
+    # get Evis of this event and calculate index corresponding to number_total:
+    index_E = int(Evis_array[index1] - 10)
+
+    # loop over the array of final_PDG[index1] to get all final PDGs of this event:
+    for index2 in range(len(final_PDG[index1])):
+        # increment index index_E of number_total by 1:
+        np.add.at(number_total, [index_E], 1)
+
+        # check final_PDG[index1][index2]:
+        if final_PDG[index1][index2] == 22:
+            # increment index index_E of number_gamma by 1:
+            np.add.at(number_gamma, [index_E], 1)
+            # check final_PDG[index1][index2]:
+        elif final_PDG[index1][index2] == 2112:
+            # increment index index_E of number_neutron by 1:
+            np.add.at(number_neutron, [index_E], 1)
+        elif final_PDG[index1][index2] == 2212:
+            # increment index index_E of number_proton by 1:
+            np.add.at(number_proton, [index_E], 1)
+        elif final_PDG[index1][index2] == 1000020040:
+            # increment index index_E of number_alpha by 1:
+            np.add.at(number_alpha, [index_E], 1)
+        elif final_PDG[index1][index2] == 1000010020:
+            # increment index index_E of number_deuteron by 1:
+            np.add.at(number_deuteron, [index_E], 1)
+        elif final_PDG[index1][index2] == 1000020030:
+            # increment index index_E of number_alpha by 1:
+            np.add.at(number_He3, [index_E], 1)
+        elif final_PDG[index1][index2] == 1000010030:
+            # increment index index_E of number_triton by 1:
+            np.add.at(number_triton, [index_E], 1)
+        else:
+            if final_PDG[index1][index2] < 1000020040:
+                print("new PDG:")
+                print(final_PDG[index1][index2])
+
+# calculate the fraction in percent of the different particles as function of energy (1 MeV):
+fraction_gamma = number_gamma / number_total * 100
+fraction_neutron = number_neutron / number_total * 100
+fraction_proton = number_proton / number_total * 100
+fraction_alpha = number_alpha / number_total * 100
+fraction_deuteron = number_deuteron / number_total * 100
+fraction_He3 = number_He3 / number_total * 100
+fraction_triton = number_triton / number_total * 100
+
+plt.figure(figsize=(11, 6))
+energy_array = np.arange(10, 101, 1)
+plt.step(energy_array, fraction_gamma, color="orange", label="gamma")
+plt.step(energy_array, fraction_neutron, color="blue", label="neutron")
+plt.step(energy_array, fraction_proton, color="red", label="proton")
+plt.step(energy_array, fraction_alpha, color="green", label="alpha")
+plt.step(energy_array, fraction_deuteron, color="black", label="deuteron")
+# plt.step(energy_array, fraction_He3, color="green", linestyle="dashed", label="He3")
+# plt.step(energy_array, fraction_triton, color="black", linestyle="dashed", label="triton")
+plt.xlim(xmin=10.0, xmax=100)
+plt.xlabel("Visible energy in MeV")
+plt.ylabel("fraction of particles per bin (bin-width = 1 MeV) in %")
+plt.title("Particle content of IBD-like atmo. NC events")
+plt.legend()
+plt.grid()
+plt.show()
+
+""" get the fraction of gamma energy to total energy for each event as function of the energy: """
+# preallocate array of visible energy in MeV (bin-width = 1 MeV):
+visible_energy = np.arange(10, 101, 1)
+# preallocate array, where the gamma energy in MeV is stored as function of total energy (bin-width 1 MeV):
+energy_gamma = np.zeros(len(visible_energy))
+# preallocate the number of events as function of energy (bin-width 1 MeV):
+array_events = np.zeros(len(visible_energy))
+
+# loop over every event:
+for index1 in range(len(Evis_array)):
+
+    # get Evis of this event and calculate index corresponding to number_total:
+    index_E = int(Evis_array[index1] - 10)
+
+    # increment index index_E of array_events by 1 (to get the number of events per energy bin):
+    np.add.at(array_events, [index_E], 1)
+
+    # preallocate gamma energy in this event:
+    E_gamma_event = 0.0
+
+    # loop over the array of final_PDG[index1] to get all final PDGs of this event:
+    for index2 in range(len(final_PDG[index1])):
+
+        # check final_PDG[index1][index2]:
+        if final_PDG[index1][index2] == 22:
+
+            # calculate gamma energy in GeV:
+            E_gamma = np.sqrt(final_Px[index1][index2]**2 + final_Py[index1][index2]**2 + final_Pz[index1][index2]**2)
+            # convert E_gamma to energy in MeV:
+            E_gamma = E_gamma * 1000.0
+            # add E_gamma to E_gamma_event:
+            E_gamma_event += E_gamma
+
+    # increment index index_E of energy_gamma by E_gamma_event:
+    np.add.at(energy_gamma, [index_E], E_gamma_event)
+
+# calculate the gamma energy per event as function of the visible energy:
+E_gamma_per_event = energy_gamma / array_events
+
+plt.figure(figsize=(11, 6))
+plt.step(visible_energy, E_gamma_per_event, color="orange", label="gamma")
+plt.xlim(xmin=10.0, xmax=100)
+plt.xlabel("Visible energy in MeV")
+plt.ylabel("gamma energy per event per bin (bin-width = 1 MeV) in MeV")
+plt.title("Gamma energy per event of IBD-like atmo. NC events")
+plt.legend()
+plt.grid()
+plt.show()
+
+# Calculate the fraction of gamma energy per event to the total energy in percent:
+fraction_gamma_energy = E_gamma_per_event / visible_energy * 100.0
+
+plt.figure(figsize=(11, 6))
+plt.step(visible_energy, fraction_gamma_energy, color="orange", label="gamma")
+plt.xlim(xmin=10.0, xmax=100)
+plt.xlabel("Visible energy in MeV")
+plt.ylabel("fraction of gamma energy per event per bin to vis. energy in %\n(bin-width = 1 MeV)")
+plt.title("Fraction of gamma energy per event to vis. energy of IBD-like atmo. NC events")
+plt.legend()
+plt.grid()
+plt.show()
 
 """ get the number of events as function of the energy of the incoming neutrinos for each neutrino type: """
 (Energy_nu_incoming,

@@ -56,7 +56,7 @@ date = datetime.datetime.now()
 now = date.strftime("%Y-%m-%d %H:%M")
 
 """ set flag, if hittimes must be calculated or read from file: """
-flag_read_hittime_from_file = False
+flag_read_hittime_from_file = True
 
 """ define time window and bin width: """
 # set time window of whole signal in ns:
@@ -84,30 +84,26 @@ radius_cut = 16000
 E_prompt_min = 10.0
 E_prompt_max = 100.0
 # time cut in ns:
-T_cut_min = 500.0
+T_cut_min = 1000.0
 T_cut_max = 1000000.0
 # multiplicity:
 multiplicity = 1
-# delayed energy cut in PE:
-E_delayed_min = 2400.0
-E_delayed_max = 3400.0
+# delayed energy cut in MeV:
+E_delayed_min_MeV = 1.80
+E_delayed_max_MeV = 2.55
 # distance cut in mm:
 distance_cut = 500.0
 # delayed volume cut in mm:
 delayed_volume = 17700.0
 
-# path, where root files of positron simulation are saved:
+# path, where root files of neutron simulation are saved:
 input_path_neutron = "/local/scratch1/pipc51/astro/blum/conversion_nPE_MeV/neutron_output/"
 
 # path, where TTR values of NC and IBD events, that pass all cuts, are stored:
-# input_path_TTR = ("/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/results_{0:.0f}mm_{1:.0f}MeVto{2:.0f}MeV_"
-#                   "{3:.0f}nsto{4:.0f}ms_mult{5}_{6:.0f}PEto{7:.0f}PE_dist{8:.0f}mm_R{9:.0f}mm_PSD{10:.0f}/"
-#                   .format(radius_cut, E_prompt_min, E_prompt_max, T_cut_min, T_cut_max/1000000, multiplicity,
-#                           E_delayed_min, E_delayed_max, distance_cut, delayed_volume, NC_suppression))
 input_path_TTR = ("/home/astro/blum/juno/atmoNC/data_NC/output_detsim_v2/DCR_results_{0:.0f}mm_{1:.0f}MeVto{2:.0f}MeV_"
-                  "{3:.0f}nsto{4:.0f}ms_mult{5}_{6:.0f}PEto{7:.0f}PE_dist{8:.0f}mm_R{9:.0f}mm_PSD{10:.0f}/"
+                  "{3:.0f}nsto{4:.0f}ms_mult{5}_{6:.0f}keVto{7:.0f}keV_dist{8:.0f}mm_R{9:.0f}mm_PSD{10:.0f}/"
                   .format(radius_cut, E_prompt_min, E_prompt_max, T_cut_min, T_cut_max/1000000, multiplicity,
-                          E_delayed_min, E_delayed_max, distance_cut, delayed_volume, NC_suppression))
+                          E_delayed_min_MeV*1000, E_delayed_max_MeV*1000, distance_cut, delayed_volume, NC_suppression))
 
 # path, where hittime distributions (png and txt) are saved:
 input_path_hittimes = "/home/astro/blum/PhD/work/MeVDM_JUNO/fast_neutrons/"
@@ -128,6 +124,8 @@ number_evts_total = (last_file_neutron - first_file_neutron + 1) * number_evts_p
 number_analyzed = 0
 # array, where TTR values of neutron events are saved:
 array_TTR_neutron = []
+# array, where prompt energy of neutron events is saved in MeV:
+array_E_prompt_neutron = []
 # number of neutron events, that pass the PSD cut:
 number_neutron_after_PSD = 0
 
@@ -137,17 +135,23 @@ file_PMT_position = "/home/astro/blum/juno/atmoNC/PMT_information/PMT_position.r
 pmtID_pos_file, x_pos_pmt, y_pos_pmt, z_pos_pmt = NC_background_functions.get_pmt_position(file_PMT_position)
 
 """ load 'time resolution' in ns of the 20 inch PMTs and corresponding PMT ID from file PmtData.root: """
-file_PMT_time = "/home/astro/blum/juno/atmoNC/PMT_information/PmtData.root"
+file_PMT_time = "/home/astro/blum/juno/atmoNC/PMT_information/PmtData_old.root"
 # array with PMT ID and corresponding sigma in ns:
 pmtID_time_file, sigma_time_20inch = NC_background_functions.get_20inchpmt_tts(file_PMT_time)
 # set TTS (FWHM) of the 3inch PMTs in ns:
 tts_3inch = 5.0
 # calculate time resolution (sigma) for the 3inch PMTs in ns:
 sigma_time_3inch = tts_3inch / (2 * np.sqrt(2 * np.log(2)))
-# set effective speed of light in the liquid scintillator in mm/ns (see page 7 of c_effective_JUNO-doc-3144-v2.pdf in
-# folder /home/astro/blum/PhD/paper/Pulse_Shape_Discrimination/). Effective refraction index in LS n_eff = 1.54.
-# c/n_eff = 299792458 m / 1.54 s ~ 194670427 m/s = 194670427 * 10**(-6) mm/ns ~ 194.67 mm/ns:
-c_effective = 194.67
+# set effective speed of light in the liquid scintillator in mm/ns (see page 12 of
+# 20200111_zli_VertexReconstruction_page20.pdf in folder /home/astro/blum/PhD/paper/reconstruction/).
+# The effective refraction index in LS depends on the TTS of the PMT (Hamamatsu with TTS ~ 2.7 ns,
+# NNVT with TTS ~ 18 ns).
+# for Hamamatsu and 3inch PMTs (TTS ~ 2.7 ns and 5 ns) use n_eff = 1.544 (c/n_eff = 299792458 m / 1.544 s
+# = 194166100 * 10**(-6) mm/ns ~ 194.17 mm/ns):
+c_effective_smallTTS = 194.17
+# for MCP PMTs (TTS ~ 18 ns) use n_eff = 1.578 (c/n_eff = 299792458 m / 1.578 s = 189982546 * 10**(-6) mm/ns ~
+# 189.98 mm/ns):
+c_effective_largeTTS = 189.98
 
 # if pulse shapes are not calculated already, read ROOT files and save pulse shape to txt file:
 if not flag_read_hittime_from_file:
@@ -277,6 +281,7 @@ if not flag_read_hittime_from_file:
                     x_pmt = x_pos_pmt[pmtID]
                     y_pmt = y_pos_pmt[pmtID]
                     z_pmt = z_pos_pmt[pmtID]
+
                 else:
                     # 3inch PMT:
                     # calculate index of pos_pmt array that correspond to pmtID of 3inch PMTs (for example:
@@ -291,9 +296,6 @@ if not flag_read_hittime_from_file:
                 distance_tof = np.sqrt((x_reconstructed - x_pmt)**2 + (y_reconstructed - y_pmt)**2 +
                                        (z_reconstructed - z_pmt)**2)
 
-                # calculate time of flight in ns:
-                time_of_flight = distance_tof / c_effective
-
                 """ time resolution of PMT: """
                 # get time resolution of PMT with specific pmtID (pmtID is ascending number from 0 to 17738 (17739 large
                 # PMTs)) -> For 20inch PMTs, the pmtID is equal to index of sigma_time_20inch array.
@@ -301,7 +303,28 @@ if not flag_read_hittime_from_file:
                 if pmtID < 20000:
                     # 20inch PMT:
                     # get time resolution (sigma) of PMT in ns from array:
-                    sigma_pmt = sigma_time_20inch[pmtID]
+                    sigma_pmt_1 = sigma_time_20inch[pmtID]
+
+                    if sigma_pmt_1 < 3:
+                        # Hamamatsu PMT:
+                        # sigma = TTS / (2*np.sqrt(2*np.log(2))) -> TTS = 7 ns as edge between Hamamatsu and MCP
+                        # -> sigma = 3 ns: Hamamatsu if sigma < 3 ns, MCP if sigma > 3 ns:
+                        # For Hamamatsu PMTs use sigma_t / TTS of old PmtData_old.root file:
+                        sigma_pmt = sigma_pmt_1
+
+                        # Calculate time of flight in ns for the small TTS:
+                        time_of_flight = distance_tof / c_effective_smallTTS
+
+                    else:
+                        # MCP PMT:
+                        # do NOT use sigma_t / TTS from old PmtData_old.root file, because there the TTS is
+                        # around 12 ns.
+                        # Use TTS of 18 ns and calculate sigma_pmt:
+                        TTS_MCP = 18.0
+                        sigma_pmt = TTS_MCP / (2 * np.sqrt(2 * np.log(2)))
+
+                        # Calculate time of flight in ns for the large TTS:
+                        time_of_flight = distance_tof / c_effective_largeTTS
 
                 elif 20000 < pmtID < 40000:
                     # there are some PMTs with ID around 30000 (user_atmoNC_7.root, event=32: 30637, 30276, 30573,30561,
@@ -312,6 +335,9 @@ if not flag_read_hittime_from_file:
                 else:
                     # 3inch PMT:
                     sigma_pmt = sigma_time_3inch
+
+                    # Calculate time of flight in ns for the small TTS:
+                    time_of_flight = distance_tof / c_effective_smallTTS
 
                 # consider time resolution of PMT by generating normal distributed random number with mu = hittime and
                 # sigma = sigma_pmt (only the hittime at the PMT must be smeared, not the time-of-flight):
@@ -391,6 +417,14 @@ else:
             # prompt signal defined by start_time and end_time:
             nPE_per_bin = npe_from_file[6:(int((time_limit_prompt + binwidth + np.abs(min_time)) / binwidth)+3)]
 
+            # calculate the total number of PE of the prompt signal:
+            nPE_total = np.sum(nPE_per_bin)
+
+            # convert nPE_total to energy in MeV:
+            E_prompt = NC_background_functions.conversion_npe_to_evis(nPE_total)
+            # append E_prompt to array:
+            array_E_prompt_neutron.append(E_prompt)
+
             # set the time window corresponding to nPE_per_bin:
             time_window = np.arange(min_time, time_limit_prompt+binwidth, binwidth)
 
@@ -412,6 +446,35 @@ else:
             if TTR_neutron <= TTR_cut:
                 # event passes PSD cut:
                 number_neutron_after_PSD += 1
+                print("energy of event that pass PSD cut = {0:.2f} MeV".format(E_prompt))
+
+    """ display energy of prompt signal in histogram: """
+    h3 = plt.figure(3, figsize=(11, 6))
+    binwidth_energy = 1.0
+    Bins_energy = np.arange(0.0, 200.0, binwidth_energy)
+    N_energy, bins_energy, patches = plt.hist(array_E_prompt_neutron, bins=Bins_energy, histtype="step", align='mid',
+                                              color="r", label="entries = {0:d}".format(len(array_E_prompt_neutron)))
+    plt.xlabel("Visible energy of prompt signal in MeV")
+    plt.ylabel("events per bin (bin width = {0:.1f} MeV)")
+    plt.title("Energy spectrum of prompt signal of simulated neutron events")
+    plt.legend()
+    plt.grid()
+    plt.savefig(output_path_neutron + "E_prompt_{0:.0f}MeVto{1:.0f}MeV_R{2:.0f}mm.png"
+                .format(min(Bins_energy), max(Bins_energy), radius_cut))
+    plt.close()
+
+    h4 = plt.figure(4)
+    plt.hist2d(array_E_prompt_neutron, array_TTR_neutron, bins=100)
+    plt.hlines(TTR_cut, xmin=min(array_E_prompt_neutron), xmax=max(array_E_prompt_neutron),
+               label="TTR cut value = {0:.5f}".format(TTR_cut))
+    plt.xlabel("visible energy of prompt signal in MeV")
+    plt.ylabel("TTR value for tail window from {0:.0f} ns to {1:.0f}".format(tail_start, tail_stop))
+    plt.title("TTR vs visible energy of simulated neutron events")
+    plt.grid()
+    plt.legend()
+    plt.savefig(output_path_neutron + "TTR_vs_Evis_{0:.0f}ns_{1:.0f}ns_R{2:.0f}mm.png".format(tail_start, tail_stop,
+                                                                                              radius_cut))
+    plt.close()
 
     # all neutron events within radius_cut and Qedep_prmtrkdep between 10 and 100 MeV are analyzed:
     # calculate PSD neutron suppression:
@@ -452,7 +515,7 @@ else:
     PSD_IBD_suppression = 1.0 - float(number_IBD_after_PSD) / float(len(array_TTR_IBD))
 
     # display ttr-values for IBD, NC and fast neutron events for the given configuration:
-    h1 = plt.figure(1, figsize=(15, 8))
+    h1 = plt.figure(1, figsize=(11, 6))
     First_bin = 0.0
     Last_bin = 0.05
     Bin_width = (Last_bin-First_bin) / 200
@@ -474,12 +537,12 @@ else:
               "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start, tail_stop))
     plt.legend()
     plt.grid()
-    plt.savefig(output_path_neutron + "TTR_{0:.0f}_{1:.0f}nsto{2:.0f}ns_PosNCfastN.png"
-                .format(NC_suppression, tail_start, tail_stop))
+    plt.savefig(output_path_neutron + "TTR_{0:.0f}_{1:.0f}nsto{2:.0f}ns_PosNCfastN_R{3:.0f}mm.png"
+                .format(NC_suppression, tail_start, tail_stop, radius_cut))
     plt.close()
 
     # display tot-values for positrons, NC and fast neutron events for the given configuration with efficiencies:
-    h2 = plt.figure(2, figsize=(15, 8))
+    h2 = plt.figure(2, figsize=(11, 6))
     First_bin = 0.0
     Last_bin = 0.05
     Bin_width = (Last_bin-First_bin) / 200
@@ -513,8 +576,8 @@ else:
               "\n(tail window {0:0.1f} ns to {1:0.1f} ns)".format(tail_start, tail_stop))
     plt.legend()
     plt.grid()
-    plt.savefig(output_path_neutron + "TTR_{0:.0f}_{1:.0f}nsto{2:.0f}ns_PosNCfastN_efficiencies.png"
-                .format(NC_suppression, tail_start, tail_stop))
+    plt.savefig(output_path_neutron + "TTR_{0:.0f}_{1:.0f}nsto{2:.0f}ns_PosNCfastN_R{3:.0f}mm_efficiencies.png"
+                .format(NC_suppression, tail_start, tail_stop, radius_cut))
     plt.close()
 
 
